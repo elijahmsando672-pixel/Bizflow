@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,17 +12,50 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, Users, UserCheck, UserX } from "lucide-react";
-
-const customers = [
-  { id: 1, name: "John Doe", email: "john@example.com", phone: "+1 555-0101", totalSpent: "$4,500", orders: 12, status: "Active" },
-  { id: 2, name: "Jane Smith", email: "jane@example.com", phone: "+1 555-0102", totalSpent: "$2,890", orders: 8, status: "Active" },
-  { id: 3, name: "Bob Wilson", email: "bob@example.com", phone: "+1 555-0103", totalSpent: "$1,200", orders: 3, status: "Inactive" },
-  { id: 4, name: "Alice Brown", email: "alice@example.com", phone: "+1 555-0104", totalSpent: "$5,600", orders: 15, status: "Active" },
-  { id: 5, name: "Charlie Davis", email: "charlie@example.com", phone: "+1 555-0105", totalSpent: "$890", orders: 2, status: "Active" },
-];
+import { Plus, Search, Users, UserCheck, UserX, Loader2 } from "lucide-react";
+import api from "@/lib/api";
+import { useToast } from "@/components/ui/toast";
 
 export default function CustomersPage() {
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const toast = useToast();
+
+  useEffect(() => {
+    loadCustomers();
+  }, []);
+
+  const loadCustomers = async () => {
+    try {
+      setLoading(true);
+      const data = await api.customers.getAll();
+      setCustomers(data);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to load customers");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure?")) return;
+    try {
+      await api.customers.delete(id);
+      toast.success("Customer deleted");
+      loadCustomers();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete customer");
+    }
+  };
+
+  const filteredCustomers = customers.filter((c) =>
+    c.name?.toLowerCase().includes(search.toLowerCase()) ||
+    c.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const activeCustomers = customers.filter((c) => c.status === "active");
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -38,7 +72,12 @@ export default function CustomersPage() {
       <div className="flex gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input placeholder="Search customers..." className="pl-10" />
+          <Input
+            placeholder="Search customers..."
+            className="pl-10"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
       </div>
 
@@ -46,7 +85,7 @@ export default function CustomersPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total Customers</CardDescription>
-            <CardTitle className="text-3xl">248</CardTitle>
+            <CardTitle className="text-3xl">{customers.length}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -58,7 +97,7 @@ export default function CustomersPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Active Customers</CardDescription>
-            <CardTitle className="text-3xl text-green-600">186</CardTitle>
+            <CardTitle className="text-3xl text-green-600">{activeCustomers.length}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2 text-sm text-green-600">
@@ -70,7 +109,9 @@ export default function CustomersPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Inactive</CardDescription>
-            <CardTitle className="text-3xl text-gray-600">62</CardTitle>
+            <CardTitle className="text-3xl text-gray-600">
+              {customers.length - activeCustomers.length}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -87,44 +128,59 @@ export default function CustomersPage() {
           <CardDescription>View and manage your customer database</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Customer</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Total Spent</TableHead>
-                <TableHead>Orders</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {customers.map((customer) => (
-                <TableRow key={customer.id}>
-                  <TableCell className="font-medium">{customer.name}</TableCell>
-                  <TableCell className="text-gray-500">{customer.email}</TableCell>
-                  <TableCell>{customer.phone}</TableCell>
-                  <TableCell>{customer.totalSpent}</TableCell>
-                  <TableCell>{customer.orders}</TableCell>
-                  <TableCell>
-                    <span
-                      className={`rounded-full px-2 py-1 text-xs font-medium ${
-                        customer.status === "Active"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-700"
-                      }`}
-                    >
-                      {customer.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm">View</Button>
-                  </TableCell>
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Total Spent</TableHead>
+                  <TableHead>Orders</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredCustomers.map((customer) => (
+                  <TableRow key={customer.id}>
+                    <TableCell className="font-medium">{customer.name}</TableCell>
+                    <TableCell className="text-gray-500">{customer.email}</TableCell>
+                    <TableCell>{customer.phone}</TableCell>
+                    <TableCell>${customer.total_spent || 0}</TableCell>
+                    <TableCell>{customer.order_count || 0}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs font-medium ${
+                          customer.status === "active"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        {customer.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm">
+                        View
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredCustomers.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                      No customers found
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
