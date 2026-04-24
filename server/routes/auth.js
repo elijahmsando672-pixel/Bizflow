@@ -1,8 +1,9 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { query, initDatabase } from '../config/db.js';
+import { query } from '../config/db.js';
 import { sendWelcomeEmail } from '../utils/email.js';
+import { authenticate } from '../middleware/auth.js';
 import Joi from 'joi';
 
 const router = express.Router();
@@ -121,24 +122,6 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
-// Middleware to verify token and add business_id to request
-export const authenticate = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'No token provided' });
-  }
-
-  try {
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    req.business_id = decoded.business_id;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-};
 
 // Get current user info
 router.get('/me', authenticate, async (req, res) => {

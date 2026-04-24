@@ -56,12 +56,12 @@ router.post('/', authenticate, async (req, res) => {
 
     const { customer_id, sale_date, due_date, items, notes, discount_amount = 0 } = req.body;
 
-    // Generate invoice number
+    // Generate sale number
     const invResult = await client.query(
       "SELECT COUNT(*) as count FROM sales WHERE business_id = $1",
       [req.business_id]
     );
-    const invoiceNumber = `INV-${String(parseInt(invResult.rows[0].count) + 1).padStart(5, '0')}`;
+    const saleNumber = `SAL-${String(parseInt(invResult.rows[0].count) + 1).padStart(5, '0')}`;
 
     // Calculate totals
     let subtotal = 0;
@@ -74,7 +74,7 @@ router.post('/', authenticate, async (req, res) => {
     const saleResult = await client.query(
       `INSERT INTO sales (business_id, customer_id, invoice_number, sale_date, due_date, subtotal, discount_amount, total, notes, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-      [req.business_id, customer_id, invoiceNumber, sale_date || new Date(), due_date, subtotal, discount_amount, total, notes, req.user.id]
+      [req.business_id, customer_id, saleNumber, sale_date || new Date(), due_date, subtotal, discount_amount, total, notes, req.user.id]
     );
     const sale = saleResult.rows[0];
 
@@ -113,7 +113,7 @@ router.post('/', authenticate, async (req, res) => {
       await client.query(
         `INSERT INTO cashflow_entries (business_id, entry_type, amount, date, description, source_type, source_id)
          VALUES ($1, 'inflow', $2, $3, $4, 'sale', $5)`,
-        [req.business_id, total, sale_date || new Date(), `Invoice ${invoiceNumber}`, sale.id]
+        [req.business_id, total, sale_date || new Date(), `Sale ${saleNumber}`, sale.id]
       );
     }
 
@@ -154,6 +154,10 @@ router.delete('/:id', authenticate, async (req, res) => {
   try {
     await client.query('BEGIN');
 
+    // Get sale to find cashflow entries
+    const saleResult = await client.query('SELECT id FROM sales WHERE id = $1 AND business_id = $2', [req.params.id, req.business_id]);
+    if (saleResult.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+
     // Get items to restore stock
     const items = await client.query('SELECT product_id, qty FROM sale_items WHERE sale_id = $1 AND business_id = $2', [req.params.id, req.business_id]);
 
@@ -165,6 +169,9 @@ router.delete('/:id', authenticate, async (req, res) => {
         );
       }
     }
+
+    // Delete associated cashflow entries
+    await client.query('DELETE FROM cashflow_entries WHERE source_id = $1 AND source_type = $2', [req.params.id, 'sale']);
 
     await client.query('DELETE FROM sale_items WHERE sale_id = $1 AND business_id = $2', [req.params.id, req.business_id]);
     await client.query('DELETE FROM sales WHERE id = $1 AND business_id = $2', [req.params.id, req.business_id]);

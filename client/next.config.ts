@@ -5,6 +5,14 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
   output: 'standalone',
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
+  },
 };
 
 export default nextConfig;

@@ -59,7 +59,14 @@ export function Sidebar() {
 
   return (
     <div className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
-      <div className="flex h-16 items-center border-b border-gray-200 px-6">
+      <div className="flex h-16 items-center gap-2 border-b border-gray-200 px-6">
+        <img
+          src="/logo.svg"
+          alt="BizFlow"
+          width={36}
+          height={36}
+          className="h-9 w-9 rounded-md"
+        />
         <h1 className="text-xl font-bold text-blue-600">BizFlow</h1>
       </div>
       <div className="flex-1 overflow-y-auto py-4">
