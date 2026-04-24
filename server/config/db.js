@@ -25,6 +25,9 @@ export const query = async (text, params) => {
 
 export const initDatabase = async () => {
   const schema = `
+    -- Enable UUID extension
+    CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+    
     -- ========================================
     -- Core Tables (must be first due to FK)
     -- ========================================

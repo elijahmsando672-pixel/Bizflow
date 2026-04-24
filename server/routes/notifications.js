@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../config/db.js';
-import { authenticate } from './auth.js';
+import { authenticate } from '../middleware/auth.js';
 import { sendPaymentReminderEmail, sendLowStockAlert } from '../utils/email.js';
 
 const router = express.Router();

@@ -214,10 +214,10 @@ export const sendLowStockAlert = async (to, products) => {
           </div>
           <div class="content">
             <p>The following items are running low:</p>
-            <table>
-              <tr><th>Product</th><th>Current Stock</th><th>Reorder Level</th></tr>
-              ${products.map(p => `<tr><td>${p.name}</td><td>${p.quantity}</td><td>${p.low_stock_threshold}</td></tr>`).join('')}
-            </table>
+             <table>
+               <tr><th>Product</th><th>Current Stock</th><th>Reorder Level</th></tr>
+               ${products.map(p => `<tr><td>${p.name}</td><td>${p.stock_qty}</td><td>${p.reorder_level}</td></tr>`).join('')}
+             </table>
           </div>
         </div>
       </body>
