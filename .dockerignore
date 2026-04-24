@@ -1,0 +1,50 @@
+# Docker ignore for root context (used by backend service)
+# Exclude frontend build files and dependencies from backend image builds
+
+# Frontend client code (backend doesn't need it)
+client/
+
+# Dependency directories (already excluded by patterns below but explicit)
+**/node_modules/
+node_modules/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files (secrets)
+.env
+.env.*
+!.env.example
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Tests coverage
+coverage/
+.nyc_output
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Misc
+.cache/
+temp/
+tmp/

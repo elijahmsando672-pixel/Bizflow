@@ -1,0 +1,27 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Logs
+logs
+*.log
+
+# Misc
+.DS_Store
+*.pem
+
+# env files
+.env
+.env.local
+.env.*.local
+
+# Git
+.git
+.gitignore
+
+# Tests
+tests
+coverage
+
+# README
+README.md
