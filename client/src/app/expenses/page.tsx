@@ -21,14 +21,6 @@ const expenses = [
   { id: 5, description: "Software Subscription", category: "Software", amount: "$299", date: "2024-01-01", status: "Approved" },
 ];
 
-const categories = [
-  { name: "Supplies", count: 12, total: "$1,450" },
-  { name: "Utilities", count: 8, total: "$890" },
-  { name: "Marketing", count: 5, total: "$2,500" },
-  { name: "Rent", count: 1, total: "$2,000" },
-  { name: "Software", count: 3, total: "$899" },
-];
-
 export default function ExpensesPage() {
   return (
     <div className="space-y-6">

@@ -14,7 +14,6 @@ import {
   FileText,
   Bell,
   Settings,
-  ChevronDown,
 } from "lucide-react";
 
 const navigation = [
