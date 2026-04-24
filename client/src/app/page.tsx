@@ -52,16 +52,6 @@ const recentTransactions = [
   { id: 5, customer: "Charlie Davis", amount: "$620", status: "Paid", date: "2024-01-13" },
 ];
 
-const salesData = [
-  { name: "Mon", sales: 4000, expenses: 2400 },
-  { name: "Tue", sales: 3000, expenses: 1398 },
-  { name: "Wed", sales: 2000, expenses: 9800 },
-  { name: "Thu", sales: 2780, expenses: 3908 },
-  { name: "Fri", sales: 1890, expenses: 4800 },
-  { name: "Sat", sales: 2390, expenses: 3800 },
-  { name: "Sun", sales: 3490, expenses: 4300 },
-];
-
 function DashboardCards() {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
