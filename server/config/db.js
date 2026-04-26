@@ -298,6 +298,27 @@ export const initDatabase = async () => {
     );
 
     -- ========================================
+    -- Password Reset
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS password_resets (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      email VARCHAR(255) NOT NULL,
+      token VARCHAR(255) NOT NULL,
+      expires_at TIMESTAMP NOT NULL,
+      used BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS refresh_tokens (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      token VARCHAR(255) NOT NULL UNIQUE,
+      expires_at TIMESTAMP NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ========================================
     -- INDEXES
     -- ========================================
 

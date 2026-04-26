@@ -234,3 +234,52 @@ export const sendLowStockAlert = async (to, products) => {
     return false;
   }
 };
+
+export const sendPasswordResetEmail = async (to, resetToken) => {
+  const resetUrl = `${process.env.APP_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+  const mailOptions = {
+    from: `"BizFlow" <${process.env.SMTP_USER || 'noreply@bizflow.co.ke'}>`,
+    to,
+    subject: 'Reset Your BizFlow Password',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #1e293b; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #4f46e5; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; }
+          .btn { display: inline-block; background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+          .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin:0;">Reset Password</h1>
+          </div>
+          <div class="content">
+            <p>You requested to reset your BizFlow password.</p>
+            <p>Click the button below to create a new password. This link will expire in 1 hour.</p>
+            <center><a href="${resetUrl}" class="btn">Reset Password</a></center>
+            <p style="margin-top:20px;">If you didn't request this, please ignore this email.</p>
+          </div>
+          <div class="footer">
+            <p>&copy; 2026 BizFlow. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  };
+  
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Password reset email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('Failed to send password reset email:', error);
+    return false;
+  }
+};

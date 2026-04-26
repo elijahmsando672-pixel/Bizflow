@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,17 +13,50 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [message, setMessage] = useState("");
   const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setMessage("");
     setIsLoading(true);
 
     try {
       await login(email, password);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/forgot-password`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        }
+      );
+
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error || "Failed to send reset email");
+      } else {
+        setMessage(data.message);
+        setIsForgotPassword(false);
+      }
+    } catch {
+      setError("Something went wrong");
     } finally {
       setIsLoading(false);
     }
@@ -38,13 +72,20 @@ export default function LoginPage() {
             </div>
           </div>
           <CardTitle className="text-2xl">BizFlow</CardTitle>
-          <CardDescription>Sign in to your account</CardDescription>
+          <CardDescription>
+            {isForgotPassword ? "Enter your email to reset password" : "Sign in to your account"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={isForgotPassword ? handleForgotPassword : handleSubmit} className="space-y-4">
             {error && (
               <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
                 {error}
+              </div>
+            )}
+            {message && (
+              <div className="rounded-md bg-green-50 p-3 text-sm text-green-600">
+                {message}
               </div>
             )}
             <div className="space-y-2">
@@ -60,22 +101,47 @@ export default function LoginPage() {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                Password
-              </label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
+            {!isForgotPassword && (
+              <div className="space-y-2">
+                <label htmlFor="password" className="text-sm font-medium">
+                  Password
+                </label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign In"}
+              {isLoading 
+                ? (isForgotPassword ? "Sending..." : "Signing in...") 
+                : (isForgotPassword ? "Send Reset Link" : "Sign In")}
             </Button>
+            {!isForgotPassword ? (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setIsForgotPassword(true)}
+                  className="text-sm text-blue-600 hover:underline"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            ) : (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setIsForgotPassword(false)}
+                  className="text-sm text-blue-600 hover:underline"
+                >
+                  Back to Login
+                </button>
+              </div>
+            )}
           </form>
         </CardContent>
       </Card>
