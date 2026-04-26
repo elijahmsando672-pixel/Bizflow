@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, ReactNode, useState } from "react";
-import { useRouter } from "next/navigation";
-import { MainLayout } from "@/components/layout/MainLayout";
-import { ToastProvider } from "@/components/ui/toast";
+import { useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { Loader2 } from "lucide-react";
 
-function LoginCheck({ children }: { children: ReactNode }) {
+export function LoginContent({ children }: { children: React.ReactNode }) {
   const { isLoading, user, token } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -18,12 +18,19 @@ function LoginCheck({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!mounted || isLoading) return;
-    if (!token || !user) {
-      router.push("/login");
-    }
-  }, [mounted, isLoading, token, user, router]);
 
-  if (!mounted || isLoading) {
+    const isLoginPage = pathname === "/login";
+
+    if (!token || !user) {
+      if (!isLoginPage) {
+        router.push("/login");
+      }
+    } else if (isLoginPage) {
+      router.push("/");
+    }
+  }, [mounted, isLoading, token, user, pathname, router]);
+
+  if (isLoading || !mounted) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
@@ -32,16 +39,8 @@ function LoginCheck({ children }: { children: ReactNode }) {
   }
 
   if (!token || !user) {
-    return <>{children}</>;
+    return children;
   }
 
   return <MainLayout>{children}</MainLayout>;
-}
-
-export function Providers({ children }: { children: ReactNode }) {
-  return (
-    <ToastProvider>
-      <LoginCheck>{children}</LoginCheck>
-    </ToastProvider>
-  );
 }
