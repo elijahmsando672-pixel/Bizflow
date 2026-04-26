@@ -46,6 +46,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
+  useEffect(() => {
+    if (!isLoading && !token && router) {
+      if (window.location.pathname !== "/login") {
+        router.push("/login");
+      }
+    }
+  }, [isLoading, token, router]);
+
   const login = async (email: string, password: string) => {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/login`,
