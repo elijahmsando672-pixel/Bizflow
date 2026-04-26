@@ -1,47 +1,17 @@
 "use client";
 
 import { useEffect, ReactNode, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { ToastProvider } from "@/components/ui/toast";
-import { useAuth } from "@/lib/auth-context";
-import { Loader2 } from "lucide-react";
 
-function LoginCheck({ children }: { children: ReactNode }) {
-  const { isLoading, user, token } = useAuth();
-  const router = useRouter();
-  const [mounted, setMounted] = useState(false);
+export function Providers({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  
+  const isLoginPage = pathname === "/login";
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted || isLoading) return;
-    if (!token || !user) {
-      router.push("/login");
-    }
-  }, [mounted, isLoading, token, user, router]);
-
-  if (!mounted || isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-      </div>
-    );
-  }
-
-  if (!token || !user) {
+  if (isLoginPage) {
     return <>{children}</>;
   }
 
   return <MainLayout>{children}</MainLayout>;
-}
-
-export function Providers({ children }: { children: ReactNode }) {
-  return (
-    <ToastProvider>
-      <LoginCheck>{children}</LoginCheck>
-    </ToastProvider>
-  );
 }
