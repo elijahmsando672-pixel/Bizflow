@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head><title>Test</title></head>
+<body>
+<script>
+fetch('http://localhost:5000/api/dashboard', {
+  headers: { 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjYxZGYzZWE1LTAyMDQtNDZiOS1hN2Q4LTg1YzQ2ZmFjMzg0MCIsImVtYWlsIjoiZWxpamFobXNhbmRvQGdtYWlsLmNvbSIsImJ1c2luZXNzX2lkIjoiN2M1YjE0NmItMTlkNS00YjM3LWI2MjItOGM1NjVjYWY4YmE1Iiwicm9sZSI6Im93bmVyIiwiaWF0IjoxNzc3MTk3OTIxLCJleHAiOjE3Nzc4MDI3MjF9.go3aN4N1IpB-zZ8RH_kKsbATx4JFz-f54K9VfQKpd1c' }
+})
+.then(r => r.text()).then(console.log).catch(console.error);
+</script>
+</body>
+</html>

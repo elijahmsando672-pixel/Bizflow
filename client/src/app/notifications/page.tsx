@@ -9,7 +9,7 @@ import api from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [data, setData] = useState<{ overdueSales: any[]; lowStockProducts: any[]; systemNotifications: any[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
 
@@ -18,8 +18,8 @@ export default function NotificationsPage() {
   const loadNotifications = async () => {
     try {
       setLoading(true);
-      const data = await api.notifications.getAll();
-      setNotifications(data);
+      const response = await api.notifications.getAll();
+      setData(response);
     } catch (err: any) {
       toast.error(err?.message || "Failed to load notifications");
     } finally {
@@ -37,8 +37,9 @@ export default function NotificationsPage() {
     }
   };
 
-  const unread = notifications.filter((n) => !n.read).length;
-  const warnings = notifications.filter((n) => n.type === "warning").length;
+  const notifications = data?.systemNotifications || [];
+  const unread = notifications.filter((n) => !n.read_at).length;
+  const warnings = (data?.overdueSales?.length || 0) + (data?.lowStockProducts?.length || 0);
 
   return (
     <div className="space-y-6">
@@ -60,7 +61,7 @@ export default function NotificationsPage() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2 text-sm text-gray-500">
-              <Bell className="h-4 w-4" /> Unread: {unread}
+              <Bell className="h-4 w-4" /> Pending: {(data?.overdueSales?.length || 0)}
             </div>
           </CardContent>
         </Card>
@@ -77,8 +78,8 @@ export default function NotificationsPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Today</CardDescription>
-            <CardTitle className="text-3xl">0</CardTitle>
+            <CardDescription>Low Stock</CardDescription>
+            <CardTitle className="text-3xl">{data?.lowStockProducts?.length || 0}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2 text-sm text-gray-500">

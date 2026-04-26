@@ -40,9 +40,11 @@ export const initDatabase = async () => {
       registration_number VARCHAR(100),
       tax_id VARCHAR(100),
       logo_url TEXT,
+      status VARCHAR(20) DEFAULT 'pending',
       timezone VARCHAR(50) DEFAULT 'Africa/Nairobi',
       currency VARCHAR(10) DEFAULT 'KES',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS users (
