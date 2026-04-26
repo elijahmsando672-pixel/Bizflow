@@ -35,6 +35,11 @@ async function fetchApi(endpoint: string, options: FetchOptions = {}) {
 }
 
 const api = {
+  auth: {
+    login: (email: string, password: string) => fetchApi('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    register: (data: any) => fetchApi('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+    me: () => fetchApi('/auth/me'),
+  },
   sales: {
     getAll: (status?: string) => fetchApi(`/sales${status ? `?status=${status}` : ''}`),
     getById: (id: string) => fetchApi(`/sales/${id}`),

@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -12,47 +15,70 @@ import {
   AlertTriangle,
   ShoppingCart,
 } from "lucide-react";
+import api from "@/lib/api";
 
-const stats = [
-  {
-    title: "Today's Sales",
-    value: "$12,450",
-    change: "+12.5%",
-    trend: "up",
-    icon: DollarSign,
-  },
-  {
-    title: "Expenses",
-    value: "$4,320",
-    change: "+8.2%",
-    trend: "up",
-    icon: TrendingUp,
-  },
-  {
-    title: "Profit",
-    value: "$8,130",
-    change: "+15.3%",
-    trend: "up",
-    icon: TrendingDown,
-  },
-  {
-    title: "Low Stock Alerts",
-    value: "5",
-    change: "Items",
-    trend: "down",
-    icon: AlertTriangle,
-  },
-];
+interface DashboardData {
+  stats: {
+    totalCustomers: number;
+    totalRevenue: number;
+    pendingPayments: number;
+    totalExpenses: number;
+    activeInvoices: number;
+    lowStockProducts: number;
+    totalInflow: number;
+    totalOutflow: number;
+  };
+  recentSales: any[];
+  recentExpenses: any[];
+}
 
-const recentTransactions = [
-  { id: 1, customer: "John Doe", amount: "$450", status: "Paid", date: "2024-01-15" },
-  { id: 2, customer: "Jane Smith", amount: "$320", status: "Pending", date: "2024-01-15" },
-  { id: 3, customer: "Bob Wilson", amount: "$890", status: "Paid", date: "2024-01-14" },
-  { id: 4, customer: "Alice Brown", amount: "$150", status: "Overdue", date: "2024-01-14" },
-  { id: 5, customer: "Charlie Davis", amount: "$620", status: "Paid", date: "2024-01-13" },
-];
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(amount);
+}
 
-function DashboardCards() {
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function DashboardCards({ data }: { data: DashboardData }) {
+  const stats = [
+    {
+      title: "Total Revenue",
+      value: formatCurrency(data.stats.totalRevenue),
+      change: "+12.5%",
+      trend: "up",
+      icon: DollarSign,
+    },
+    {
+      title: "Expenses",
+      value: formatCurrency(data.stats.totalExpenses),
+      change: "+8.2%",
+      trend: "up",
+      icon: TrendingUp,
+    },
+    {
+      title: "Profit",
+      value: formatCurrency(data.stats.totalRevenue - data.stats.totalExpenses),
+      change: "+15.3%",
+      trend: "up",
+      icon: TrendingDown,
+    },
+    {
+      title: "Low Stock Alerts",
+      value: data.stats.lowStockProducts,
+      change: "Items",
+      trend: "down",
+      icon: AlertTriangle,
+    },
+  ];
+
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat) => {
@@ -85,7 +111,7 @@ function DashboardCards() {
   );
 }
 
-function RecentTransactions() {
+function RecentTransactions({ data }: { data: DashboardData }) {
   return (
     <Card className="col-span-2">
       <CardHeader>
@@ -94,36 +120,93 @@ function RecentTransactions() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {recentTransactions.map((tx) => (
-            <div
-              key={tx.id}
-              className="flex items-center justify-between border-b border-gray-100 pb-4 last:border-0"
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
-                  <ShoppingCart className="h-5 w-5 text-blue-600" />
+          {data.recentSales.length === 0 ? (
+            <p className="text-sm text-gray-500">No recent transactions</p>
+          ) : (
+            data.recentSales.slice(0, 5).map((tx: any) => (
+              <div
+                key={tx.id}
+                className="flex items-center justify-between border-b border-gray-100 pb-4 last:border-0"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
+                    <ShoppingCart className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      {tx.customer_name || "Walk-in Customer"}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {formatDate(tx.sale_date)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-gray-900">{tx.customer}</p>
-                  <p className="text-sm text-gray-500">{tx.date}</p>
+                <div className="flex items-center gap-4">
+                  <span
+                    className={`rounded-full px-2 py-1 text-xs font-medium ${
+                      tx.status === "paid"
+                        ? "bg-green-100 text-green-700"
+                        : tx.status === "draft"
+                        ? "bg-yellow-100 text-yellow-700"
+                        : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    {tx.status}
+                  </span>
+                  <span className="font-medium text-gray-900">
+                    {formatCurrency(tx.total)}
+                  </span>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                <span
-                  className={`rounded-full px-2 py-1 text-xs font-medium ${
-                    tx.status === "Paid"
-                      ? "bg-green-100 text-green-700"
-                      : tx.status === "Pending"
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-red-100 text-red-700"
-                  }`}
-                >
-                  {tx.status}
-                </span>
-                <span className="font-medium text-gray-900">{tx.amount}</span>
-              </div>
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatsOverview({ data }: { data: DashboardData }) {
+  return (
+    <Card className="col-span-2">
+      <CardHeader>
+        <CardTitle>Overview</CardTitle>
+        <CardDescription>Business summary</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div>
+              <p className="text-sm text-gray-500">Total Customers</p>
+              <p className="text-2xl font-bold">{data.stats.totalCustomers}</p>
             </div>
-          ))}
+            <DollarSign className="h-8 w-8 text-gray-400" />
+          </div>
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div>
+              <p className="text-sm text-gray-500">Active Invoices</p>
+              <p className="text-2xl font-bold">{data.stats.activeInvoices}</p>
+            </div>
+            <AlertTriangle className="h-8 w-8 text-gray-400" />
+          </div>
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div>
+              <p className="text-sm text-gray-500">Total Inflow</p>
+              <p className="text-2xl font-bold text-green-600">
+                {formatCurrency(data.stats.totalInflow)}
+              </p>
+            </div>
+            <TrendingUp className="h-8 w-8 text-green-600" />
+          </div>
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div>
+              <p className="text-sm text-gray-500">Total Outflow</p>
+              <p className="text-2xl font-bold text-red-600">
+                {formatCurrency(data.stats.totalOutflow)}
+              </p>
+            </div>
+            <TrendingDown className="h-8 w-8 text-red-600" />
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -131,14 +214,61 @@ function RecentTransactions() {
 }
 
 export default function Home() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchDashboard() {
+      try {
+        const result = await api.dashboard.getStats();
+        setData(result);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load dashboard");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchDashboard();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900">Dashboard</h2>
+          <p className="text-gray-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900">Dashboard</h2>
+          <p className="text-red-500">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return null;
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-gray-900">Dashboard</h2>
-        <p className="text-gray-500">Welcome back! Heres an overview of your business.</p>
+        <p className="text-gray-500">Welcome back! Here&apos;s an overview of your business.</p>
       </div>
-      <DashboardCards />
-      <RecentTransactions />
+      <DashboardCards data={data} />
+      <div className="grid gap-4 md:grid-cols-2">
+        <RecentTransactions data={data} />
+        <StatsOverview data={data} />
+      </div>
     </div>
   );
 }
