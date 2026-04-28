@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 interface User {
@@ -44,15 +44,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  const refreshAccessToken = async () => {
-    if (!refreshToken) return false;
+  const refreshAccessToken = useCallback(async () => {
+    const currentRefreshToken = localStorage.getItem("refreshToken");
+    if (!currentRefreshToken) return false;
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/refresh-token`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refreshToken }),
+          body: JSON.stringify({ refreshToken: currentRefreshToken }),
         }
       );
       if (!response.ok) return false;
@@ -65,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       return false;
     }
-  };
+  }, []);
 
   useEffect(() => {
     const savedToken = localStorage.getItem("token");
@@ -87,14 +88,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const decoded = decodeJWT(token);
       if (decoded) {
         const expiresIn = decoded.exp * 1000 - Date.now();
-        if (expiresIn < 0) {
-          refreshAccessToken();
-        } else if (expiresIn < 5 * 60 * 1000) {
+        if (expiresIn < 0 || expiresIn < 5 * 60 * 1000) {
           refreshAccessToken();
         }
       }
     }
-  }, [isLoading, token]);
+  }, [isLoading, token, refreshAccessToken]);
 
   useEffect(() => {
     if (!isLoading && !token && router) {

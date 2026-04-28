@@ -22,10 +22,6 @@ export default function ProductsPage() {
   const [search, setSearch] = useState("");
   const toast = useToast();
 
-  useEffect(() => {
-    loadProducts();
-  }, []);
-
   const loadProducts = async () => {
     try {
       setLoading(true);
@@ -37,6 +33,10 @@ export default function ProductsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure?")) return;

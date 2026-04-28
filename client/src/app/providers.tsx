@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, ReactNode, useState } from "react";
+import { type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { ToastProvider } from "@/components/ui/toast";

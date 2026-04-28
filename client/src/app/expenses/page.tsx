@@ -22,10 +22,6 @@ export default function ExpensesPage() {
   const [search, setSearch] = useState("");
   const toast = useToast();
 
-  useEffect(() => {
-    loadExpenses();
-  }, []);
-
   const loadExpenses = async () => {
     try {
       setLoading(true);
@@ -37,6 +33,10 @@ export default function ExpensesPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadExpenses();
+  }, []);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure?")) return;

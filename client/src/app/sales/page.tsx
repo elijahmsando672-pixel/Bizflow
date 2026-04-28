@@ -23,10 +23,6 @@ export default function SalesPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const toast = useToast();
 
-  useEffect(() => {
-    loadSales();
-  }, []);
-
   const loadSales = async () => {
     try {
       setLoading(true);
@@ -38,6 +34,10 @@ export default function SalesPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadSales();
+  }, []);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure?")) return;

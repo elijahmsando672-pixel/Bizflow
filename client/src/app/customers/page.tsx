@@ -22,10 +22,6 @@ export default function CustomersPage() {
   const [search, setSearch] = useState("");
   const toast = useToast();
 
-  useEffect(() => {
-    loadCustomers();
-  }, []);
-
   const loadCustomers = async () => {
     try {
       setLoading(true);
@@ -37,6 +33,10 @@ export default function CustomersPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadCustomers();
+  }, []);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure?")) return;

@@ -22,10 +22,6 @@ export default function CreditorsPage() {
   const [search, setSearch] = useState("");
   const toast = useToast();
 
-  useEffect(() => {
-    loadCreditors();
-  }, []);
-
   const loadCreditors = async () => {
     try {
       setLoading(true);
@@ -37,6 +33,10 @@ export default function CreditorsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadCreditors();
+  }, []);
 
   const filteredCreditors = creditors.filter((c) =>
     c.name?.toLowerCase().includes(search.toLowerCase())

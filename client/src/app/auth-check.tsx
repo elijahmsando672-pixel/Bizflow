@@ -1,23 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Loader2 } from "lucide-react";
 
+const emptySubscribe = () => () => {};
+const emptyGetSnapshot = () => true;
+const emptyServerSnapshot = () => true;
+
 export function LoginContent({ children }: { children: React.ReactNode }) {
   const { isLoading, user, token } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(emptySubscribe, emptyGetSnapshot, emptyServerSnapshot);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted || isLoading) return;
+    if (isLoading) return;
 
     const isLoginPage = pathname === "/login";
 
@@ -28,7 +28,7 @@ export function LoginContent({ children }: { children: React.ReactNode }) {
     } else if (isLoginPage) {
       router.push("/");
     }
-  }, [mounted, isLoading, token, user, pathname, router]);
+  }, [isLoading, token, user, pathname, router]);
 
   if (isLoading || !mounted) {
     return (

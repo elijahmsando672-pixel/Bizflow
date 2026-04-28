@@ -4,36 +4,35 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bell, Check, Clock, AlertTriangle, Info, CheckCircle, Loader2 } from "lucide-react";
-import { ReactNode } from "react";
 import api from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 
 export default function NotificationsPage() {
-  const [data, setData] = useState<{ overdueSales: any[]; lowStockProducts: any[]; systemNotifications: any[] } | null>(null);
+  const [data, setData] = useState<{ overdueSales: unknown[]; lowStockProducts: unknown[]; systemNotifications: unknown[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
-
-  useEffect(() => { loadNotifications(); }, []);
 
   const loadNotifications = async () => {
     try {
       setLoading(true);
       const response = await api.notifications.getAll();
-      setData(response);
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load notifications");
+      setData(response as { overdueSales: unknown[]; lowStockProducts: unknown[]; systemNotifications: unknown[] });
+    } catch (err: unknown) {
+      toast.error((err as Error)?.message || "Failed to load notifications");
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => { loadNotifications(); }, []);
 
   const markAllRead = async () => {
     try {
       await api.notifications.markAllRead();
       toast.success("All notifications marked as read");
       loadNotifications();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to mark as read");
+    } catch (err: unknown) {
+      toast.error((err as Error)?.message || "Failed to mark as read");
     }
   };
 
@@ -105,7 +104,7 @@ export default function NotificationsPage() {
                 <p className="text-center py-8 text-gray-500">No notifications</p>
               )}
               {notifications.map((notification) => {
-                const icons: Record<string, ReactNode> = { warning: <AlertTriangle className="h-5 w-5 text-yellow-600" />, success: <CheckCircle className="h-5 w-5 text-green-600" />, info: <Info className="h-5 w-5 text-blue-600" /> };
+                const icons: Record<string, React.ReactNode> = { warning: <AlertTriangle className="h-5 w-5 text-yellow-600" />, success: <CheckCircle className="h-5 w-5 text-green-600" />, info: <Info className="h-5 w-5 text-blue-600" /> };
                 const bgColors: Record<string, string> = { warning: "bg-yellow-50", success: "bg-green-50", info: "bg-blue-50" };
                 const type = notification.type || "info";
                 return (
