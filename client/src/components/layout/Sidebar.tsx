@@ -14,6 +14,11 @@ import {
   FileText,
   Bell,
   Settings,
+  UserPlus,
+  HardHat,
+  BadgeDollarSign,
+  Brain,
+  UserCheck,
 } from "lucide-react";
 
 const navigation = [
@@ -23,6 +28,7 @@ const navigation = [
       { name: "Sales", href: "/sales", icon: ShoppingCart },
       { name: "Expenses", href: "/expenses", icon: DollarSign },
       { name: "Creditors", href: "/creditors", icon: CreditCard },
+      { name: "Debtors", href: "/debtors", icon: BadgeDollarSign },
     ],
   },
   {
@@ -35,6 +41,8 @@ const navigation = [
     title: "People",
     items: [
       { name: "Customers", href: "/customers", icon: Users },
+      { name: "Team", href: "/team", icon: UserPlus },
+      { name: "Employees", href: "/employees", icon: HardHat },
     ],
   },
   {
@@ -42,6 +50,7 @@ const navigation = [
     items: [
       { name: "Reports", href: "/reports", icon: BarChart3 },
       { name: "Dashboard", href: "/", icon: LayoutDashboard },
+      { name: "AI Insights", href: "/ai", icon: Brain },
     ],
   },
   {
@@ -49,6 +58,7 @@ const navigation = [
     items: [
       { name: "Documents", href: "/documents", icon: FileText },
       { name: "Notifications", href: "/notifications", icon: Bell },
+      { name: "Subscription", href: "/subscription", icon: UserCheck },
       { name: "Settings", href: "/settings", icon: Settings },
     ],
   },

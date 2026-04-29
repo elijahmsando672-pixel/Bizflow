@@ -1,5 +1,6 @@
 import express from 'express';
 import { query } from '../config/db.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 

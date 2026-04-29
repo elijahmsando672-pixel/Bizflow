@@ -297,3 +297,53 @@ export const sendPasswordResetEmail = async (to, resetToken) => {
     return false;
   }
 };
+
+export const sendTeamInvitationEmail = async (to, { token, businessName, role, invitedBy }) => {
+  const acceptUrl = `${process.env.APP_URL || 'http://localhost:3000'}/accept-invite?token=${token}`;
+  const mailOptions = {
+    from: `"BizFlow" <${process.env.SMTP_USER || 'noreply@bizflow.co.ke'}>`,
+    to,
+    subject: `You've been invited to join ${escapeHtml(businessName)} on BizFlow`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #1e293b; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #4f46e5; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; }
+          .btn { display: inline-block; background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+          .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin:0;">Team Invitation</h1>
+          </div>
+          <div class="content">
+            <p>${escapeHtml(invitedBy || 'Someone')} has invited you to join <strong>${escapeHtml(businessName)}</strong> on BizFlow.</p>
+            <p>Your role will be: <strong>${escapeHtml(role)}</strong></p>
+            <p>Click the button below to accept the invitation and create your account. This link expires in 7 days.</p>
+            <center><a href="${escapeHtml(acceptUrl)}" class="btn">Accept Invitation</a></center>
+            <p style="margin-top:20px;">If you weren't expecting this invitation, please ignore this email.</p>
+          </div>
+          <div class="footer">
+            <p>&copy; 2026 BizFlow. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  };
+  
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Team invitation sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('Failed to send team invitation:', error);
+    return false;
+  }
+};

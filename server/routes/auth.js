@@ -463,6 +463,9 @@ router.post('/refresh-token', auditLogger('auth.refresh-token'), async (req, res
     // Do NOT rotate CSRF token on refresh (avoid breaking parallel requests)
     // CSRF token remains valid until logout or expiration (24h)
 
+    const userForToken = { id: oldTokenRecord.user_id, email: oldTokenRecord.email, business_id: oldTokenRecord.business_id, role: oldTokenRecord.role };
+    const accessToken = generateToken(userForToken);
+
     res.json({
       token: accessToken,
     });

@@ -1,147 +1,519 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
-
-const monthlyData = [
-  { name: "Jan", sales: 4000, expenses: 2400, profit: 1600 },
-  { name: "Feb", sales: 3000, expenses: 1398, profit: 1602 },
-  { name: "Mar", sales: 2000, expenses: 9800, profit: -7800 },
-  { name: "Apr", sales: 2780, expenses: 3908, profit: -1128 },
-  { name: "May", sales: 1890, expenses: 4800, profit: -2910 },
-  { name: "Jun", sales: 2390, expenses: 3800, profit: -1410 },
-  { name: "Jul", sales: 3490, expenses: 4300, profit: -810 },
-];
-
-const categoryData = [
-  { name: "Electronics", value: 45 },
-  { name: "Accessories", value: 25 },
-  { name: "Software", value: 15 },
-  { name: "Services", value: 10 },
-  { name: "Other", value: 5 },
-];
-
-const COLORS = ["#2563eb", "#16a34a", "#f59e0b", "#8b5cf6", "#6b7280"];
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarChart3, TrendingUp, TrendingDown, DollarSign, Package, FileDown } from "lucide-react";
+import api from "@/lib/api";
 
 export default function ReportsPage() {
+  const [pl, setPL] = useState<any>(null);
+  const [salesReport, setSalesReport] = useState<any>(null);
+  const [inventory, setInventory] = useState<any>(null);
+  const [cashflow, setCashflow] = useState<any>(null);
+  const [taxSummary, setTaxSummary] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState({ start_date: "", end_date: "" });
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 1).toISOString().split("T")[0];
+    const end = now.toISOString().split("T")[0];
+    setDateRange({ start_date: start, end_date: end });
+    loadReports(start, end);
+  }, []);
+
+  async function loadReports(start: string, end: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = `?start_date=${start}&end_date=${end}`;
+      const [plRes, salesRes, invRes, cfRes, taxRes] = await Promise.all([
+        api.reports.getProfitLoss(params),
+        api.reports.getSalesReport(params),
+        api.reports.getInventoryReport(),
+        api.reports.getCashflowReport(params),
+        api.reports.getTaxSummary(new Date().getFullYear().toString()),
+      ]);
+      setPL(plRes);
+      setSalesReport(salesRes);
+      setInventory(invRes);
+      setCashflow(cfRes);
+      setTaxSummary(taxRes);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleRefresh() {
+    loadReports(dateRange.start_date, dateRange.end_date);
+  }
+
+  if (loading) return <div className="p-8">Loading reports...</div>;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">Reports</h2>
-          <p className="text-gray-500">Analytics and insights for your business</p>
+          <h2 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+            <BarChart3 className="h-8 w-8 text-blue-600" />
+            Advanced Reports
+          </h2>
+          <p className="text-gray-500">Comprehensive business analytics and reports</p>
         </div>
-        <Select defaultValue="30">
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Select period" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7">Last 7 days</SelectItem>
-            <SelectItem value="30">Last 30 days</SelectItem>
-            <SelectItem value="90">Last 90 days</SelectItem>
-            <SelectItem value="365">Last year</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2">
+          <Input
+            type="date"
+            value={dateRange.start_date}
+            onChange={(e) => setDateRange({ ...dateRange, start_date: e.target.value })}
+            className="w-40"
+          />
+          <Input
+            type="date"
+            value={dateRange.end_date}
+            onChange={(e) => setDateRange({ ...dateRange, end_date: e.target.value })}
+            className="w-40"
+          />
+          <Button onClick={handleRefresh}>
+            <FileDown className="mr-2 h-4 w-4" /> Generate
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="col-span-2">
-          <CardHeader>
-            <CardTitle>Revenue Overview</CardTitle>
-            <CardDescription>Monthly sales, expenses, and profit trends</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Legend />
-                  <Bar dataKey="sales" fill="#2563eb" name="Sales" />
-                  <Bar dataKey="expenses" fill="#ef4444" name="Expenses" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+      {error && <div className="rounded-lg bg-red-50 p-4 text-red-600">{error}</div>}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Profit Trend</CardTitle>
-            <CardDescription>Monthly profit over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="profit"
-                    stroke="#16a34a"
-                    strokeWidth={2}
-                    name="Profit"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+      <Tabs defaultValue="profit-loss">
+        <TabsList>
+          <TabsTrigger value="profit-loss">Profit & Loss</TabsTrigger>
+          <TabsTrigger value="sales">Sales</TabsTrigger>
+          <TabsTrigger value="inventory">Inventory</TabsTrigger>
+          <TabsTrigger value="cashflow">Cashflow</TabsTrigger>
+          <TabsTrigger value="tax">Tax Summary</TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Sales by Category</CardTitle>
-            <CardDescription>Distribution of sales across categories</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={categoryData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    paddingAngle={5}
-                    dataKey="value"
-                    label={({ name, percent = 0 }) =>
-                      `${name} ${(percent * 100).toFixed(0)}%`
-                    }
-                  >
-                    {categoryData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+        <TabsContent value="profit-loss">
+          {pl && (
+            <div className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+                    <DollarSign className="h-4 w-4 text-green-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600">
+                      {pl.revenue.toLocaleString()}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">COGS</CardTitle>
+                    <Package className="h-4 w-4 text-yellow-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {pl.cogs.toLocaleString()}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Gross Profit</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-blue-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {pl.gross_profit.toLocaleString()}
+                    </div>
+                    <p className="text-xs text-gray-500">Margin: {pl.gross_margin}%</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-purple-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div
+                      className={`text-2xl font-bold ${
+                        pl.net_profit >= 0 ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
+                      {pl.net_profit.toLocaleString()}
+                    </div>
+                    <p className="text-xs text-gray-500">Margin: {pl.net_margin}%</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Expenses by Category</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Category</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pl.expenses_by_category.map((cat: any, i: number) => (
+                        <TableRow key={i}>
+                          <TableCell className="font-medium">
+                            {cat.category || "Uncategorized"}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {cat.total.toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="sales">
+          {salesReport && (
+            <div className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Top Customers</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>Purchases</TableHead>
+                          <TableHead>Total Spent</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {salesReport.top_customers.map((c: any, i: number) => (
+                          <TableRow key={i}>
+                            <TableCell className="font-medium">{c.name}</TableCell>
+                            <TableCell>{c.purchase_count}</TableCell>
+                            <TableCell className="font-semibold">
+                              {c.total_spent.toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Top Products</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Product</TableHead>
+                          <TableHead>Qty Sold</TableHead>
+                          <TableHead>Revenue</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {salesReport.top_products.map((p: any, i: number) => (
+                          <TableRow key={i}>
+                            <TableCell className="font-medium">{p.name}</TableCell>
+                            <TableCell>{p.qty_sold}</TableCell>
+                            <TableCell className="font-semibold text-green-600">
+                              {p.revenue.toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="inventory">
+          {inventory && (
+            <div className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Products</CardTitle>
+                    <Package className="h-4 w-4 text-gray-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{inventory.total_products}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Low Stock</CardTitle>
+                    <TrendingDown className="h-4 w-4 text-yellow-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {inventory.low_stock_count}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Out of Stock</CardTitle>
+                    <TrendingDown className="h-4 w-4 text-red-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-red-600">
+                      {inventory.out_of_stock_count}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Inventory Value</CardTitle>
+                    <DollarSign className="h-4 w-4 text-green-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600">
+                      {inventory.total_inventory_value.toLocaleString()}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Stock Movements (Last 30 days)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Change</TableHead>
+                        <TableHead>Reason</TableHead>
+                        <TableHead>Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {inventory.recent_movements.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center text-gray-500">
+                            No recent movements
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        inventory.recent_movements.map((m: any, i: number) => (
+                          <TableRow key={i}>
+                            <TableCell className="font-medium">{m.product_name}</TableCell>
+                            <TableCell>
+                              <Badge
+                                className={
+                                  m.qty_change > 0
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-red-100 text-red-700"
+                                }
+                              >
+                                {m.qty_change > 0 ? "+" : ""}
+                                {m.qty_change}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{m.reason}</TableCell>
+                            <TableCell>
+                              {new Date(m.created_at).toLocaleDateString()}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="cashflow">
+          {cashflow && (
+            <div className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Inflow</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-green-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600">
+                      {cashflow.total_inflow.toLocaleString()}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Outflow</CardTitle>
+                    <TrendingDown className="h-4 w-4 text-red-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-red-600">
+                      {cashflow.total_outflow.toLocaleString()}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Net Cashflow</CardTitle>
+                    <DollarSign className="h-4 w-4 text-blue-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div
+                      className={`text-2xl font-bold ${
+                        cashflow.net_cashflow >= 0 ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
+                      {cashflow.net_cashflow.toLocaleString()}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Inflows by Source</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Source</TableHead>
+                          <TableHead>Count</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {cashflow.inflows_by_source.map((s: any, i: number) => (
+                          <TableRow key={i}>
+                            <TableCell className="font-medium">{s.source}</TableCell>
+                            <TableCell>{s.count}</TableCell>
+                            <TableCell className="text-right text-green-600 font-semibold">
+                              {s.total.toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Outflows by Source</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Source</TableHead>
+                          <TableHead>Count</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {cashflow.outflows_by_source.map((s: any, i: number) => (
+                          <TableRow key={i}>
+                            <TableCell className="font-medium">{s.source}</TableCell>
+                            <TableCell>{s.count}</TableCell>
+                            <TableCell className="text-right text-red-600 font-semibold">
+                              {s.total.toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="tax">
+          {taxSummary && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tax Summary {taxSummary.year}</CardTitle>
+                  <CardDescription>Total tax collected this year</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-blue-600">
+                    {taxSummary.total_tax_collected.toLocaleString()}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Monthly Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Month</TableHead>
+                        <TableHead>Sales</TableHead>
+                        <TableHead>Revenue</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {taxSummary.monthly_sales.map((m: any, i: number) => {
+                        const monthNames = [
+                          "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+                        ];
+                        return (
+                          <TableRow key={i}>
+                            <TableCell className="font-medium">
+                              {monthNames[parseInt(m.month) - 1]}
+                            </TableCell>
+                            <TableCell>{m.count}</TableCell>
+                            <TableCell className="font-semibold">
+                              {m.revenue.toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
