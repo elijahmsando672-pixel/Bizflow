@@ -323,6 +323,13 @@ const api = {
     updateEntry: (id: string, data: unknown) => fetchApi(`/timetracking/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     deleteEntry: (id: string) => fetchApi(`/timetracking/${id}`, { method: 'DELETE' }),
   },
+  permissions: {
+    getRoles: () => fetchApi('/permissions/roles'),
+    getPermissions: () => fetchApi('/permissions/permissions'),
+    updatePermission: (id: string, data: unknown) => fetchApi(`/permissions/permissions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    updateBulkPermissions: (role: string, permissions: unknown) => fetchApi('/permissions/permissions/bulk', { method: 'POST', body: JSON.stringify({ role_name: role, permissions }) }),
+    checkPermission: (role: string, resource: string) => fetchApi(`/permissions/check?role=${role}&resource=${resource}`),
+  },
 };
 
 export default api;

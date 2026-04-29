@@ -25,6 +25,8 @@ import {
   FolderOpen,
   Truck,
   Clock,
+  Shield,
+  Database,
 } from "lucide-react";
 
 const navigation = [
@@ -78,6 +80,8 @@ const navigation = [
   {
     title: "System",
     items: [
+      { name: "Permissions", href: "/permissions", icon: Shield },
+      { name: "Data Import", href: "/data-import", icon: Database },
       { name: "Documents", href: "/documents", icon: FileText },
       { name: "Notifications", href: "/notifications", icon: Bell },
       { name: "Subscription", href: "/subscription", icon: UserCheck },
