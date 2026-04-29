@@ -9,11 +9,26 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
   DollarSign,
   TrendingUp,
   TrendingDown,
   AlertTriangle,
   ShoppingCart,
+  Users,
+  Package,
+  Calculator,
+  CheckCircle,
 } from "lucide-react";
 import api from "@/lib/api";
 
@@ -33,14 +48,16 @@ interface DashboardData {
 }
 
 function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("en-KE", {
     style: "currency",
-    currency: "USD",
+    currency: "KES",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(amount);
 }
 
 function formatDate(date: string) {
-  return new Date(date).toLocaleDateString("en-US", {
+  return new Date(date).toLocaleDateString("en-KE", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -52,28 +69,28 @@ function DashboardCards({ data }: { data: DashboardData }) {
     {
       title: "Total Revenue",
       value: formatCurrency(data.stats.totalRevenue),
-      change: "+12.5%",
+      change: "From paid sales",
       trend: "up",
       icon: DollarSign,
     },
     {
       title: "Expenses",
       value: formatCurrency(data.stats.totalExpenses),
-      change: "+8.2%",
+      change: "Total costs",
       trend: "up",
       icon: TrendingUp,
     },
     {
       title: "Profit",
       value: formatCurrency(data.stats.totalRevenue - data.stats.totalExpenses),
-      change: "+15.3%",
-      trend: "up",
+      change: "Revenue - Expenses",
+      trend: data.stats.totalRevenue > data.stats.totalExpenses ? "up" : "down",
       icon: TrendingDown,
     },
     {
       title: "Low Stock Alerts",
       value: data.stats.lowStockProducts,
-      change: "Items",
+      change: "Items below threshold",
       trend: "down",
       icon: AlertTriangle,
     },
@@ -93,21 +110,272 @@ function DashboardCards({ data }: { data: DashboardData }) {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-gray-500">
-                <span
-                  className={`font-medium ${
-                    stat.trend === "up" ? "text-green-600" : "text-red-600"
-                  }`}
-                >
-                  {stat.change}
-                </span>{" "}
-                from last week
-              </p>
+              <p className="text-xs text-gray-500">{stat.change}</p>
             </CardContent>
           </Card>
         );
       })}
     </div>
+  );
+}
+
+function LowStockAlerts({ data }: { data: any[] }) {
+  if (!data.length) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-amber-500" />Low Stock Alerts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-500 text-center py-8">All products are well stocked</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-amber-500" />Low Stock Alerts ({data.length})</CardTitle>
+        <CardDescription>Products below reorder threshold</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Product</TableHead>
+              <TableHead>SKU</TableHead>
+              <TableHead className="text-right">In Stock</TableHead>
+              <TableHead className="text-right">Reorder At</TableHead>
+              <TableHead className="text-right">Restock Qty</TableHead>
+              <TableHead className="text-right">Est. Cost</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.map((item: any) => {
+              const stockPercent = (item.stock_qty / item.reorder_level) * 100;
+              const severity = stockPercent < 25 ? "bg-red-100 text-red-700" : stockPercent < 50 ? "bg-orange-100 text-orange-700" : "bg-yellow-100 text-yellow-700";
+              return (
+                <TableRow key={item.id}>
+                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell className="text-xs text-gray-500">{item.sku || "-"}</TableCell>
+                  <TableCell className="text-right">
+                    <Badge variant="secondary" className={severity}>{item.stock_qty}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">{item.reorder_level}</TableCell>
+                  <TableCell className="text-right font-medium">{item.suggested_restock_qty}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(parseFloat(item.estimated_restock_cost || 0))}</TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TopProducts({ data }: { data: any[] }) {
+  if (!data.length) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5 text-blue-500" />Top Selling Products</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-500 text-center py-8">No sales data yet</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5 text-blue-500" />Top Selling Products</CardTitle>
+        <CardDescription>Best sellers by quantity sold (last 30 days)</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>#</TableHead>
+              <TableHead>Product</TableHead>
+              <TableHead className="text-right">Sold</TableHead>
+              <TableHead className="text-right">Orders</TableHead>
+              <TableHead className="text-right">Revenue</TableHead>
+              <TableHead className="text-right">In Stock</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.map((item: any, idx: number) => (
+              <TableRow key={item.id}>
+                <TableCell className="font-bold text-gray-400">{idx + 1}</TableCell>
+                <TableCell>
+                  <p className="font-medium">{item.name}</p>
+                  <p className="text-xs text-gray-500">{item.category_name || "Uncategorized"}</p>
+                </TableCell>
+                <TableCell className="text-right font-semibold text-blue-600">{item.total_sold}</TableCell>
+                <TableCell className="text-right">{item.order_count}</TableCell>
+                <TableCell className="text-right font-medium">{formatCurrency(parseFloat(item.total_revenue || 0))}</TableCell>
+                <TableCell className="text-right">
+                  <Badge variant={parseInt(item.stock_qty) < parseInt(item.reorder_level || "0") ? "destructive" : "secondary"}>{item.stock_qty}</Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FrequentCustomers({ data }: { data: any[] }) {
+  if (!data.length) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-green-500" />Top Customers</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-500 text-center py-8">No customer data yet</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-green-500" />Top Customers</CardTitle>
+        <CardDescription>Ranked by total spend (last 30 days)</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>#</TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead className="text-right">Orders</TableHead>
+              <TableHead className="text-right">Total Spent</TableHead>
+              <TableHead className="text-right">Avg Order</TableHead>
+              <TableHead className="text-right">Last Order</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.map((item: any, idx: number) => (
+              <TableRow key={item.id}>
+                <TableCell className="font-bold text-gray-400">{idx + 1}</TableCell>
+                <TableCell>
+                  <p className="font-medium">{item.name}</p>
+                  <p className="text-xs text-gray-500">{item.email || item.phone || ""}</p>
+                </TableCell>
+                <TableCell className="text-right">{item.total_orders}</TableCell>
+                <TableCell className="text-right font-semibold text-green-600">{formatCurrency(parseFloat(item.total_spent || 0))}</TableCell>
+                <TableCell className="text-right">{formatCurrency(parseFloat(item.avg_order_value || 0))}</TableCell>
+                <TableCell className="text-right text-sm text-gray-500">{item.last_order_date ? formatDate(item.last_order_date) : "-"}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RestockBudget({ budgetData, onCreated }: { budgetData: any; onCreated: () => void }) {
+  const [multiplier, setMultiplier] = useState("2");
+  const [loading, setLoading] = useState(false);
+  const [created, setCreated] = useState(false);
+  const [selectedVendor, setSelectedVendor] = useState("");
+
+  const items = budgetData?.items || [];
+  const total = budgetData?.totalBudget || 0;
+  const count = budgetData?.itemCount || 0;
+
+  async function handleCreateBudget() {
+    if (!items.length) return;
+    setLoading(true);
+    try {
+      await api.dashboard.createRestockBudget({
+        items: items.map((i: any) => ({ product_id: i.id, name: i.name, cost_price: i.cost_price, stock_qty: i.stock_qty, reorder_level: i.reorder_level })),
+        vendor_id: selectedVendor || null,
+        multiplier: parseFloat(multiplier),
+      });
+      setCreated(true);
+      onCreated();
+      setTimeout(() => setCreated(false), 3000);
+    } catch {
+      // Error handled by caller
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (!items.length) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Calculator className="h-5 w-5 text-purple-500" />Restock Budget</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-500 text-center py-8">No items need restocking</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Calculator className="h-5 w-5 text-purple-500" />Restock Budget Calculator</CardTitle>
+        <CardDescription>{count} items need restocking · Total estimated: {formatCurrency(total)}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex gap-4 items-end">
+            <div className="flex-1">
+              <label className="text-sm font-medium text-gray-500">Stock Multiplier</label>
+              <Input type="number" value={multiplier} onChange={e => setMultiplier(e.target.value)} min="1" max="5" step="0.5" className="mt-1" />
+              <p className="text-xs text-gray-400 mt-1">Target = reorder level × multiplier - current stock</p>
+            </div>
+            <Button onClick={handleCreateBudget} disabled={loading || created} className="bg-purple-600 hover:bg-purple-700">
+              {created ? <><CheckCircle className="h-4 w-4 mr-2" />Created!</> : loading ? "Creating..." : <><Calculator className="h-4 w-4 mr-2" />Create Purchase Order</>}
+            </Button>
+          </div>
+
+          <div className="border rounded-lg max-h-48 overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead className="text-right">Current</TableHead>
+                  <TableHead className="text-right">Target</TableHead>
+                  <TableHead className="text-right">Order Qty</TableHead>
+                  <TableHead className="text-right">Est. Cost</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((item: any) => {
+                  const targetQty = Math.ceil(item.reorder_level * parseFloat(multiplier));
+                  const orderQty = Math.max(0, targetQty - item.stock_qty);
+                  const estCost = orderQty * parseFloat(item.cost_price || 0);
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium text-sm">{item.name}</TableCell>
+                      <TableCell className="text-right text-sm">{item.stock_qty}</TableCell>
+                      <TableCell className="text-right text-sm">{targetQty}</TableCell>
+                      <TableCell className="text-right text-sm font-semibold">{orderQty}</TableCell>
+                      <TableCell className="text-right text-sm">{formatCurrency(estCost)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -214,23 +482,41 @@ function StatsOverview({ data }: { data: DashboardData }) {
 }
 
 export default function Home() {
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [lowStock, setLowStock] = useState<any[]>([]);
+  const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [frequentCustomers, setFrequentCustomers] = useState<any[]>([]);
+  const [restockBudget, setRestockBudget] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchDashboard() {
+    async function fetchAll() {
       try {
-        const result = await api.dashboard.getStats();
-        setData(result as DashboardData);
+        const [stats, low, top, freq, budget] = await Promise.all([
+          api.dashboard.getStats(),
+          api.dashboard.getLowStockDetails(),
+          api.dashboard.getTopProducts("30"),
+          api.dashboard.getFrequentCustomers("30"),
+          api.dashboard.getRestockBudget(2),
+        ]);
+        setDashboardData(stats as DashboardData);
+        setLowStock(low as any[]);
+        setTopProducts(top as any[]);
+        setFrequentCustomers(freq as any[]);
+        setRestockBudget(budget as any);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load dashboard");
       } finally {
         setIsLoading(false);
       }
     }
-    fetchDashboard();
+    fetchAll();
   }, []);
+
+  function handleBudgetCreated() {
+    api.dashboard.getRestockBudget(2).then((b: any) => setRestockBudget(b));
+  }
 
   if (isLoading) {
     return (
@@ -254,7 +540,7 @@ export default function Home() {
     );
   }
 
-  if (!data) {
+  if (!dashboardData) {
     return null;
   }
 
@@ -264,10 +550,22 @@ export default function Home() {
         <h2 className="text-3xl font-bold text-gray-900">Dashboard</h2>
         <p className="text-gray-500">Welcome back! Here&apos;s an overview of your business.</p>
       </div>
-      <DashboardCards data={data} />
+
+      <DashboardCards data={dashboardData} />
+
       <div className="grid gap-4 md:grid-cols-2">
-        <RecentTransactions data={data} />
-        <StatsOverview data={data} />
+        <RecentTransactions data={dashboardData} />
+        <StatsOverview data={dashboardData} />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <LowStockAlerts data={lowStock} />
+        <TopProducts data={topProducts} />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <FrequentCustomers data={frequentCustomers} />
+        <RestockBudget budgetData={restockBudget} onCreated={handleBudgetCreated} />
       </div>
     </div>
   );

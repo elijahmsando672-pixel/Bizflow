@@ -225,6 +225,11 @@ const api = {
     getProfitSummary: () => fetchApi('/dashboard/profit-summary'),
     getRecentSales: () => fetchApi('/dashboard'),
     getLowStock: () => fetchApi('/products?low_stock=true'),
+    getLowStockDetails: () => fetchApi('/dashboard/low-stock'),
+    getTopProducts: (period?: string) => fetchApi(`/dashboard/top-products${period ? `?period=${period}` : ''}`),
+    getFrequentCustomers: (period?: string) => fetchApi(`/dashboard/frequent-customers${period ? `?period=${period}` : ''}`),
+    getRestockBudget: (multiplier?: number) => fetchApi(`/dashboard/restock-budget${multiplier ? `?multiplier=${multiplier}` : ''}`),
+    createRestockBudget: (data: unknown) => fetchApi('/dashboard/restock-budget', { method: 'POST', body: JSON.stringify(data) }),
   },
   notifications: {
     getAll: () => fetchApi('/notifications'),
