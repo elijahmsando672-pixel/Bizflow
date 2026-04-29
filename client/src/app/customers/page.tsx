@@ -26,7 +26,7 @@ export default function CustomersPage() {
     try {
       setLoading(true);
       const data = await api.customers.getAll();
-      setCustomers(data);
+      setCustomers(data as any[]);
     } catch (err: any) {
       toast.error(err?.message || "Failed to load customers");
     } finally {

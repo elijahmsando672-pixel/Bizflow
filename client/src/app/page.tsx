@@ -222,7 +222,7 @@ export default function Home() {
     async function fetchDashboard() {
       try {
         const result = await api.dashboard.getStats();
-        setData(result);
+        setData(result as DashboardData);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load dashboard");
       } finally {

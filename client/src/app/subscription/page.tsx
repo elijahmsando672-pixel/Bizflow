@@ -34,9 +34,9 @@ export default function SubscriptionPage() {
         api.subscriptions.getCurrent(),
         api.subscriptions.getPayments(),
       ]);
-      setPlans(plansRes);
-      setCurrentSub(subRes);
-      setPayments(paymentsRes);
+      setPlans(plansRes as any[]);
+      setCurrentSub(subRes as any);
+      setPayments(paymentsRes as any[]);
     } catch (err) {
       setError("Failed to load subscription data");
     } finally {

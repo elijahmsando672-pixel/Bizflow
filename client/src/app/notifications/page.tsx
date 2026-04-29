@@ -8,7 +8,7 @@ import api from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 
 export default function NotificationsPage() {
-  const [data, setData] = useState<{ overdueSales: unknown[]; lowStockProducts: unknown[]; systemNotifications: unknown[] } | null>(null);
+  const [data, setData] = useState<{ overdueSales: any[]; lowStockProducts: any[]; systemNotifications: any[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
 
@@ -16,7 +16,7 @@ export default function NotificationsPage() {
     try {
       setLoading(true);
       const response = await api.notifications.getAll();
-      setData(response as { overdueSales: unknown[]; lowStockProducts: unknown[]; systemNotifications: unknown[] });
+      setData(response as { overdueSales: any[]; lowStockProducts: any[]; systemNotifications: any[] });
     } catch (err: unknown) {
       toast.error((err as Error)?.message || "Failed to load notifications");
     } finally {

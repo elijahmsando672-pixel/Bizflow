@@ -26,7 +26,7 @@ export default function CreditorsPage() {
     try {
       setLoading(true);
       const data = await api.customers.getAll();
-      setCreditors(data);
+      setCreditors(data as any[]);
     } catch (err: any) {
       toast.error(err?.message || "Failed to load creditors");
     } finally {

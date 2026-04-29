@@ -51,8 +51,8 @@ export default function TeamPage() {
         api.team.getMembers(),
         api.team.getInvitations(),
       ]);
-      setMembers(membersRes);
-      setInvitations(invitesRes);
+      setMembers(membersRes as any[]);
+      setInvitations(invitesRes as any[]);
     } catch (err) {
       setError("Failed to load team data");
     } finally {

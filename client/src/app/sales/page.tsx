@@ -27,7 +27,7 @@ export default function SalesPage() {
     try {
       setLoading(true);
       const data = await api.sales.getAll(statusFilter);
-      setSales(data);
+      setSales(data as any[]);
     } catch (err: any) {
       toast.error(err?.message || "Failed to load sales");
     } finally {

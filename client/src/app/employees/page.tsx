@@ -55,9 +55,9 @@ export default function EmployeesPage() {
         api.employees.getAttendance(`date=${new Date().toISOString().split("T")[0]}`),
         api.employees.getPayroll(),
       ]);
-      setEmployees(empRes);
-      setAttendance(attRes);
-      setPayroll(payRes);
+      setEmployees(empRes as any[]);
+      setAttendance(attRes as any[]);
+      setPayroll(payRes as any[]);
     } catch (err) {
       setError("Failed to load data");
     } finally {

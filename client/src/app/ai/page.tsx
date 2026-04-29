@@ -36,7 +36,7 @@ export default function AIPage() {
       ]);
       setInsights(insightsRes);
       setPredictions(predictionsRes);
-      setHistory(historyRes);
+      setHistory(historyRes as any[]);
     } catch (err: any) {
       setError(err.message);
     } finally {

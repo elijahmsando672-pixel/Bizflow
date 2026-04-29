@@ -26,7 +26,7 @@ export default function ExpensesPage() {
     try {
       setLoading(true);
       const data = await api.expenses.getAll();
-      setExpenses(data);
+      setExpenses(data as any[]);
     } catch (err: any) {
       toast.error(err?.message || "Failed to load expenses");
     } finally {

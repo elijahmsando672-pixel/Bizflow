@@ -49,8 +49,8 @@ export default function DebtorsPage() {
         api.debtors.getAll(),
         api.debtors.getSummary(),
       ]);
-      setDebtors(debtorsRes);
-      setSummary(summaryRes);
+      setDebtors(debtorsRes as any[]);
+      setSummary(summaryRes as any);
     } catch (err) {
       setError("Failed to load data");
     } finally {
