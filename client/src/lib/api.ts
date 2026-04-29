@@ -184,6 +184,9 @@ const api = {
     create: (data: SaleData) => fetchApi('/sales', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: SaleData) => fetchApi(`/sales/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => fetchApi(`/sales/${id}`, { method: 'DELETE' }),
+    getReceipt: (saleId: string) => fetchApi(`/sales/${saleId}/receipt`),
+    getReceiptHtml: (saleId: string) => fetchApi(`/sales/${saleId}/receipt/html`),
+    getAllReceipts: () => fetchApi('/sales/receipts'),
   },
   products: {
     getAll: (params?: string) => fetchApi(`/products${params ? `?${params}` : ''}`),

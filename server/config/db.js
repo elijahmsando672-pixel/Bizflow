@@ -167,6 +167,26 @@ export const initDatabase = async () => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS receipts (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      sale_id UUID REFERENCES sales(id) ON DELETE CASCADE,
+      receipt_number VARCHAR(50) UNIQUE NOT NULL,
+      customer_name VARCHAR(255),
+      customer_phone VARCHAR(50),
+      items JSONB NOT NULL,
+      subtotal DECIMAL(12,2) DEFAULT 0,
+      discount_amount DECIMAL(12,2) DEFAULT 0,
+      tax_amount DECIMAL(12,2) DEFAULT 0,
+      total DECIMAL(12,2) DEFAULT 0,
+      payment_method VARCHAR(20) DEFAULT 'cash',
+      receipt_html TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_receipts_sale ON receipts(sale_id);
+    CREATE INDEX IF NOT EXISTS idx_receipts_business ON receipts(business_id);
+
     CREATE TABLE IF NOT EXISTS invoices (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,

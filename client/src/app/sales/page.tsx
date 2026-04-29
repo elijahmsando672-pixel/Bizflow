@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,15 +12,78 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, Filter, Download, Loader2 } from "lucide-react";
+import { Plus, Search, Filter, Download, Loader2, Receipt, Eye, X, Printer } from "lucide-react";
 import api from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
+
+interface ReceiptModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  receiptHtml: string | null;
+  receiptNumber: string | null;
+  loading: boolean;
+}
+
+function ReceiptModal({ isOpen, onClose, receiptHtml, receiptNumber, loading }: ReceiptModalProps) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const handlePrint = () => {
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.print();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center gap-2">
+            <Receipt className="h-5 w-5 text-blue-600" />
+            <h3 className="text-lg font-semibold">Receipt {receiptNumber || ""}</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handlePrint} disabled={!receiptHtml}>
+              <Printer className="mr-2 h-4 w-4" />
+              Print
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-hidden">
+          {loading ? (
+            <div className="flex items-center justify-center h-96">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <span className="ml-2 text-gray-500">Loading receipt...</span>
+            </div>
+          ) : receiptHtml ? (
+            <iframe
+              ref={iframeRef}
+              srcDoc={receiptHtml}
+              className="w-full h-full min-h-[600px] border-0"
+              title="Receipt"
+              sandbox="allow-scripts"
+            />
+          ) : (
+            <div className="flex items-center justify-center h-96">
+              <p className="text-gray-500">No receipt available</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function SalesPage() {
   const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [receiptModal, setReceiptModal] = useState({ isOpen: false, receiptHtml: null as string | null, receiptNumber: null as string | null, loading: false });
   const toast = useToast();
 
   const loadSales = async () => {
@@ -47,6 +110,34 @@ export default function SalesPage() {
       loadSales();
     } catch (err: any) {
       toast.error(err?.message || "Failed to delete sale");
+    }
+  };
+
+  const handleViewReceipt = async (saleId: string) => {
+    setReceiptModal({ isOpen: true, receiptHtml: null, receiptNumber: null, loading: true });
+    try {
+      const receipt = await api.sales.getReceipt(saleId);
+      const receiptAny = receipt as any;
+      const htmlResponse = await api.sales.getReceiptHtml(saleId);
+      setReceiptModal({
+        isOpen: true,
+        receiptHtml: htmlResponse as string,
+        receiptNumber: receiptAny?.receipt_number || null,
+        loading: false,
+      });
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to load receipt");
+      setReceiptModal({ isOpen: true, receiptHtml: null, receiptNumber: null, loading: false });
+    }
+  };
+
+  const handleMarkPaid = async (saleId: string) => {
+    try {
+      await api.sales.update(saleId, { status: "paid" } as any);
+      toast.success("Sale marked as paid");
+      loadSales();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update sale");
     }
   };
 
@@ -114,7 +205,7 @@ export default function SalesPage() {
                   <TableRow key={sale.id}>
                     <TableCell className="font-medium">{sale.invoice_number}</TableCell>
                     <TableCell>{sale.customer_name || "Walk-in"}</TableCell>
-                    <TableCell>${sale.total}</TableCell>
+                    <TableCell>KSh {parseFloat(sale.total || 0).toLocaleString()}</TableCell>
                     <TableCell>
                       <span
                         className={`rounded-full px-2 py-1 text-xs font-medium ${
@@ -132,9 +223,31 @@ export default function SalesPage() {
                       {new Date(sale.sale_date).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">
-                        View
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        {sale.status === "paid" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewReceipt(sale.id)}
+                          >
+                            <Receipt className="mr-1 h-4 w-4" />
+                            Receipt
+                          </Button>
+                        )}
+                        {sale.status !== "paid" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleMarkPaid(sale.id)}
+                          >
+                            Mark Paid
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm">
+                          <Eye className="mr-1 h-4 w-4" />
+                          View
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -150,6 +263,14 @@ export default function SalesPage() {
           )}
         </CardContent>
       </Card>
+
+      <ReceiptModal
+        isOpen={receiptModal.isOpen}
+        onClose={() => setReceiptModal({ isOpen: false, receiptHtml: null, receiptNumber: null, loading: false })}
+        receiptHtml={receiptModal.receiptHtml}
+        receiptNumber={receiptModal.receiptNumber}
+        loading={receiptModal.loading}
+      />
     </div>
   );
 }
