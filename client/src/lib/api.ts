@@ -15,19 +15,21 @@ interface FetchOptions extends RequestInit {
 async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<unknown> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   
-  // Get CSRF token from cookie for state-changing requests
-  const csrfToken = typeof document !== 'undefined' 
-    ? document.cookie.split('; ').find(row => row.startsWith('csrf_token='))?.split('=')[1]
-    : null;
-
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(csrfToken && !['GET', 'HEAD'].includes(options.method || 'GET') 
-      ? { 'X-Csrf-Token': csrfToken } 
-      : {}),
     ...options.headers,
   };
+
+  const isStateChanging = !['GET', 'HEAD'].includes(options.method || 'GET');
+  if (isStateChanging) {
+    const csrfToken = typeof document !== 'undefined' 
+      ? document.cookie.split('; ').find(row => row.startsWith('csrf_token='))?.split('=')[1]
+      : null;
+    if (csrfToken) {
+      headers['X-Csrf-Token'] = csrfToken;
+    }
+  }
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
@@ -35,7 +37,31 @@ async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<u
     credentials: 'include',
   });
 
-  // If token expired, attempt one refresh and retry
+  if (response.status === 403 && isStateChanging) {
+    try {
+      const csrfResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/csrf-token`,
+        { method: 'GET', credentials: 'include' }
+      );
+      if (csrfResponse.ok) {
+        const { csrfToken } = await csrfResponse.json();
+        headers['X-Csrf-Token'] = csrfToken;
+        const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+          ...options,
+          headers,
+          credentials: 'include',
+        });
+        if (!retryResponse.ok) {
+          const error = await retryResponse.json().catch(() => ({ error: 'Request failed' }));
+          throw new ApiError(error.error || 'Request failed', retryResponse.status);
+        }
+        return retryResponse.json();
+      }
+    } catch {
+      // CSRF recovery failed, fall through to normal error handling
+    }
+  }
+
   if (response.status === 401) {
     try {
       const refreshResponse = await fetch(
@@ -51,7 +77,6 @@ async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<u
         const { token: newToken } = await refreshResponse.json();
         localStorage.setItem('token', newToken);
         
-        // Retry original request with new token
         const newHeaders = {
           ...headers,
           Authorization: `Bearer ${newToken}`,
@@ -69,8 +94,7 @@ async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<u
         
         return retryResponse.json();
       }
-    } catch (refreshErr) {
-      // Refresh failed, clear auth and redirect handled by auth context
+    } catch {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -329,6 +353,12 @@ const api = {
     updatePermission: (id: string, data: unknown) => fetchApi(`/permissions/permissions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     updateBulkPermissions: (role: string, permissions: unknown) => fetchApi('/permissions/permissions/bulk', { method: 'POST', body: JSON.stringify({ role_name: role, permissions }) }),
     checkPermission: (role: string, resource: string) => fetchApi(`/permissions/check?role=${role}&resource=${resource}`),
+  },
+  importExport: {
+    importData: (resource: string, data: unknown[]) => fetchApi(`/import/import/${resource}`, { method: 'POST', body: JSON.stringify({ data, format: 'json' }) }),
+    importCsv: (resource: string, csvContent: string) => fetchApi(`/import/import-csv/${resource}`, { method: 'POST', body: JSON.stringify({ csvContent }) }),
+    exportData: (resource: string, format?: string) => fetchApi(`/export/export/${resource}${format ? `?format=${format}` : ''}`),
+    getTemplate: (resource: string) => fetchApi(`/import/templates/${resource}`),
   },
 };
 

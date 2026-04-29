@@ -1,5 +1,6 @@
 import express from 'express';
 import { query } from '../config/db.js';
+import { sendDealCreatedEmail, sendDealWonEmail } from '../utils/email.js';
 
 const router = express.Router();
 
@@ -82,7 +83,16 @@ router.post('/', async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
       [req.business_id, customer_id, lead_id, name, stage_id, value, priority, expected_close_date, assigned_to, notes, req.user_id]
     );
-    res.status(201).json(result.rows[0]);
+    const deal = result.rows[0];
+
+    if (assigned_to) {
+      const assigneeResult = await query(`SELECT email, name FROM users WHERE id = $1`, [assigned_to]);
+      if (assigneeResult.rows.length && assigneeResult.rows[0].email) {
+        sendDealCreatedEmail(assigneeResult.rows[0].email, deal, req.user.name).catch(() => {});
+      }
+    }
+
+    res.status(201).json(deal);
   } catch (error) {
     console.error('Create deal error:', error);
     res.status(500).json({ error: 'Failed to create deal' });
@@ -194,7 +204,16 @@ router.put('/:id', async (req, res) => {
       params
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Deal not found' });
-    res.json(result.rows[0]);
+    const deal = result.rows[0];
+
+    if (outcome === 'won') {
+      const ownerResult = await query(`SELECT email FROM users WHERE id = $1`, [deal.assigned_to || deal.created_by]);
+      if (ownerResult.rows.length && ownerResult.rows[0].email) {
+        sendDealWonEmail(ownerResult.rows[0].email, deal).catch(() => {});
+      }
+    }
+
+    res.json(deal);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update deal' });
   }

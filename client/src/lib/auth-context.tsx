@@ -22,6 +22,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
+  hasPermission: (resource: string, action: 'create' | 'read' | 'update' | 'delete') => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -49,20 +50,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: 'include', // Send httpOnly refresh token cookie
+          credentials: 'include',
         }
       );
       if (!response.ok) {
-        // Refresh failed, clear auth and redirect to login
-        logout();
+        setUser(null);
+        setBusiness(null);
+        setToken(null);
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("business");
         return false;
       }
       const data = await response.json();
       setToken(data.token);
       localStorage.setItem("token", data.token);
       return true;
-    } catch (err) {
-      logout();
+    } catch {
+      setUser(null);
+      setBusiness(null);
+      setToken(null);
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("business");
       return false;
     }
   }, []);
@@ -76,10 +86,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(savedToken);
       setUser(JSON.parse(savedUser));
       setBusiness(JSON.parse(savedBusiness));
+      // Fetch fresh CSRF token for state-changing requests
+      fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/csrf-token`,
+        { method: "GET", credentials: 'include' }
+      ).catch(() => {});
       setIsLoading(false);
     } else {
       // No token in storage, try to refresh using httpOnly cookie
-      refreshAccessToken().then(() => {
+      refreshAccessToken().then((success) => {
+        if (success) {
+          fetch(
+            `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/csrf-token`,
+            { method: "GET", credentials: 'include' }
+          ).catch(() => {});
+        }
         setIsLoading(false);
       }).catch(() => {
         setIsLoading(false);
@@ -147,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       );
     } catch (err) {
-      console.error('Logout error:', err);
+      // Silently fail - server may be unreachable
     } finally {
       setUser(null);
       setBusiness(null);
@@ -159,8 +180,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const hasPermission = useCallback(async (resource: string, action: 'create' | 'read' | 'update' | 'delete'): Promise<boolean> => {
+    if (!user) return false;
+    if (user.role === 'owner' || user.role === 'admin') return true;
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/permissions/check?role=${user.role}&resource=${resource}`,
+        { method: "GET", credentials: 'include' }
+      );
+      if (!response.ok) return false;
+      const data = await response.json();
+      return data[`can_${action}`] === true;
+    } catch {
+      return false;
+    }
+  }, [user]);
+
   return (
-    <AuthContext.Provider value={{ user, business, token, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, business, token, login, logout, isLoading, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

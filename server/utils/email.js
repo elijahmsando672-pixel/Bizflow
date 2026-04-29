@@ -347,3 +347,259 @@ export const sendTeamInvitationEmail = async (to, { token, businessName, role, i
     return false;
   }
 };
+
+export const sendTicketCreatedEmail = async (to, ticket, assignee) => {
+  const mailOptions = {
+    from: `"BizFlow" <${process.env.SMTP_USER || 'noreply@bizflow.co.ke'}>`,
+    to,
+    subject: `Support Ticket #${escapeHtml(ticket.ticket_number || ticket.id)}: ${escapeHtml(ticket.subject)}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #1e293b; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #8b5cf6; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; }
+          .badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+          .badge-high { background: #fef2f2; color: #dc2626; }
+          .badge-medium { background: #fffbeb; color: #d97706; }
+          .badge-low { background: #f0fdf4; color: #16a34a; }
+          .btn { display: inline-block; background: #8b5cf6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+          .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin:0;">New Support Ticket</h1>
+            <p>#${escapeHtml(ticket.ticket_number || ticket.id)}</p>
+          </div>
+          <div class="content">
+            <p>A new support ticket has been created:</p>
+            <p><strong>Subject:</strong> ${escapeHtml(ticket.subject)}</p>
+            <p><strong>Priority:</strong> <span class="badge badge-${escapeHtml(ticket.priority || 'medium')}">${escapeHtml(ticket.priority || 'medium')}</span></p>
+            ${assignee ? `<p><strong>Assigned to:</strong> ${escapeHtml(assignee.name)}</p>` : ''}
+            <p><strong>Description:</strong></p>
+            <p>${escapeHtml(ticket.description || '').substring(0, 300)}${(ticket.description || '').length > 300 ? '...' : ''}</p>
+            <a href="${escapeHtml(process.env.APP_URL || 'http://localhost:3000')}/support/${escapeHtml(ticket.id)}" class="btn">View Ticket</a>
+          </div>
+          <div class="footer">
+            <p>Powered by <strong>BizFlow</strong></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Ticket created email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('Failed to send ticket email:', error);
+    return false;
+  }
+};
+
+export const sendTicketReplyEmail = async (to, ticket, reply, senderName) => {
+  const mailOptions = {
+    from: `"BizFlow" <${process.env.SMTP_USER || 'noreply@bizflow.co.ke'}>`,
+    to,
+    subject: `Re: Support Ticket #${escapeHtml(ticket.ticket_number || ticket.id)}: ${escapeHtml(ticket.subject)}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #1e293b; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #8b5cf6; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; }
+          .reply-box { background: white; border-left: 4px solid #8b5cf6; padding: 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }
+          .btn { display: inline-block; background: #8b5cf6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+          .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin:0;">New Reply on Ticket</h1>
+            <p>#${escapeHtml(ticket.ticket_number || ticket.id)}</p>
+          </div>
+          <div class="content">
+            <p><strong>${escapeHtml(senderName)}</strong> replied to your ticket:</p>
+            <div class="reply-box">
+              ${escapeHtml(reply.message || '').substring(0, 500)}${(reply.message || '').length > 500 ? '...' : ''}
+            </div>
+            <a href="${escapeHtml(process.env.APP_URL || 'http://localhost:3000')}/support/${escapeHtml(ticket.id)}" class="btn">View Thread</a>
+          </div>
+          <div class="footer">
+            <p>Powered by <strong>BizFlow</strong></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Ticket reply email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('Failed to send ticket reply email:', error);
+    return false;
+  }
+};
+
+export const sendDealCreatedEmail = async (to, deal, owner) => {
+  const mailOptions = {
+    from: `"BizFlow" <${process.env.SMTP_USER || 'noreply@bizflow.co.ke'}>`,
+    to,
+    subject: `New Deal: ${escapeHtml(deal.name)} - KSh ${parseFloat(deal.value || 0).toLocaleString()}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #1e293b; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #0ea5e9; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; }
+          .value { font-size: 28px; font-weight: bold; color: #0ea5e9; }
+          .btn { display: inline-block; background: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+          .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin:0;">New Deal Created</h1>
+          </div>
+          <div class="content">
+            <p class="value">KSh ${parseFloat(deal.value || 0).toLocaleString()}</p>
+            <p><strong>Deal:</strong> ${escapeHtml(deal.name)}</p>
+            ${owner ? `<p><strong>Owner:</strong> ${escapeHtml(owner)}</p>` : ''}
+            <p><strong>Stage:</strong> ${escapeHtml(deal.stage_name || deal.stage || 'New')}</p>
+            ${deal.expected_close_date ? `<p><strong>Expected Close:</strong> ${new Date(deal.expected_close_date).toLocaleDateString()}</p>` : ''}
+            ${deal.notes ? `<p><strong>Notes:</strong> ${escapeHtml(deal.notes).substring(0, 200)}</p>` : ''}
+            <a href="${escapeHtml(process.env.APP_URL || 'http://localhost:3000')}/pipeline" class="btn">View Pipeline</a>
+          </div>
+          <div class="footer">
+            <p>Powered by <strong>BizFlow</strong></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Deal created email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('Failed to send deal email:', error);
+    return false;
+  }
+};
+
+export const sendDealWonEmail = async (to, deal) => {
+  const mailOptions = {
+    from: `"BizFlow" <${process.env.SMTP_USER || 'noreply@bizflow.co.ke'}>`,
+    to,
+    subject: `Deal Won: ${escapeHtml(deal.name)} - KSh ${parseFloat(deal.value || 0).toLocaleString()}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #1e293b; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #16a34a; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; }
+          .value { font-size: 32px; font-weight: bold; color: #16a34a; }
+          .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin:0;">Deal Closed Won</h1>
+          </div>
+          <div class="content">
+            <p class="value">KSh ${parseFloat(deal.value || 0).toLocaleString()}</p>
+            <p><strong>Deal:</strong> ${escapeHtml(deal.name)}</p>
+            <p>Congratulations! This deal has been marked as won.</p>
+          </div>
+          <div class="footer">
+            <p>Powered by <strong>BizFlow</strong></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Deal won email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('Failed to send deal won email:', error);
+    return false;
+  }
+};
+
+export const sendProjectUpdateEmail = async (to, project, update) => {
+  const mailOptions = {
+    from: `"BizFlow" <${process.env.SMTP_USER || 'noreply@bizflow.co.ke'}>`,
+    to,
+    subject: `Project Update: ${escapeHtml(project.name)}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #1e293b; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #f59e0b; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; }
+          .btn { display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+          .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin:0;">Project Update</h1>
+            <p>${escapeHtml(project.name)}</p>
+          </div>
+          <div class="content">
+            <p><strong>Status:</strong> ${escapeHtml(project.status || 'active')}</p>
+            ${update ? `<p><strong>Update:</strong> ${escapeHtml(update)}</p>` : ''}
+            ${project.due_date ? `<p><strong>Due Date:</strong> ${new Date(project.due_date).toLocaleDateString()}</p>` : ''}
+            ${project.budget ? `<p><strong>Budget:</strong> KSh ${parseFloat(project.budget).toLocaleString()}</p>` : ''}
+            <a href="${escapeHtml(process.env.APP_URL || 'http://localhost:3000')}/projects/${escapeHtml(project.id)}" class="btn">View Project</a>
+          </div>
+          <div class="footer">
+            <p>Powered by <strong>BizFlow</strong></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Project update email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('Failed to send project update email:', error);
+    return false;
+  }
+};

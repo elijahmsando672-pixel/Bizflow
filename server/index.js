@@ -25,7 +25,9 @@ import projectRoutes from './routes/projects.js';
 import procurementRoutes from './routes/procurement.js';
 import timetrackingRoutes from './routes/timetracking.js';
 import permissionsRoutes from './routes/permissions.js';
+import importExportRoutes from './routes/importExport.js';
 import { protect } from './middleware/protect.js';
+import { requirePermission } from './middleware/rbac.js';
 
 dotenv.config();
 
@@ -118,28 +120,30 @@ app.use(globalRateLimiter);
 app.use(['/api/auth/login', '/api/auth/register'], authRateLimiter);
 app.use(['/api/auth/forgot-password', '/api/auth/reset-password'], passwordResetRateLimiter);
 
-// Protected resource routes - authenticate + CSRF validation
-app.use('/api/customers', protect, customerRoutes);
-app.use('/api/products', protect, productRoutes);
-app.use('/api/invoices', protect, invoiceRoutes);
-app.use('/api/sales', protect, saleRoutes);
-app.use('/api/expenses', protect, expenseRoutes);
+// Protected resource routes - authenticate + CSRF + RBAC validation
+app.use('/api/customers', protect, requirePermission, customerRoutes);
+app.use('/api/products', protect, requirePermission, productRoutes);
+app.use('/api/invoices', protect, requirePermission, invoiceRoutes);
+app.use('/api/sales', protect, requirePermission, saleRoutes);
+app.use('/api/expenses', protect, requirePermission, expenseRoutes);
 app.use('/api/dashboard', protect, dashboardRoutes);
 app.use('/api/notifications', protect, notificationRoutes);
 app.use('/api/admin', protect, adminRoutes);
-app.use('/api/team', protect, teamRoutes);
-app.use('/api/employees', protect, employeeRoutes);
+app.use('/api/team', protect, requirePermission, teamRoutes);
+app.use('/api/employees', protect, requirePermission, employeeRoutes);
 app.use('/api/subscriptions', protect, subscriptionRoutes);
 app.use('/api/debtors', protect, debtorRoutes);
-app.use('/api/reports', protect, reportRoutes);
+app.use('/api/reports', protect, requirePermission, reportRoutes);
 app.use('/api/ai', protect, aiRoutes);
-app.use('/api/crm', protect, crmRoutes);
-app.use('/api/pipeline', protect, pipelineRoutes);
-app.use('/api/support', protect, supportRoutes);
-app.use('/api/projects', protect, projectRoutes);
-app.use('/api/procurement', protect, procurementRoutes);
+app.use('/api/crm', protect, requirePermission, crmRoutes);
+app.use('/api/pipeline', protect, requirePermission, pipelineRoutes);
+app.use('/api/support', protect, requirePermission, supportRoutes);
+app.use('/api/projects', protect, requirePermission, projectRoutes);
+app.use('/api/procurement', protect, requirePermission, procurementRoutes);
 app.use('/api/timetracking', protect, timetrackingRoutes);
 app.use('/api/permissions', protect, permissionsRoutes);
+app.use('/api/import', protect, express.json({ limit: '10mb' }), importExportRoutes);
+app.use('/api/export', protect, importExportRoutes);
 
 // Auth routes (no CSRF, have their own protections)
 app.use('/api/auth', authRoutes);

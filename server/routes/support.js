@@ -1,5 +1,6 @@
 import express from 'express';
 import { query } from '../config/db.js';
+import { sendTicketCreatedEmail, sendTicketReplyEmail } from '../utils/email.js';
 
 const router = express.Router();
 
@@ -116,7 +117,23 @@ router.post('/', async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [req.business_id, customer_id, ticketNumber, subject, description, priority, category, assigned_to, slaDeadline.toISOString(), req.user_id]
     );
-    res.status(201).json(result.rows[0]);
+    const ticket = result.rows[0];
+
+    if (assigned_to) {
+      const assigneeResult = await query(`SELECT email, name FROM users WHERE id = $1`, [assigned_to]);
+      if (assigneeResult.rows.length) {
+        sendTicketCreatedEmail(assigneeResult.rows[0].email, ticket, { name: req.user.name }).catch(() => {});
+      }
+    }
+
+    if (customer_id) {
+      const custResult = await query(`SELECT email FROM customers WHERE id = $1`, [customer_id]);
+      if (custResult.rows.length && custResult.rows[0].email) {
+        sendTicketCreatedEmail(custResult.rows[0].email, ticket, null).catch(() => {});
+      }
+    }
+
+    res.status(201).json(ticket);
   } catch (error) {
     console.error('Create ticket error:', error);
     res.status(500).json({ error: 'Failed to create ticket' });
@@ -212,9 +229,24 @@ router.post('/:id/replies', async (req, res) => {
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [req.business_id, req.params.id, message, is_internal || false, req.user_id]
     );
+    const reply = result.rows[0];
 
     await query(`UPDATE support_tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [req.params.id]);
-    res.status(201).json(result.rows[0]);
+
+    if (!is_internal) {
+      const ticketResult = await query(
+        `SELECT t.*, c.email as customer_email FROM support_tickets t LEFT JOIN customers c ON t.customer_id = c.id WHERE t.id = $1`,
+        [req.params.id]
+      );
+      if (ticketResult.rows.length) {
+        const ticket = ticketResult.rows[0];
+        if (ticket.customer_email && ticket.assigned_to !== req.user_id) {
+          sendTicketReplyEmail(ticket.customer_email, ticket, reply, req.user.name).catch(() => {});
+        }
+      }
+    }
+
+    res.status(201).json(reply);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create reply' });
   }
