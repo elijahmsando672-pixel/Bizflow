@@ -1,11 +1,12 @@
 import express from 'express';
 import { query } from '../config/db.js';
-import { authenticate } from '../middleware/auth.js';
 import { sendPaymentReminderEmail, sendLowStockAlert } from '../utils/email.js';
 
 const router = express.Router();
 
-router.get('/', authenticate, async (req, res) => {
+// Protected by global `protect` middleware with CSRF
+
+router.get('/', async (req, res) => {
   try {
     const businessId = req.business_id;
     
@@ -38,7 +39,7 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-router.post('/send-reminder/:id', authenticate, async (req, res) => {
+router.post('/send-reminder/:id', async (req, res) => {
   try {
     const invoiceResult = await query(
       `SELECT s.*, c.name as customer_name, c.email as customer_email
@@ -67,7 +68,7 @@ router.post('/send-reminder/:id', authenticate, async (req, res) => {
   }
 });
 
-router.post('/low-stock-alert/:productId', authenticate, async (req, res) => {
+router.post('/low-stock-alert/:productId', async (req, res) => {
   try {
     const productResult = await query(
       'SELECT * FROM products WHERE id = $1 AND business_id = $2',
@@ -85,7 +86,7 @@ router.post('/low-stock-alert/:productId', authenticate, async (req, res) => {
   }
 });
 
-router.post('/mark-read/:id', authenticate, async (req, res) => {
+router.post('/mark-read/:id', async (req, res) => {
   try {
     await query(
       'UPDATE notifications SET read_at = NOW() WHERE id = $1 AND business_id = $2',
@@ -98,7 +99,7 @@ router.post('/mark-read/:id', authenticate, async (req, res) => {
   }
 });
 
-router.post('/mark-all-read', authenticate, async (req, res) => {
+router.post('/mark-all-read', async (req, res) => {
   try {
     await query(
       'UPDATE notifications SET read_at = NOW() WHERE business_id = $1 AND read_at IS NULL',

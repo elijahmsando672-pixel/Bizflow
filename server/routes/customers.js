@@ -1,24 +1,27 @@
 import express from 'express';
 import { query } from '../config/db.js';
-import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // ========== MODULE 1: CUSTOMERS ==========
 
-router.get('/', authenticate, async (req, res) => {
+// All routes are automatically protected by the global `protect` middleware
+// and have CSRF validation applied for state-changing methods
+
+router.get('/', async (req, res) => {
   try {
     const result = await query(
       'SELECT * FROM customers WHERE business_id = $1 ORDER BY created_at DESC',
       [req.business_id]
     );
     res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+   } catch (err) {
+     console.error('Customers route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
-router.post('/', authenticate, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { name, email, phone, address, company, notes, credit_limit } = req.body;
     const result = await query(
@@ -27,12 +30,13 @@ router.post('/', authenticate, async (req, res) => {
       [req.business_id, name, email, phone, address, company, notes, credit_limit || 0]
     );
     res.status(201).json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+   } catch (err) {
+     console.error('Customers route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { name, email, phone, address, company, notes, credit_limit } = req.body;
     const result = await query(
@@ -42,19 +46,21 @@ router.put('/:id', authenticate, async (req, res) => {
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
     res.json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+   } catch (err) {
+     console.error('Customers route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const result = await query('DELETE FROM customers WHERE id=$1 AND business_id=$2 RETURNING id', [req.params.id, req.business_id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
     res.json({ message: 'Deleted' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+   } catch (err) {
+     console.error('Customers route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
 export default router;

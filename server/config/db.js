@@ -11,6 +11,15 @@ export const pool = new Pool({
   database: process.env.DB_NAME || 'bizflow',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
+  max: 20, // maximum number of clients
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+  ...(process.env.NODE_ENV === 'production' && {
+    ssl: {
+      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true',
+      ca: process.env.DB_SSL_CA ? process.env.DB_SSL_CA : undefined,
+    },
+  }),
 });
 
 export const query = async (text, params) => {
@@ -319,6 +328,20 @@ export const initDatabase = async () => {
     );
 
     -- ========================================
+    -- Security: Failed Login Tracking & Account Lockout
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS login_attempts (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      email VARCHAR(255) NOT NULL,
+      ip_address INET NOT NULL,
+      success BOOLEAN NOT NULL,
+      attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_login_attempts_email_ip ON login_attempts(email, ip_address, attempted_at);
+
+    -- ========================================
     -- INDEXES
     -- ========================================
 
@@ -335,6 +358,27 @@ export const initDatabase = async () => {
     CREATE INDEX IF NOT EXISTS idx_cashflow_business ON cashflow_entries(business_id, date);
     CREATE INDEX IF NOT EXISTS idx_notifications_business ON notifications(business_id, is_read);
     CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON stock_movements(product_id, created_at);
+
+    -- ========================================
+    -- Audit Logging: Track sensitive operations
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+      action VARCHAR(100) NOT NULL,
+      resource_type VARCHAR(50),
+      resource_id UUID,
+      details JSONB,
+      ip_address INET,
+      user_agent TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_business ON audit_logs(business_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
   `;
 
   await pool.query(schema);

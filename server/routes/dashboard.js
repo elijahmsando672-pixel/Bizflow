@@ -1,8 +1,9 @@
 import express from 'express';
 import { query } from '../config/db.js';
-import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// All routes protected by global `protect` middleware with CSRF
 
 router.get('/', authenticate, async (req, res) => {
   try {

@@ -1,11 +1,12 @@
 import express from 'express';
 import { query, pool } from '../config/db.js';
-import { authenticate } from '../middleware/auth.js';
 import { sendInvoiceEmail, sendPaymentReminderEmail } from '../utils/email.js';
 
 const router = express.Router();
 
-router.get('/', authenticate, async (req, res) => {
+// All routes protected by global `protect` middleware with CSRF
+
+router.get('/', async (req, res) => {
   try {
     const { status } = req.query;
     let sql = `SELECT i.*, c.name as customer_name FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id WHERE i.business_id = $1`;
@@ -26,7 +27,7 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const invoiceResult = await query(
       `SELECT i.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone
@@ -55,7 +56,7 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
-router.post('/', authenticate, async (req, res) => {
+router.post('/', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -113,7 +114,7 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { status, due_date, notes, customer_id, items, discount_amount } = req.body;
     
@@ -162,7 +163,7 @@ router.put('/:id', authenticate, async (req, res) => {
   }
 });
 
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     await query('DELETE FROM invoice_items WHERE invoice_id = $1 AND business_id = $2', [req.params.id, req.business_id]);
     

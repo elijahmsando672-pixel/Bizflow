@@ -19,9 +19,8 @@ interface AuthContextType {
   user: User | null;
   business: Business | null;
   token: string | null;
-  refreshToken: string | null;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -40,48 +39,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
   const refreshAccessToken = useCallback(async () => {
-    const currentRefreshToken = localStorage.getItem("refreshToken");
-    if (!currentRefreshToken) return false;
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/refresh-token`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refreshToken: currentRefreshToken }),
+          credentials: 'include', // Send httpOnly refresh token cookie
         }
       );
-      if (!response.ok) return false;
+      if (!response.ok) {
+        // Refresh failed, clear auth and redirect to login
+        logout();
+        return false;
+      }
       const data = await response.json();
       setToken(data.token);
-      setRefreshToken(data.refreshToken);
       localStorage.setItem("token", data.token);
-      localStorage.setItem("refreshToken", data.refreshToken);
       return true;
-    } catch {
+    } catch (err) {
+      logout();
       return false;
     }
   }, []);
 
   useEffect(() => {
     const savedToken = localStorage.getItem("token");
-    const savedRefreshToken = localStorage.getItem("refreshToken");
     const savedUser = localStorage.getItem("user");
     const savedBusiness = localStorage.getItem("business");
 
     if (savedToken && savedUser && savedBusiness) {
       setToken(savedToken);
-      setRefreshToken(savedRefreshToken);
       setUser(JSON.parse(savedUser));
       setBusiness(JSON.parse(savedBusiness));
+      setIsLoading(false);
+    } else {
+      // No token in storage, try to refresh using httpOnly cookie
+      refreshAccessToken().then(() => {
+        setIsLoading(false);
+      }).catch(() => {
+        setIsLoading(false);
+      });
     }
-    setIsLoading(false);
-  }, []);
+  }, [refreshAccessToken]);
 
   useEffect(() => {
     if (!isLoading && token) {
@@ -110,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
+        credentials: 'include', // Accept httpOnly cookie
       }
     );
 
@@ -120,32 +125,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const data = await response.json();
     setToken(data.token);
-    setRefreshToken(data.refreshToken);
     setUser(data.user);
     setBusiness(data.business);
 
     localStorage.setItem("token", data.token);
-    localStorage.setItem("refreshToken", data.refreshToken);
     localStorage.setItem("user", JSON.stringify(data.user));
     localStorage.setItem("business", JSON.stringify(data.business));
 
     router.push("/");
   };
 
-  const logout = () => {
-    setUser(null);
-    setBusiness(null);
-    setToken(null);
-    setRefreshToken(null);
-    localStorage.removeItem("token");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("user");
-    localStorage.removeItem("business");
-    router.push("/login");
+  const logout = async () => {
+    try {
+      // Call server to invalidate refresh token and clear cookie
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/logout`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: 'include',
+        }
+      );
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      setUser(null);
+      setBusiness(null);
+      setToken(null);
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("business");
+      router.push("/login");
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, business, token, refreshToken, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, business, token, login, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

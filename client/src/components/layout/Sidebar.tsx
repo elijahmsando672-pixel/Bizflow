@@ -61,7 +61,7 @@ export function Sidebar() {
     <div className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
       <div className="flex h-16 items-center gap-2 border-b border-gray-200 px-6">
         <img
-          src="/logo.svg"
+          src="/logo.png"
           alt="BizFlow"
           width={36}
           height={36}

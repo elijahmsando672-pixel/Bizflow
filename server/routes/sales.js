@@ -1,12 +1,12 @@
 import express from 'express';
 import { query, pool } from '../config/db.js';
-import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // ========== MODULE 3: SALES / INVOICES ==========
+// Protected by global `protect` middleware with CSRF
 
-router.get('/', authenticate, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { status } = req.query;
     let sql = `SELECT s.*, c.name as customer_name, c.email as customer_email 
@@ -22,12 +22,13 @@ router.get('/', authenticate, async (req, res) => {
     sql += ' ORDER BY s.created_at DESC';
     const result = await query(sql, params);
     res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+   } catch (err) {
+     console.error('Sales route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const saleResult = await query(
       `SELECT s.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone
@@ -44,12 +45,13 @@ router.get('/:id', authenticate, async (req, res) => {
     );
 
     res.json({ ...saleResult.rows[0], items: itemsResult.rows });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+   } catch (err) {
+     console.error('Sales route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
-router.post('/', authenticate, async (req, res) => {
+router.post('/', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -119,15 +121,14 @@ router.post('/', authenticate, async (req, res) => {
 
     await client.query('COMMIT');
     res.status(201).json(sale);
-  } catch (err) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: err.message });
-  } finally {
-    client.release();
-  }
+   } catch (err) {
+     await client.query('ROLLBACK');
+     console.error('Sales route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { status, notes } = req.body;
 
@@ -144,12 +145,13 @@ router.put('/:id', authenticate, async (req, res) => {
 
     if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
     res.json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+   } catch (err) {
+     console.error('Sales route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -178,12 +180,11 @@ router.delete('/:id', authenticate, async (req, res) => {
 
     await client.query('COMMIT');
     res.json({ message: 'Deleted' });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: err.message });
-  } finally {
-    client.release();
-  }
+   } catch (err) {
+     await client.query('ROLLBACK');
+     console.error('Sales route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
 export default router;

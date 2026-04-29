@@ -1,13 +1,13 @@
 import express from 'express';
 import { query } from '../config/db.js';
-import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // ========== MODULE 2: PRODUCTS / INVENTORY ==========
+// All routes protected by global `protect` middleware with CSRF
 
 // Get product by ID
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const result = await query(
       'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = $1 AND p.business_id = $2',
@@ -15,13 +15,14 @@ router.get('/:id', authenticate, async (req, res) => {
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
     res.json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+   } catch (err) {
+     console.error('Products route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
 // Get all products
-router.get('/', authenticate, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { low_stock, category } = req.query;
     let sql = 'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.business_id = $1';
@@ -38,23 +39,25 @@ router.get('/', authenticate, async (req, res) => {
     sql += ' ORDER BY p.name';
     const result = await query(sql, params);
     res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+   } catch (err) {
+     console.error('Products route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
 // Get categories
-router.get('/categories', authenticate, async (req, res) => {
+router.get('/categories', async (req, res) => {
   try {
     const result = await query('SELECT * FROM categories WHERE business_id = $1 ORDER BY name', [req.business_id]);
     res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+   } catch (err) {
+     console.error('Products route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
 // Create category
-router.post('/categories', authenticate, async (req, res) => {
+router.post('/categories', async (req, res) => {
   try {
     const { name, description, parent_id } = req.body;
     const result = await query(
@@ -62,13 +65,14 @@ router.post('/categories', authenticate, async (req, res) => {
       [req.business_id, name, description, parent_id]
     );
     res.status(201).json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+   } catch (err) {
+     console.error('Products route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
 // Create product
-router.post('/', authenticate, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { name, sku, barcode, description, category_id, unit, cost_price, selling_price, stock_qty, reorder_level, image_url } = req.body;
     const result = await query(
@@ -87,13 +91,14 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     res.status(201).json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+   } catch (err) {
+     console.error('Products route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
 // Update product
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { name, sku, barcode, description, category_id, unit, cost_price, selling_price, stock_qty, reorder_level, is_active, image_url } = req.body;
     
@@ -122,33 +127,36 @@ router.put('/:id', authenticate, async (req, res) => {
     }
 
     res.json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+   } catch (err) {
+     console.error('Products route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
 // Delete product
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const result = await query('DELETE FROM products WHERE id=$1 AND business_id=$2 RETURNING id', [req.params.id, req.business_id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
     res.json({ message: 'Deleted' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+   } catch (err) {
+     console.error('Products route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
 // Get stock movements for a product
-router.get('/:id/stock-history', authenticate, async (req, res) => {
+router.get('/:id/stock-history', async (req, res) => {
   try {
     const result = await query(
       'SELECT * FROM stock_movements WHERE product_id=$1 AND business_id=$2 ORDER BY created_at DESC',
       [req.params.id, req.business_id]
     );
     res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+   } catch (err) {
+     console.error('Products route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
 });
 
 export default router;

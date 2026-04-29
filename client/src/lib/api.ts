@@ -15,16 +15,71 @@ interface FetchOptions extends RequestInit {
 async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<unknown> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   
-  const headers = {
+  // Get CSRF token from cookie for state-changing requests
+  const csrfToken = typeof document !== 'undefined' 
+    ? document.cookie.split('; ').find(row => row.startsWith('csrf_token='))?.split('=')[1]
+    : null;
+
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(csrfToken && !['GET', 'HEAD'].includes(options.method || 'GET') 
+      ? { 'X-Csrf-Token': csrfToken } 
+      : {}),
     ...options.headers,
   };
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
+    credentials: 'include',
   });
+
+  // If token expired, attempt one refresh and retry
+  if (response.status === 401) {
+    try {
+      const refreshResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/refresh-token`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        }
+      );
+      
+      if (refreshResponse.ok) {
+        const { token: newToken } = await refreshResponse.json();
+        localStorage.setItem('token', newToken);
+        
+        // Retry original request with new token
+        const newHeaders = {
+          ...headers,
+          Authorization: `Bearer ${newToken}`,
+        };
+        const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+          ...options,
+          headers: newHeaders,
+          credentials: 'include',
+        });
+        
+        if (!retryResponse.ok) {
+          const error = await retryResponse.json().catch(() => ({ error: 'Request failed' }));
+          throw new ApiError(error.error || 'Request failed', retryResponse.status);
+        }
+        
+        return retryResponse.json();
+      }
+    } catch (refreshErr) {
+      // Refresh failed, clear auth and redirect handled by auth context
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('business');
+        window.location.href = '/login';
+      }
+      throw new ApiError('Session expired', 401);
+    }
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Request failed' }));

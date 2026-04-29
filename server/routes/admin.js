@@ -1,10 +1,10 @@
 import express from 'express';
 import { query } from '../config/db.js';
-import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.use(authenticate);
+// Protected by global `protect` middleware
+// Role-based checks performed per-route below
 
 router.get('/businesses', async (req, res) => {
   try {

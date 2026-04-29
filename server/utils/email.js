@@ -1,7 +1,21 @@
 import nodemailer from 'nodemailer';
+import sanitizeHtml from 'sanitize-html';
 import dotenv from 'dotenv';
 
 dotenv.config();
+
+// Default sanitization options for email content
+const sanitizeOptions = {
+  allowedTags: [], // Strip all HTML tags
+  allowedAttributes: {},
+  allowedStyles: {},
+};
+
+// Helper to escape and sanitize for HTML context
+const escapeHtml = (str) => {
+  if (!str) return '';
+  return sanitizeHtml(String(str), sanitizeOptions);
+};
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -17,7 +31,7 @@ export const sendInvoiceEmail = async (to, invoice, customer) => {
   const mailOptions = {
     from: `"BizFlow" <${process.env.SMTP_USER || 'noreply@bizflow.co.ke'}>`,
     to,
-    subject: `Invoice ${invoice.invoice_number} from ${process.env.BUSINESS_NAME || 'BizFlow'}`,
+    subject: `Invoice ${escapeHtml(invoice.invoice_number)} from ${escapeHtml(process.env.BUSINESS_NAME || 'BizFlow')}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -39,26 +53,26 @@ export const sendInvoiceEmail = async (to, invoice, customer) => {
         <div class="container">
           <div class="header">
             <h1 style="margin:0;font-size:28px;">INVOICE</h1>
-            <p style="margin:5px 0 0;">${invoice.invoice_number}</p>
+            <p style="margin:5px 0 0;">${escapeHtml(invoice.invoice_number)}</p>
           </div>
           <div class="content">
             <table class="invoice-info">
               <tr><td class="label">Date:</td><td>${new Date(invoice.created_at).toLocaleDateString()}</td></tr>
               <tr><td class="label">Due Date:</td><td>${invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'Upon Receipt'}</td></tr>
-              <tr><td class="label">Customer:</td><td>${customer?.name || 'N/A'}</td></tr>
-              <tr><td class="label">Status:</td><td><strong>${invoice.status.toUpperCase()}</strong></td></tr>
+              <tr><td class="label">Customer:</td><td>${escapeHtml(customer?.name || 'N/A')}</td></tr>
+              <tr><td class="label">Status:</td><td><strong>${escapeHtml(invoice.status.toUpperCase())}</strong></td></tr>
               <tr><td class="label">Total:</td><td class="total">KSh ${parseFloat(invoice.total).toLocaleString()}</td></tr>
             </table>
             <p style="margin-top:20px;">Please find the invoice details attached. Payment can be made via:</p>
             <ul>
-              <li>M-Pesa: ${process.env.MPESA_SHORTCODE || 'XXXXXX'}</li>
-              <li>Bank Transfer: ${process.env.BANK_DETAILS || 'Contact for details'}</li>
+              <li>M-Pesa: ${escapeHtml(process.env.MPESA_SHORTCODE || 'XXXXXX')}</li>
+              <li>Bank Transfer: ${escapeHtml(process.env.BANK_DETAILS || 'Contact for details')}</li>
             </ul>
-            <a href="${process.env.APP_URL || 'http://localhost:5173'}/invoice/${invoice.id}" class="btn">View Invoice</a>
+            <a href="${escapeHtml(process.env.APP_URL || 'http://localhost:5173')}/invoice/${escapeHtml(invoice.id)}" class="btn">View Invoice</a>
           </div>
           <div class="footer">
             <p>Powered by <strong>BizFlow</strong> - Business Management Made Simple</p>
-            <p>${process.env.BUSINESS_NAME || 'Your Company'}</p>
+            <p>${escapeHtml(process.env.BUSINESS_NAME || 'Your Company')}</p>
           </div>
         </div>
       </body>
@@ -80,7 +94,7 @@ export const sendPaymentReminderEmail = async (to, invoice, customer) => {
   const mailOptions = {
     from: `"BizFlow" <${process.env.SMTP_USER || 'noreply@bizflow.co.ke'}>`,
     to,
-    subject: `Payment Reminder: Invoice ${invoice.invoice_number}`,
+    subject: `Payment Reminder: Invoice ${escapeHtml(invoice.invoice_number)}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -99,14 +113,14 @@ export const sendPaymentReminderEmail = async (to, invoice, customer) => {
         <div class="container">
           <div class="header">
             <h1 style="margin:0;">Payment Reminder</h1>
-            <p>Invoice #${invoice.invoice_number}</p>
+            <p>Invoice #${escapeHtml(invoice.invoice_number)}</p>
           </div>
           <div class="content">
-            <p>Dear ${customer?.name || 'Valued Customer'},</p>
+            <p>Dear ${escapeHtml(customer?.name || 'Valued Customer')},</p>
             <p>This is a friendly reminder that payment for the above invoice is now due.</p>
             <p class="amount">KSh ${parseFloat(invoice.total).toLocaleString()}</p>
             <p>Due Date: <strong>${invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'N/A'}</strong></p>
-            <a href="${process.env.APP_URL || 'http://localhost:5173'}/invoice/${invoice.id}" class="btn">Pay Now</a>
+            <a href="${escapeHtml(process.env.APP_URL || 'http://localhost:5173')}/invoice/${escapeHtml(invoice.id)}" class="btn">Pay Now</a>
           </div>
           <div class="footer">
             <p>Powered by <strong>BizFlow</strong></p>
@@ -154,7 +168,7 @@ export const sendWelcomeEmail = async (to, user) => {
             <p>Business Management Made Simple</p>
           </div>
           <div class="content">
-            <p>Hi ${user.name},</p>
+            <p>Hi ${escapeHtml(user.name)},</p>
             <p>Welcome to BizFlow! We're excited to help you manage your business more efficiently.</p>
             <div class="features">
               <strong>Here's what you can do:</strong>
@@ -166,7 +180,7 @@ export const sendWelcomeEmail = async (to, user) => {
                 <li>📈 Get business insights</li>
               </ul>
             </div>
-            <center><a href="${process.env.APP_URL || 'http://localhost:5173'}/dashboard.html" class="btn">Get Started</a></center>
+            <center><a href="${escapeHtml(process.env.APP_URL || 'http://localhost:5173')}/dashboard.html" class="btn">Get Started</a></center>
           </div>
           <div class="footer">
             <p>Need help? Reply to this email or contact support@bizflow.co.ke</p>
@@ -216,7 +230,7 @@ export const sendLowStockAlert = async (to, products) => {
             <p>The following items are running low:</p>
              <table>
                <tr><th>Product</th><th>Current Stock</th><th>Reorder Level</th></tr>
-               ${products.map(p => `<tr><td>${p.name}</td><td>${p.stock_qty}</td><td>${p.reorder_level}</td></tr>`).join('')}
+               ${products.map(p => `<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.stock_qty)}</td><td>${escapeHtml(p.reorder_level)}</td></tr>`).join('')}
              </table>
           </div>
         </div>
@@ -262,7 +276,7 @@ export const sendPasswordResetEmail = async (to, resetToken) => {
           <div class="content">
             <p>You requested to reset your BizFlow password.</p>
             <p>Click the button below to create a new password. This link will expire in 1 hour.</p>
-            <center><a href="${resetUrl}" class="btn">Reset Password</a></center>
+            <center><a href="${escapeHtml(resetUrl)}" class="btn">Reset Password</a></center>
             <p style="margin-top:20px;">If you didn't request this, please ignore this email.</p>
           </div>
           <div class="footer">

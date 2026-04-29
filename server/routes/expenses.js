@@ -1,10 +1,11 @@
 import express from 'express';
 import { query, pool } from '../config/db.js';
-import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.get('/', authenticate, async (req, res) => {
+// All routes protected by global `protect` middleware with CSRF
+
+router.get('/', async (req, res) => {
   try {
     const { category_id, start_date, end_date } = req.query;
     let sql = `SELECT e.*, ec.name as category_name 
@@ -38,7 +39,7 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const result = await query(
       'SELECT * FROM expenses WHERE id = $1 AND business_id = $2',
@@ -56,7 +57,7 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
-router.post('/', authenticate, async (req, res) => {
+router.post('/', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -94,7 +95,7 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { category_id, description, amount, date, vendor, reference, is_receipt_attached, notes } = req.body;
     
@@ -119,7 +120,7 @@ router.put('/:id', authenticate, async (req, res) => {
   }
 });
 
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const result = await query(
       'DELETE FROM expenses WHERE id = $1 AND business_id = $2 RETURNING id',
@@ -137,7 +138,7 @@ router.delete('/:id', authenticate, async (req, res) => {
   }
 });
 
-router.get('/categories/list', authenticate, async (req, res) => {
+router.get('/categories/list', async (req, res) => {
   try {
     const result = await query(
       'SELECT * FROM expense_categories WHERE business_id = $1 ORDER BY name',
@@ -150,7 +151,7 @@ router.get('/categories/list', authenticate, async (req, res) => {
   }
 });
 
-router.post('/categories', authenticate, async (req, res) => {
+router.post('/categories', async (req, res) => {
   try {
     const { name, description, icon } = req.body;
     const result = await query(
