@@ -256,12 +256,11 @@ router.get('/restock-budget', authenticate, async (req, res) => {
     const { multiplier = 2 } = req.query;
     const lowStock = await query(
       `SELECT p.id, p.name, p.sku, p.stock_qty, p.reorder_level, p.cost_price, p.selling_price,
-              c.name as category_name, v.name as preferred_vendor,
+              c.name as category_name,
               ((p.reorder_level * ${parseFloat(multiplier)} - p.stock_qty)) as suggested_qty,
               ((p.reorder_level * ${parseFloat(multiplier)} - p.stock_qty) * p.cost_price) as estimated_cost
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
-       LEFT JOIN vendors v ON p.category_id IS NOT NULL
        WHERE p.business_id = $1 AND p.stock_qty <= p.reorder_level AND p.is_active = true
          AND (p.reorder_level * ${parseFloat(multiplier)} - p.stock_qty) > 0
        ORDER BY estimated_cost DESC`,

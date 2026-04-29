@@ -356,12 +356,12 @@ function RestockBudget({ budgetData, onCreated }: { budgetData: any; onCreated: 
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item: any) => {
+                {items.map((item: any, i: number) => {
                   const targetQty = Math.ceil(item.reorder_level * parseFloat(multiplier));
                   const orderQty = Math.max(0, targetQty - item.stock_qty);
                   const estCost = orderQty * parseFloat(item.cost_price || 0);
                   return (
-                    <TableRow key={item.id}>
+                    <TableRow key={`${item.id}-${i}`}>
                       <TableCell className="font-medium text-sm">{item.name}</TableCell>
                       <TableCell className="text-right text-sm">{item.stock_qty}</TableCell>
                       <TableCell className="text-right text-sm">{targetQty}</TableCell>
