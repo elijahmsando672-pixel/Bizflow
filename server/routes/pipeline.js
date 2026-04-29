@@ -100,8 +100,8 @@ router.get('/', async (req, res) => {
 
     const result = await query(
       `SELECT d.*, ds.name as stage_name, ds.win_probability, ds.color as stage_color,
-              c.first_name || ' ' || c.last_name as customer_name,
-              u.first_name || ' ' || u.last_name as assigned_name
+              c.name as customer_name,
+              u.name as assigned_name
        FROM deals d
        LEFT JOIN deal_stages ds ON d.stage_id = ds.id
        LEFT JOIN customers c ON d.customer_id = c.id
@@ -117,12 +117,44 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Pipeline summary (for dashboard) - must be before /:id
+router.get('/pipeline-summary', async (req, res) => {
+  try {
+    const stages = await query(
+      `SELECT ds.id, ds.name, ds.color, ds.win_probability,
+              COUNT(d.id) as deal_count,
+              COALESCE(SUM(d.value), 0) as total_value,
+              COALESCE(SUM(d.value * ds.win_probability / 100), 0) as weighted_value
+       FROM deal_stages ds
+       LEFT JOIN deals d ON ds.id = d.stage_id AND d.outcome IS NULL
+       WHERE ds.business_id = $1
+       GROUP BY ds.id
+       ORDER BY ds.order_index`,
+      [req.business_id]
+    );
+
+    const summary = await query(
+      `SELECT 
+         COUNT(*) FILTER (WHERE outcome = 'won') as won_deals,
+         COALESCE(SUM(value) FILTER (WHERE outcome = 'won'), 0) as won_value,
+         COUNT(*) FILTER (WHERE outcome = 'lost') as lost_deals,
+         COALESCE(SUM(value) FILTER (WHERE outcome = 'lost'), 0) as lost_value
+       FROM deals WHERE business_id = $1 AND outcome IS NOT NULL`,
+      [req.business_id]
+    );
+
+    res.json({ stages: stages.rows, summary: summary.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch pipeline summary' });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const result = await query(
       `SELECT d.*, ds.name as stage_name, ds.win_probability, ds.color as stage_color,
-              c.first_name || ' ' || c.last_name as customer_name,
-              u.first_name || ' ' || u.last_name as assigned_name
+              c.name as customer_name,
+              u.name as assigned_name
        FROM deals d
        LEFT JOIN deal_stages ds ON d.stage_id = ds.id
        LEFT JOIN customers c ON d.customer_id = c.id
@@ -190,38 +222,6 @@ router.delete('/:id', async (req, res) => {
     res.json({ message: 'Deal deleted' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete deal' });
-  }
-});
-
-// Pipeline summary (for dashboard)
-router.get('/pipeline-summary', async (req, res) => {
-  try {
-    const stages = await query(
-      `SELECT ds.id, ds.name, ds.color, ds.win_probability,
-              COUNT(d.id) as deal_count,
-              COALESCE(SUM(d.value), 0) as total_value,
-              COALESCE(SUM(d.value * ds.win_probability / 100), 0) as weighted_value
-       FROM deal_stages ds
-       LEFT JOIN deals d ON ds.id = d.stage_id AND d.outcome IS NULL
-       WHERE ds.business_id = $1
-       GROUP BY ds.id
-       ORDER BY ds.order_index`,
-      [req.business_id]
-    );
-
-    const summary = await query(
-      `SELECT 
-         COUNT(*) FILTER (WHERE outcome = 'won') as won_deals,
-         COALESCE(SUM(value) FILTER (WHERE outcome = 'won'), 0) as won_value,
-         COUNT(*) FILTER (WHERE outcome = 'lost') as lost_deals,
-         COALESCE(SUM(value) FILTER (WHERE outcome = 'lost'), 0) as lost_value
-       FROM deals WHERE business_id = $1 AND outcome IS NOT NULL`,
-      [req.business_id]
-    );
-
-    res.json({ stages: stages.rows, summary: summary.rows[0] });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch pipeline summary' });
   }
 });
 

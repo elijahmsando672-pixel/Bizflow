@@ -27,16 +27,16 @@ router.get('/', async (req, res) => {
   try {
     const { status, source, assigned_to } = req.query;
     const businessId = req.business_id;
-    let conditions = ['business_id = $1'];
+    let conditions = ['l.business_id = $1'];
     const params = [businessId];
     let idx = 2;
 
-    if (status) { conditions.push(`status = $${idx}`); params.push(status); idx++; }
-    if (source) { conditions.push(`source = $${idx}`); params.push(source); idx++; }
-    if (assigned_to) { conditions.push(`assigned_to = $${idx}`); params.push(assigned_to); idx++; }
+    if (status) { conditions.push(`l.status = $${idx}`); params.push(status); idx++; }
+    if (source) { conditions.push(`l.source = $${idx}`); params.push(source); idx++; }
+    if (assigned_to) { conditions.push(`l.assigned_to = $${idx}`); params.push(assigned_to); idx++; }
 
     const result = await query(
-      `SELECT l.*, u.first_name || ' ' || u.last_name as assigned_name, c.first_name || ' ' || c.last_name as created_name
+      `SELECT l.*, u.name as assigned_name, c.name as created_name
        FROM leads l
        LEFT JOIN users u ON l.assigned_to = u.id
        LEFT JOIN users c ON l.created_by = c.id
@@ -54,7 +54,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const result = await query(
-      `SELECT l.*, u.first_name || ' ' || u.last_name as assigned_name
+      `SELECT l.*, u.name as assigned_name
        FROM leads l LEFT JOIN users u ON l.assigned_to = u.id
        WHERE l.id = $1 AND l.business_id = $2`,
       [req.params.id, req.business_id]

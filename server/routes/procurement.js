@@ -130,7 +130,7 @@ router.get('/purchase-orders', async (req, res) => {
     if (status) { conditions.push(`po.status = $${idx}`); params.push(status); idx++; }
 
     const result = await query(
-      `SELECT po.*, v.name as vendor_name, u.first_name || ' ' || u.last_name as created_by_name
+      `SELECT po.*, v.name as vendor_name, u.name as created_by_name
        FROM purchase_orders po
        LEFT JOIN vendors v ON po.vendor_id = v.id
        LEFT JOIN users u ON po.created_by = u.id

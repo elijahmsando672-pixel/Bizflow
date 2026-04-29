@@ -14,7 +14,7 @@ async function getNextTicketNumber(businessId) {
   return `TKT-${String(ticketCounter).padStart(5, '0')}`;
 }
 
-// SLA Configs
+// SLA Configs (before /:id)
 router.get('/sla-configs', async (req, res) => {
   try {
     const result = await query(
@@ -64,6 +64,38 @@ router.put('/sla-configs/:id', async (req, res) => {
   }
 });
 
+// Dashboard stats (before /:id)
+router.get('/dashboard-stats', async (req, res) => {
+  try {
+    const stats = await query(
+      `SELECT 
+         COUNT(*) as total_tickets,
+         COUNT(*) FILTER (WHERE status = 'open') as open_tickets,
+         COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress_tickets,
+         COUNT(*) FILTER (WHERE status = 'resolved') as resolved_tickets,
+         COUNT(*) FILTER (WHERE status = 'closed') as closed_tickets,
+         COUNT(*) FILTER (WHERE sla_deadline < NOW() AND status IN ('open','in_progress')) as breached_tickets,
+         COUNT(*) FILTER (WHERE priority = 'critical') as critical_tickets
+       FROM support_tickets WHERE business_id = $1`,
+      [req.business_id]
+    );
+
+    const recent = await query(
+      `SELECT t.ticket_number, t.subject, t.status, t.priority, t.created_at,
+              c.name as customer_name
+       FROM support_tickets t
+       LEFT JOIN customers c ON t.customer_id = c.id
+       WHERE t.business_id = $1
+       ORDER BY t.created_at DESC LIMIT 10`,
+      [req.business_id]
+    );
+
+    res.json({ stats: stats.rows[0], recent: recent.rows });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch ticket stats' });
+  }
+});
+
 // Tickets
 router.post('/', async (req, res) => {
   try {
@@ -104,8 +136,8 @@ router.get('/', async (req, res) => {
     if (assigned_to) { conditions.push(`t.assigned_to = $${idx}`); params.push(assigned_to); idx++; }
 
     const result = await query(
-      `SELECT t.*, c.first_name || ' ' || c.last_name as customer_name,
-              u.first_name || ' ' || u.last_name as assigned_name,
+      `SELECT t.*, c.name as customer_name,
+              u.name as assigned_name,
               CASE WHEN t.sla_deadline < NOW() AND t.status IN ('open','in_progress') THEN true ELSE false END as sla_breached
        FROM support_tickets t
        LEFT JOIN customers c ON t.customer_id = c.id
@@ -126,8 +158,8 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const result = await query(
-      `SELECT t.*, c.first_name || ' ' || c.last_name as customer_name,
-              u.first_name || ' ' || u.last_name as assigned_name,
+      `SELECT t.*, c.name as customer_name,
+              u.name as assigned_name,
               CASE WHEN t.sla_deadline < NOW() AND t.status IN ('open','in_progress') THEN true ELSE false END as sla_breached
        FROM support_tickets t
        LEFT JOIN customers c ON t.customer_id = c.id
@@ -191,7 +223,7 @@ router.post('/:id/replies', async (req, res) => {
 router.get('/:id/replies', async (req, res) => {
   try {
     const result = await query(
-      `SELECT r.*, u.first_name || ' ' || u.last_name as author_name
+      `SELECT r.*, u.name as author_name
        FROM ticket_replies r
        LEFT JOIN users u ON r.created_by = u.id
        WHERE r.ticket_id = $1
@@ -212,38 +244,6 @@ router.delete('/:id', async (req, res) => {
     res.json({ message: 'Ticket deleted' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete ticket' });
-  }
-});
-
-// Dashboard stats
-router.get('/dashboard-stats', async (req, res) => {
-  try {
-    const stats = await query(
-      `SELECT 
-         COUNT(*) as total_tickets,
-         COUNT(*) FILTER (WHERE status = 'open') as open_tickets,
-         COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress_tickets,
-         COUNT(*) FILTER (WHERE status = 'resolved') as resolved_tickets,
-         COUNT(*) FILTER (WHERE status = 'closed') as closed_tickets,
-         COUNT(*) FILTER (WHERE sla_deadline < NOW() AND status IN ('open','in_progress')) as breached_tickets,
-         COUNT(*) FILTER (WHERE priority = 'critical') as critical_tickets
-       FROM support_tickets WHERE business_id = $1`,
-      [req.business_id]
-    );
-
-    const recent = await query(
-      `SELECT t.ticket_number, t.subject, t.status, t.priority, t.created_at,
-              c.first_name || ' ' || c.last_name as customer_name
-       FROM support_tickets t
-       LEFT JOIN customers c ON t.customer_id = c.id
-       WHERE t.business_id = $1
-       ORDER BY t.created_at DESC LIMIT 10`,
-      [req.business_id]
-    );
-
-    res.json({ stats: stats.rows[0], recent: recent.rows });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch ticket stats' });
   }
 });
 

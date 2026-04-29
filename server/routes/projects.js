@@ -27,8 +27,8 @@ router.get('/', async (req, res) => {
     if (status) { conditions.push(`p.status = $${idx}`); params.push(status); idx++; }
 
     const result = await query(
-      `SELECT p.*, c.first_name || ' ' || c.last_name as customer_name,
-              u.first_name || ' ' || u.last_name as assigned_name,
+      `SELECT p.*, c.name as customer_name,
+              u.name as assigned_name,
               COUNT(pt.id) FILTER (WHERE pt.status = 'todo') as tasks_todo,
               COUNT(pt.id) FILTER (WHERE pt.status = 'in_progress') as tasks_in_progress,
               COUNT(pt.id) FILTER (WHERE pt.status = 'completed') as tasks_done,
@@ -39,7 +39,7 @@ router.get('/', async (req, res) => {
        LEFT JOIN project_tasks pt ON p.id = pt.project_id
        LEFT JOIN time_entries te ON p.id = te.project_id
        WHERE ${conditions.join(' AND ')}
-       GROUP BY p.id, c.first_name, c.last_name, u.first_name, u.last_name
+       GROUP BY p.id, c.name, u.name
        ORDER BY p.created_at DESC`,
       params
     );
@@ -52,8 +52,8 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const result = await query(
-      `SELECT p.*, c.first_name || ' ' || c.last_name as customer_name,
-              u.first_name || ' ' || u.last_name as assigned_name
+      `SELECT p.*, c.name as customer_name,
+              u.name as assigned_name
        FROM projects p
        LEFT JOIN customers c ON p.customer_id = c.id
        LEFT JOIN users u ON p.assigned_to = u.id
@@ -88,7 +88,7 @@ router.put('/:id', async (req, res) => {
 router.get('/:id/tasks', async (req, res) => {
   try {
     const result = await query(
-      `SELECT pt.*, u.first_name || ' ' || u.last_name as assignee_name
+      `SELECT pt.*, u.name as assignee_name
        FROM project_tasks pt
        LEFT JOIN users u ON pt.assignee_id = u.id
        WHERE pt.project_id = $1 AND pt.business_id = $2
