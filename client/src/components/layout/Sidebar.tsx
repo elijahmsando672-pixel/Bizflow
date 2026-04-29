@@ -24,6 +24,7 @@ import {
   Ticket,
   FolderOpen,
   Truck,
+  Clock,
 } from "lucide-react";
 
 const navigation = [
@@ -41,6 +42,7 @@ const navigation = [
     items: [
       { name: "Projects", href: "/projects", icon: FolderOpen },
       { name: "Procurement", href: "/procurement", icon: Truck },
+      { name: "Time Tracking", href: "/timetracking", icon: Clock },
       { name: "Products", href: "/products", icon: Package },
     ],
   },

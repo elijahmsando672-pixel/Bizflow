@@ -23,6 +23,7 @@ import pipelineRoutes from './routes/pipeline.js';
 import supportRoutes from './routes/support.js';
 import projectRoutes from './routes/projects.js';
 import procurementRoutes from './routes/procurement.js';
+import timetrackingRoutes from './routes/timetracking.js';
 import { protect } from './middleware/protect.js';
 
 dotenv.config();
@@ -136,6 +137,7 @@ app.use('/api/pipeline', protect, pipelineRoutes);
 app.use('/api/support', protect, supportRoutes);
 app.use('/api/projects', protect, projectRoutes);
 app.use('/api/procurement', protect, procurementRoutes);
+app.use('/api/timetracking', protect, timetrackingRoutes);
 
 // Auth routes (no CSRF, have their own protections)
 app.use('/api/auth', authRoutes);

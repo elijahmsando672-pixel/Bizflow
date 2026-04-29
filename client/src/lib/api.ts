@@ -316,6 +316,13 @@ const api = {
     updatePurchaseOrder: (id: string, data: unknown) => fetchApi(`/procurement/purchase-orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     deletePurchaseOrder: (id: string) => fetchApi(`/procurement/purchase-orders/${id}`, { method: 'DELETE' }),
   },
+  timetracking: {
+    getEntries: (params?: string) => fetchApi(`/timetracking${params ? `?${params}` : ''}`),
+    getSummary: (params?: string) => fetchApi(`/timetracking/summary${params ? `?${params}` : ''}`),
+    createEntry: (data: unknown) => fetchApi('/timetracking', { method: 'POST', body: JSON.stringify(data) }),
+    updateEntry: (id: string, data: unknown) => fetchApi(`/timetracking/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteEntry: (id: string) => fetchApi(`/timetracking/${id}`, { method: 'DELETE' }),
+  },
 };
 
 export default api;
