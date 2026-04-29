@@ -629,6 +629,278 @@ export const initDatabase = async () => {
     );
 
     CREATE INDEX IF NOT EXISTS idx_ai_insights ON ai_insights(business_id, created_at DESC);
+
+    -- ========================================
+    -- PHASE 1: CRM - Lead & Opportunity Management
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS leads (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      first_name VARCHAR(100) NOT NULL,
+      last_name VARCHAR(100) NOT NULL,
+      email VARCHAR(255),
+      phone VARCHAR(50),
+      company VARCHAR(255),
+      job_title VARCHAR(100),
+      source VARCHAR(50),
+      status VARCHAR(20) DEFAULT 'new',
+      lead_score INTEGER DEFAULT 0,
+      estimated_value DECIMAL(12,2) DEFAULT 0,
+      assigned_to UUID REFERENCES users(id),
+      notes TEXT,
+      converted_customer_id UUID REFERENCES customers(id),
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_leads_business ON leads(business_id, status);
+
+    CREATE TABLE IF NOT EXISTS customer_activities (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      customer_id UUID REFERENCES customers(id) ON DELETE CASCADE,
+      activity_type VARCHAR(50) NOT NULL,
+      subject VARCHAR(255),
+      description TEXT,
+      scheduled_at TIMESTAMP,
+      completed_at TIMESTAMP,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_customer_activities ON customer_activities(customer_id, created_at DESC);
+
+    -- ========================================
+    -- PHASE 1: Sales Pipeline
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS deal_stages (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      order_index INTEGER DEFAULT 0,
+      win_probability INTEGER DEFAULT 0,
+      color VARCHAR(7) DEFAULT '#6366f1',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS deals (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+      lead_id UUID REFERENCES leads(id) ON DELETE SET NULL,
+      name VARCHAR(255) NOT NULL,
+      stage_id UUID REFERENCES deal_stages(id) ON DELETE SET NULL,
+      value DECIMAL(12,2) DEFAULT 0,
+      priority VARCHAR(20) DEFAULT 'medium',
+      expected_close_date DATE,
+      actual_close_date DATE,
+      assigned_to UUID REFERENCES users(id),
+      outcome VARCHAR(20),
+      loss_reason TEXT,
+      notes TEXT,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_deals_business ON deals(business_id, stage_id);
+    CREATE INDEX IF NOT EXISTS idx_deals_stage ON deals(stage_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS deal_activities (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      deal_id UUID REFERENCES deals(id) ON DELETE CASCADE,
+      activity_type VARCHAR(50) NOT NULL,
+      description TEXT,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_deal_activities ON deal_activities(deal_id, created_at DESC);
+
+    -- ========================================
+    -- PHASE 1: Support / Ticketing
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS support_tickets (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+      ticket_number VARCHAR(50) UNIQUE NOT NULL,
+      subject VARCHAR(255) NOT NULL,
+      description TEXT,
+      priority VARCHAR(20) DEFAULT 'medium',
+      status VARCHAR(20) DEFAULT 'open',
+      category VARCHAR(50),
+      assigned_to UUID REFERENCES users(id),
+      sla_deadline TIMESTAMP,
+      resolved_at TIMESTAMP,
+      closed_at TIMESTAMP,
+      resolution_notes TEXT,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tickets_business ON support_tickets(business_id, status);
+
+    CREATE TABLE IF NOT EXISTS ticket_replies (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      ticket_id UUID REFERENCES support_tickets(id) ON DELETE CASCADE,
+      message TEXT NOT NULL,
+      is_internal BOOLEAN DEFAULT false,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ticket_replies ON ticket_replies(ticket_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS sla_configs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      category VARCHAR(50) NOT NULL,
+      priority VARCHAR(20) NOT NULL,
+      response_hours INTEGER DEFAULT 24,
+      resolution_hours INTEGER DEFAULT 48,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ========================================
+    -- PHASE 2: Project Management
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS projects (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      description TEXT,
+      status VARCHAR(20) DEFAULT 'active',
+      start_date DATE,
+      end_date DATE,
+      budget DECIMAL(12,2),
+      customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+      assigned_to UUID REFERENCES users(id),
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_projects_business ON projects(business_id, status);
+
+    CREATE TABLE IF NOT EXISTS project_tasks (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+      title VARCHAR(255) NOT NULL,
+      description TEXT,
+      status VARCHAR(20) DEFAULT 'todo',
+      priority VARCHAR(20) DEFAULT 'medium',
+      assignee_id UUID REFERENCES users(id),
+      due_date DATE,
+      estimated_hours DECIMAL(10,2),
+      actual_hours DECIMAL(10,2),
+      completed_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_project_tasks ON project_tasks(project_id, status);
+
+    CREATE TABLE IF NOT EXISTS time_entries (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      user_id UUID REFERENCES users(id),
+      project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+      task_id UUID REFERENCES project_tasks(id) ON DELETE SET NULL,
+      customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+      description TEXT,
+      date DATE DEFAULT CURRENT_DATE,
+      start_time TIMESTAMP,
+      end_time TIMESTAMP,
+      duration_minutes INTEGER,
+      is_billable BOOLEAN DEFAULT true,
+      billed_amount DECIMAL(10,2) DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_time_entries ON time_entries(user_id, date);
+    CREATE INDEX IF NOT EXISTS idx_time_entries_project ON time_entries(project_id);
+
+    -- ========================================
+    -- PHASE 2: Procurement & Purchase Orders
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS vendors (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255),
+      phone VARCHAR(50),
+      address TEXT,
+      contact_person VARCHAR(100),
+      payment_terms VARCHAR(50),
+      rating DECIMAL(2,1),
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_vendors_business ON vendors(business_id);
+
+    CREATE TABLE IF NOT EXISTS purchase_orders (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      po_number VARCHAR(50) UNIQUE NOT NULL,
+      vendor_id UUID REFERENCES vendors(id) ON DELETE SET NULL,
+      status VARCHAR(20) DEFAULT 'draft',
+      order_date DATE DEFAULT CURRENT_DATE,
+      expected_delivery DATE,
+      subtotal DECIMAL(12,2) DEFAULT 0,
+      tax_amount DECIMAL(12,2) DEFAULT 0,
+      total DECIMAL(12,2) DEFAULT 0,
+      notes TEXT,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_po_business ON purchase_orders(business_id, status);
+
+    CREATE TABLE IF NOT EXISTS po_items (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      po_id UUID REFERENCES purchase_orders(id) ON DELETE CASCADE,
+      product_id UUID REFERENCES products(id) ON DELETE SET NULL,
+      product_name VARCHAR(255) NOT NULL,
+      qty INTEGER NOT NULL,
+      unit_price DECIMAL(12,2) NOT NULL,
+      total DECIMAL(12,2) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ========================================
+    -- PHASE 4: Granular Permissions
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS permissions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      role_name VARCHAR(50) NOT NULL,
+      resource VARCHAR(50) NOT NULL,
+      can_create BOOLEAN DEFAULT false,
+      can_read BOOLEAN DEFAULT true,
+      can_update BOOLEAN DEFAULT false,
+      can_delete BOOLEAN DEFAULT false,
+      UNIQUE(business_id, role_name, resource),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_permissions ON permissions(business_id, role_name);
   `;
 
   await pool.query(schema);

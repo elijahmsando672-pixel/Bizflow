@@ -19,22 +19,42 @@ import {
   BadgeDollarSign,
   Brain,
   UserCheck,
+  Target,
+  FolderKanban,
+  Ticket,
+  FolderOpen,
+  Truck,
 } from "lucide-react";
 
 const navigation = [
   {
-    title: "Money",
+    title: "Sales & CRM",
     items: [
+      { name: "CRM", href: "/crm", icon: Target },
+      { name: "Pipeline", href: "/pipeline", icon: FolderKanban },
       { name: "Sales", href: "/sales", icon: ShoppingCart },
-      { name: "Expenses", href: "/expenses", icon: DollarSign },
-      { name: "Creditors", href: "/creditors", icon: CreditCard },
       { name: "Debtors", href: "/debtors", icon: BadgeDollarSign },
     ],
   },
   {
-    title: "Inventory",
+    title: "Operations",
     items: [
+      { name: "Projects", href: "/projects", icon: FolderOpen },
+      { name: "Procurement", href: "/procurement", icon: Truck },
       { name: "Products", href: "/products", icon: Package },
+    ],
+  },
+  {
+    title: "Money",
+    items: [
+      { name: "Expenses", href: "/expenses", icon: DollarSign },
+      { name: "Creditors", href: "/creditors", icon: CreditCard },
+    ],
+  },
+  {
+    title: "Support",
+    items: [
+      { name: "Tickets", href: "/support", icon: Ticket },
     ],
   },
   {

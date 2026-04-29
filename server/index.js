@@ -18,6 +18,11 @@ import subscriptionRoutes from './routes/subscriptions.js';
 import debtorRoutes from './routes/debtors.js';
 import reportRoutes from './routes/reports.js';
 import aiRoutes from './routes/ai.js';
+import crmRoutes from './routes/crm.js';
+import pipelineRoutes from './routes/pipeline.js';
+import supportRoutes from './routes/support.js';
+import projectRoutes from './routes/projects.js';
+import procurementRoutes from './routes/procurement.js';
 import { protect } from './middleware/protect.js';
 
 dotenv.config();
@@ -126,6 +131,11 @@ app.use('/api/subscriptions', protect, subscriptionRoutes);
 app.use('/api/debtors', protect, debtorRoutes);
 app.use('/api/reports', protect, reportRoutes);
 app.use('/api/ai', protect, aiRoutes);
+app.use('/api/crm', protect, crmRoutes);
+app.use('/api/pipeline', protect, pipelineRoutes);
+app.use('/api/support', protect, supportRoutes);
+app.use('/api/projects', protect, projectRoutes);
+app.use('/api/procurement', protect, procurementRoutes);
 
 // Auth routes (no CSRF, have their own protections)
 app.use('/api/auth', authRoutes);
