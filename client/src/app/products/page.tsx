@@ -12,14 +12,35 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, AlertTriangle, Package, Loader2 } from "lucide-react";
+import { Plus, Search, AlertTriangle, Package, Loader2, X } from "lucide-react";
 import api from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [productForm, setProductForm] = useState({ name: "", sku: "", category: "", price: "", stock_qty: "", reorder_level: "", description: "" });
+  const [categories, setCategories] = useState<any[]>([]);
   const toast = useToast();
 
   const loadProducts = async () => {
@@ -36,7 +57,79 @@ export default function ProductsPage() {
 
   useEffect(() => {
     loadProducts();
+    loadCategories();
   }, []);
+
+  const loadCategories = async () => {
+    try {
+      const data = await api.products.getCategories();
+      setCategories(data as any[]);
+    } catch (err: any) {
+      console.error("Failed to load categories:", err);
+    }
+  };
+
+  const handleCreateProduct = async () => {
+    if (!productForm.name || !productForm.price) {
+      toast.error("Name and price are required");
+      return;
+    }
+    try {
+      await api.products.create({
+        name: productForm.name,
+        sku: productForm.sku || undefined,
+        category: productForm.category,
+        price: parseFloat(productForm.price),
+        stock_qty: parseInt(productForm.stock_qty) || 0,
+        reorder_level: parseInt(productForm.reorder_level) || 0,
+        description: productForm.description || undefined,
+      });
+      toast.success("Product created");
+      setDialogOpen(false);
+      setProductForm({ name: "", sku: "", category: "", price: "", stock_qty: "", reorder_level: "", description: "" });
+      loadProducts();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to create product");
+    }
+  };
+
+  const handleEditProduct = (product: any) => {
+    setEditingProduct(product);
+    setProductForm({
+      name: product.name || "",
+      sku: product.sku || "",
+      category: product.category || "",
+      price: product.price || "",
+      stock_qty: product.stock_qty?.toString() || "",
+      reorder_level: product.reorder_level?.toString() || "",
+      description: product.description || "",
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateProduct = async () => {
+    if (!productForm.name || !productForm.price) {
+      toast.error("Name and price are required");
+      return;
+    }
+    try {
+      await api.products.update(editingProduct.id, {
+        name: productForm.name,
+        sku: productForm.sku || undefined,
+        category: productForm.category,
+        price: parseFloat(productForm.price),
+        stock_qty: parseInt(productForm.stock_qty) || 0,
+        reorder_level: parseInt(productForm.reorder_level) || 0,
+        description: productForm.description || undefined,
+      });
+      toast.success("Product updated");
+      setEditDialogOpen(false);
+      setEditingProduct(null);
+      loadProducts();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update product");
+    }
+  };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure?")) return;
@@ -64,7 +157,7 @@ export default function ProductsPage() {
           <h2 className="text-3xl font-bold text-gray-900">Products</h2>
           <p className="text-gray-500">Manage your product inventory</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700">
+        <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => { setProductForm({ name: "", sku: "", category: "", price: "", stock_qty: "", reorder_level: "", description: "" }); setDialogOpen(true); }}>
           <Plus className="mr-2 h-4 w-4" />
           Add Product
         </Button>
@@ -167,9 +260,14 @@ export default function ProductsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">
-                        Edit
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)}>
+                          Edit
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(product.id)}>
+                          Delete
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -185,6 +283,113 @@ export default function ProductsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Product</DialogTitle>
+            <DialogDescription>Create a new product</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Product Name</Label>
+              <Input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} placeholder="Product name" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>SKU</Label>
+                <Input value={productForm.sku} onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })} placeholder="SKU" />
+              </div>
+              <div>
+                <Label>Category</Label>
+                <Select value={productForm.category} onValueChange={(v) => setProductForm({ ...productForm, category: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat: any) => (
+                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Price</Label>
+                <Input type="number" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} placeholder="0.00" />
+              </div>
+              <div>
+                <Label>Stock Qty</Label>
+                <Input type="number" value={productForm.stock_qty} onChange={(e) => setProductForm({ ...productForm, stock_qty: e.target.value })} placeholder="0" />
+              </div>
+            </div>
+            <div>
+              <Label>Reorder Level</Label>
+              <Input type="number" value={productForm.reorder_level} onChange={(e) => setProductForm({ ...productForm, reorder_level: e.target.value })} placeholder="0" />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} placeholder="Optional description" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+              <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleCreateProduct}>Create Product</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Product</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Product Name</Label>
+              <Input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>SKU</Label>
+                <Input value={productForm.sku} onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })} />
+              </div>
+              <div>
+                <Label>Category</Label>
+                <Select value={productForm.category} onValueChange={(v) => setProductForm({ ...productForm, category: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat: any) => (
+                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Price</Label>
+                <Input type="number" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} />
+              </div>
+              <div>
+                <Label>Stock Qty</Label>
+                <Input type="number" value={productForm.stock_qty} onChange={(e) => setProductForm({ ...productForm, stock_qty: e.target.value })} />
+              </div>
+            </div>
+            <div>
+              <Label>Reorder Level</Label>
+              <Input type="number" value={productForm.reorder_level} onChange={(e) => setProductForm({ ...productForm, reorder_level: e.target.value })} />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+              <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleUpdateProduct}>Update Product</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

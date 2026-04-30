@@ -12,14 +12,33 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, Users, UserCheck, UserX, Loader2 } from "lucide-react";
+import { Plus, Search, Users, UserCheck, UserX, Loader2, X } from "lucide-react";
 import api from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [customerForm, setCustomerForm] = useState({ name: "", email: "", phone: "", address: "", status: "active" });
   const toast = useToast();
 
   const loadCustomers = async () => {
@@ -49,6 +68,33 @@ export default function CustomersPage() {
     }
   };
 
+  const handleCreateCustomer = async () => {
+    if (!customerForm.name) {
+      toast.error("Name is required");
+      return;
+    }
+    try {
+      await api.customers.create({
+        name: customerForm.name,
+        email: customerForm.email || undefined,
+        phone: customerForm.phone || undefined,
+        address: customerForm.address || undefined,
+        status: customerForm.status,
+      });
+      toast.success("Customer created");
+      setDialogOpen(false);
+      setCustomerForm({ name: "", email: "", phone: "", address: "", status: "active" });
+      loadCustomers();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to create customer");
+    }
+  };
+
+  const handleViewCustomer = (customer: any) => {
+    setSelectedCustomer(customer);
+    setViewDialogOpen(true);
+  };
+
   const filteredCustomers = customers.filter((c) =>
     c.name?.toLowerCase().includes(search.toLowerCase()) ||
     c.email?.toLowerCase().includes(search.toLowerCase())
@@ -63,7 +109,7 @@ export default function CustomersPage() {
           <h2 className="text-3xl font-bold text-gray-900">Customers</h2>
           <p className="text-gray-500">Manage your customer relationships</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700">
+        <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => { setCustomerForm({ name: "", email: "", phone: "", address: "", status: "active" }); setDialogOpen(true); }}>
           <Plus className="mr-2 h-4 w-4" />
           Add Customer
         </Button>
@@ -165,9 +211,14 @@ export default function CustomersPage() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">
-                        View
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => handleViewCustomer(customer)}>
+                          View
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(customer.id)}>
+                          Delete
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -183,6 +234,89 @@ export default function CustomersPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Customer</DialogTitle>
+            <DialogDescription>Create a new customer</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Full Name</Label>
+              <Input value={customerForm.name} onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })} placeholder="Customer name" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Email</Label>
+                <Input type="email" value={customerForm.email} onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })} placeholder="email@example.com" />
+              </div>
+              <div>
+                <Label>Phone</Label>
+                <Input value={customerForm.phone} onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })} placeholder="+254..." />
+              </div>
+            </div>
+            <div>
+              <Label>Address</Label>
+              <Input value={customerForm.address} onChange={(e) => setCustomerForm({ ...customerForm, address: e.target.value })} placeholder="Address" />
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={customerForm.status} onValueChange={(v) => setCustomerForm({ ...customerForm, status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+              <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleCreateCustomer}>Add Customer</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Customer Details</DialogTitle>
+          </DialogHeader>
+          {selectedCustomer && (
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm text-gray-500">Name</p>
+                <p className="font-medium">{selectedCustomer.name}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Email</p>
+                  <p className="font-medium">{selectedCustomer.email || "N/A"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Phone</p>
+                  <p className="font-medium">{selectedCustomer.phone || "N/A"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Total Spent</p>
+                  <p className="font-medium">KSh {parseFloat(selectedCustomer.total_spent || 0).toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Orders</p>
+                  <p className="font-medium">{selectedCustomer.order_count || 0}</p>
+                </div>
+              </div>
+              {selectedCustomer.address && (
+                <div>
+                  <p className="text-sm text-gray-500">Address</p>
+                  <p className="font-medium">{selectedCustomer.address}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

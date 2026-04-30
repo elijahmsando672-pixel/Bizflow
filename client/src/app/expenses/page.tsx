@@ -12,14 +12,35 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, DollarSign, TrendingDown, Loader2 } from "lucide-react";
+import { Plus, Search, DollarSign, TrendingDown, Loader2, X } from "lucide-react";
 import api from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<any>(null);
+  const [expenseForm, setExpenseForm] = useState({ description: "", amount: "", category: "", expense_date: "", status: "pending", receipt_url: "" });
+  const [categories, setCategories] = useState<any[]>([]);
   const toast = useToast();
 
   const loadExpenses = async () => {
@@ -36,7 +57,17 @@ export default function ExpensesPage() {
 
   useEffect(() => {
     loadExpenses();
+    loadCategories();
   }, []);
+
+  const loadCategories = async () => {
+    try {
+      const data = await api.expenses.getCategories();
+      setCategories(data as any[]);
+    } catch (err: any) {
+      console.error("Failed to load categories:", err);
+    }
+  };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure?")) return;
@@ -46,6 +77,44 @@ export default function ExpensesPage() {
       loadExpenses();
     } catch (err: any) {
       toast.error(err?.message || "Failed to delete expense");
+    }
+  };
+
+  const handleCreateExpense = async () => {
+    if (!expenseForm.description || !expenseForm.amount) {
+      toast.error("Description and amount are required");
+      return;
+    }
+    try {
+      await api.expenses.create({
+        description: expenseForm.description,
+        amount: parseFloat(expenseForm.amount),
+        category: expenseForm.category,
+        expense_date: expenseForm.expense_date || new Date().toISOString().split("T")[0],
+        status: expenseForm.status,
+        receipt_url: expenseForm.receipt_url || undefined,
+      });
+      toast.success("Expense created");
+      setDialogOpen(false);
+      setExpenseForm({ description: "", amount: "", category: "", expense_date: "", status: "pending", receipt_url: "" });
+      loadExpenses();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to create expense");
+    }
+  };
+
+  const handleViewExpense = (expense: any) => {
+    setSelectedExpense(expense);
+    setViewDialogOpen(true);
+  };
+
+  const handleApproveExpense = async (id: string) => {
+    try {
+      await api.expenses.update(id, { status: "approved" } as any);
+      toast.success("Expense approved");
+      loadExpenses();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to approve expense");
     }
   };
 
@@ -65,7 +134,7 @@ export default function ExpensesPage() {
           <h2 className="text-3xl font-bold text-gray-900">Expenses</h2>
           <p className="text-gray-500">Track and manage business expenses</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700">
+        <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Add Expense
         </Button>
@@ -165,9 +234,19 @@ export default function ExpensesPage() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">
-                        View
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => handleViewExpense(expense)}>
+                          View
+                        </Button>
+                        {expense.status === "pending" && (
+                          <Button variant="ghost" size="sm" onClick={() => handleApproveExpense(expense.id)}>
+                            Approve
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(expense.id)}>
+                          Delete
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -183,6 +262,104 @@ export default function ExpensesPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Expense</DialogTitle>
+            <DialogDescription>Record a new business expense</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Description</Label>
+              <Textarea value={expenseForm.description} onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })} placeholder="What was this expense for?" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Amount</Label>
+                <Input type="number" value={expenseForm.amount} onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} placeholder="0.00" />
+              </div>
+              <div>
+                <Label>Category</Label>
+                <Select value={expenseForm.category} onValueChange={(v) => setExpenseForm({ ...expenseForm, category: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat: any) => (
+                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Date</Label>
+                <Input type="date" value={expenseForm.expense_date} onChange={(e) => setExpenseForm({ ...expenseForm, expense_date: e.target.value })} />
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select value={expenseForm.status} onValueChange={(v) => setExpenseForm({ ...expenseForm, status: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Receipt URL (optional)</Label>
+              <Input value={expenseForm.receipt_url} onChange={(e) => setExpenseForm({ ...expenseForm, receipt_url: e.target.value })} placeholder="https://..." />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+              <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleCreateExpense}>Add Expense</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Expense Details</DialogTitle>
+          </DialogHeader>
+          {selectedExpense && (
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm text-gray-500">Description</p>
+                <p className="font-medium">{selectedExpense.description}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Amount</p>
+                  <p className="font-medium">KSh {parseFloat(selectedExpense.amount || 0).toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Category</p>
+                  <p className="font-medium">{selectedExpense.category || "N/A"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Date</p>
+                  <p className="font-medium">{new Date(selectedExpense.expense_date).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Status</p>
+                  <span className={`rounded-full px-2 py-1 text-xs font-medium ${
+                    selectedExpense.status === "approved" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                  }`}>{selectedExpense.status}</span>
+                </div>
+              </div>
+              {selectedExpense.receipt_url && (
+                <div>
+                  <p className="text-sm text-gray-500">Receipt</p>
+                  <a href={selectedExpense.receipt_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">View Receipt</a>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
