@@ -6,15 +6,26 @@ const router = express.Router();
 // ========== MODULE 2: PRODUCTS / INVENTORY ==========
 // All routes protected by global `protect` middleware with CSRF
 
-// Get product by ID
-router.get('/:id', async (req, res) => {
+// Get categories (MUST be before /:id routes)
+router.get('/categories', async (req, res) => {
   try {
+    const result = await query('SELECT * FROM categories WHERE business_id = $1 ORDER BY name', [req.business_id]);
+    res.json(result.rows);
+   } catch (err) {
+     console.error('Products route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
+});
+
+// Create category
+router.post('/categories', async (req, res) => {
+  try {
+    const { name, description, parent_id } = req.body;
     const result = await query(
-      'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = $1 AND p.business_id = $2',
-      [req.params.id, req.business_id]
+      'INSERT INTO categories (business_id, name, description, parent_id) VALUES ($1, $2, $3, $4) RETURNING *',
+      [req.business_id, name, description, parent_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
-    res.json(result.rows[0]);
+    res.status(201).json(result.rows[0]);
    } catch (err) {
      console.error('Products route error:', err);
      res.status(500).json({ error: 'Internal server error' });
@@ -45,32 +56,6 @@ router.get('/', async (req, res) => {
    }
 });
 
-// Get categories
-router.get('/categories', async (req, res) => {
-  try {
-    const result = await query('SELECT * FROM categories WHERE business_id = $1 ORDER BY name', [req.business_id]);
-    res.json(result.rows);
-   } catch (err) {
-     console.error('Products route error:', err);
-     res.status(500).json({ error: 'Internal server error' });
-   }
-});
-
-// Create category
-router.post('/categories', async (req, res) => {
-  try {
-    const { name, description, parent_id } = req.body;
-    const result = await query(
-      'INSERT INTO categories (business_id, name, description, parent_id) VALUES ($1, $2, $3, $4) RETURNING *',
-      [req.business_id, name, description, parent_id]
-    );
-    res.status(201).json(result.rows[0]);
-   } catch (err) {
-     console.error('Products route error:', err);
-     res.status(500).json({ error: 'Internal server error' });
-   }
-});
-
 // Create product
 router.post('/', async (req, res) => {
   try {
@@ -91,6 +76,21 @@ router.post('/', async (req, res) => {
     }
 
     res.status(201).json(result.rows[0]);
+   } catch (err) {
+     console.error('Products route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
+});
+
+// Get product by ID (MUST be after /categories)
+router.get('/:id', async (req, res) => {
+  try {
+    const result = await query(
+      'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = $1 AND p.business_id = $2',
+      [req.params.id, req.business_id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
+    res.json(result.rows[0]);
    } catch (err) {
      console.error('Products route error:', err);
      res.status(500).json({ error: 'Internal server error' });

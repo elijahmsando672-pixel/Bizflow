@@ -99,11 +99,11 @@ export function Sidebar() {
         <img
           src="/logo.png"
           alt="BizFlow"
-          width={56}
-          height={56}
-          className="h-14 w-14 rounded-md"
+          width={80}
+          height={80}
+          className="h-20 w-20 rounded-md"
         />
-        <h1 className="text-xl font-bold text-blue-600">BizFlow</h1>
+        <h1 className="text-2xl font-bold text-blue-600">BizFlow</h1>
       </div>
       <div className="flex-1 overflow-y-auto py-4">
         {navigation.map((group) => (
