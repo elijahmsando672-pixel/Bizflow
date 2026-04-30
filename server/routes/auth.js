@@ -258,7 +258,8 @@ router.post('/login', auditLogger('auth.login'), async (req, res) => {
 router.get('/me', authenticate, auditLogger('auth.me'), async (req, res) => {
   try {
     const result = await query(
-      `SELECT u.id, u.name, u.email, u.role, u.business_id, b.name as business_name, b.email as business_email 
+      `SELECT u.id, u.name, u.email, u.role, u.business_id, 
+              b.name as business_name, b.email as business_email, b.phone, b.address, b.tax_id
        FROM users u JOIN businesses b ON u.business_id = b.id 
        WHERE u.id = $1`,
       [req.user.id]

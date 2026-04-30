@@ -40,13 +40,13 @@ export default function SettingsPage() {
     try {
       const me = await api.auth.me();
       const meAny = me as any;
-      setProfile({ name: meAny.user?.name || "", email: meAny.user?.email || "" });
+      setProfile({ name: meAny.name || "", email: meAny.email || "" });
       setBusiness({
-        name: meAny.business?.name || "",
-        email: meAny.business?.email || "",
-        phone: meAny.business?.phone || "",
-        address: meAny.business?.address || "",
-        tax_id: meAny.business?.tax_id || "",
+        name: meAny.business_name || "",
+        email: meAny.business_email || "",
+        phone: meAny.phone || "",
+        address: meAny.address || "",
+        tax_id: meAny.tax_id || "",
       });
     } catch (err: any) {
       toast.error(err?.message || "Failed to load settings");
