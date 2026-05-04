@@ -1,12 +1,11 @@
 import express from 'express';
 import { query } from '../config/db.js';
-import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // All routes protected by global `protect` middleware with CSRF
 
-router.get('/', authenticate, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const businessId = req.business_id;
     
@@ -88,7 +87,7 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-router.get('/revenue-chart', authenticate, async (req, res) => {
+router.get('/revenue-chart', async (req, res) => {
   try {
     const { period = 'month' } = req.query;
     let sql;
@@ -127,7 +126,7 @@ router.get('/revenue-chart', authenticate, async (req, res) => {
   }
 });
 
-router.get('/expenses-chart', authenticate, async (req, res) => {
+router.get('/expenses-chart', async (req, res) => {
   try {
     const result = await query(
       `SELECT ec.name as category, COALESCE(SUM(e.amount), 0) as total 
@@ -145,7 +144,7 @@ router.get('/expenses-chart', authenticate, async (req, res) => {
   }
 });
 
-router.get('/profit-summary', authenticate, async (req, res) => {
+router.get('/profit-summary', async (req, res) => {
   try {
     const revenue = await query(
       `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status = 'paid'`,
@@ -174,7 +173,7 @@ router.get('/profit-summary', authenticate, async (req, res) => {
 });
 
 // ========== NEW: Low Stock Alerts with full product details ==========
-router.get('/low-stock', authenticate, async (req, res) => {
+router.get('/low-stock', async (req, res) => {
   try {
     const result = await query(
       `SELECT p.id, p.name, p.sku, p.stock_qty, p.reorder_level, p.selling_price, p.cost_price,
@@ -195,7 +194,7 @@ router.get('/low-stock', authenticate, async (req, res) => {
 });
 
 // ========== NEW: Top Products (best sellers by qty sold) ==========
-router.get('/top-products', authenticate, async (req, res) => {
+router.get('/top-products', async (req, res) => {
   try {
     const { period = '30' } = req.query;
     const result = await query(
@@ -224,7 +223,7 @@ router.get('/top-products', authenticate, async (req, res) => {
 });
 
 // ========== NEW: Frequent Customers ==========
-router.get('/frequent-customers', authenticate, async (req, res) => {
+router.get('/frequent-customers', async (req, res) => {
   try {
     const { period = '30' } = req.query;
     const result = await query(
@@ -251,7 +250,7 @@ router.get('/frequent-customers', authenticate, async (req, res) => {
 });
 
 // ========== NEW: Restock Budget Calculator & Creator ==========
-router.get('/restock-budget', authenticate, async (req, res) => {
+router.get('/restock-budget', async (req, res) => {
   try {
     const { multiplier = 2 } = req.query;
     const lowStock = await query(
@@ -280,7 +279,7 @@ router.get('/restock-budget', authenticate, async (req, res) => {
   }
 });
 
-router.post('/restock-budget', authenticate, async (req, res) => {
+router.post('/restock-budget', async (req, res) => {
   try {
     const { items, vendor_id, notes, multiplier = 2 } = req.body;
 

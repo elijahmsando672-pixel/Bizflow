@@ -5,7 +5,7 @@ import { app } from './test-server.js';
 const testUser = {
   name: 'Test User',
   email: `test${Date.now()}@example.com`,
-  password: 'password123',
+  password: 'Password123!',
   business_name: 'Test Business',
 };
 

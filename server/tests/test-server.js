@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { authenticate } from '../middleware/auth.js';
 
 export const app = express();
 app.use(cors());
@@ -13,9 +14,9 @@ import expenseRoutes from '../routes/expenses.js';
 import dashboardRoutes from '../routes/dashboard.js';
 
 app.use('/api/auth', authRoutes);
-app.use('/api/customers', customerRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/invoices', invoiceRoutes);
-app.use('/api/expenses', expenseRoutes);
-app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/customers', authenticate, customerRoutes);
+app.use('/api/products', authenticate, productRoutes);
+app.use('/api/invoices', authenticate, invoiceRoutes);
+app.use('/api/expenses', authenticate, expenseRoutes);
+app.use('/api/dashboard', authenticate, dashboardRoutes);
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
