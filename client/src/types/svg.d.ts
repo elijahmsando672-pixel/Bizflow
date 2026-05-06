@@ -1,5 +1,4 @@
 declare module "*.svg" {
-  import { ImageProps } from "next/image";
   const src: string;
   const content: string;
   const width: number;

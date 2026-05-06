@@ -66,7 +66,7 @@ export default function PipelinePage() {
       setStages(stagesData as Stage[]);
       setDeals(dealsData as Deal[]);
       setSummary((summaryData as { summary: Summary }).summary || {});
-    } catch (_e) {
+    } catch {
       setError("Failed to load pipeline");
     } finally {
       setLoading(false);
@@ -77,7 +77,7 @@ export default function PipelinePage() {
     try {
       const data = await api.customers.getAll();
       setCustomers(data as { id: string; name: string }[]);
-    } catch (_e) {
+    } catch {
       console.error("Failed to load customers");
     }
   }, []);
@@ -93,7 +93,7 @@ export default function PipelinePage() {
       setDialogOpen(false);
       setForm({ name: "", customer_id: "", value: 0, priority: "medium", expected_close_date: "", assigned_to: "", notes: "" });
       loadPipeline();
-    } catch (_e) {
+    } catch {
       setError("Failed to create deal");
     }
   }
@@ -104,7 +104,7 @@ export default function PipelinePage() {
       const outcome = stage?.name.includes("Won") ? "won" : stage?.name.includes("Lost") ? "lost" : undefined;
       await api.pipeline.updateDeal(deal.id, { stage_id: newStageId, outcome });
       loadPipeline();
-    } catch (_e) {
+    } catch {
       setError("Failed to update deal");
     }
   }

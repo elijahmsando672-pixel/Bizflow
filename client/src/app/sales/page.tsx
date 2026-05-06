@@ -171,27 +171,15 @@ export default function SalesPage() {
     loadCustomers();
   }, [loadSales, loadProducts, loadCustomers]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure?")) return;
-    try {
-      await api.sales.delete(id);
-      toast.success("Sale deleted");
-      loadSales();
-    } catch (_err: Error) {
-      toast.error(_err?.message || "Failed to delete sale");
-    }
-  };
-
   const handleViewReceipt = async (saleId: string) => {
     setReceiptModal({ isOpen: true, receiptHtml: null, receiptNumber: null, loading: true });
     try {
       const receipt = await api.sales.getReceipt(saleId);
-      const receiptAny = receipt as any;
       const htmlResponse = await api.sales.getReceiptHtml(saleId);
       setReceiptModal({
         isOpen: true,
         receiptHtml: htmlResponse as string,
-        receiptNumber: receiptAny?.receipt_number || null,
+        receiptNumber: (receipt as Sale).receipt_number || null,
         loading: false,
       });
     } catch (_err: Error) {
@@ -202,10 +190,10 @@ export default function SalesPage() {
 
   const handleMarkPaid = async (saleId: string) => {
     try {
-      await api.sales.update(saleId, { status: "paid" } as any);
+      await api.sales.update(saleId, { status: "paid" } as SaleInput);
       toast.success("Sale marked as paid");
       loadSales();
-    } catch (err: any) {
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to update sale");
     }
   };
@@ -213,9 +201,9 @@ export default function SalesPage() {
   const handleViewSale = async (saleId: string) => {
     try {
       const data = await api.sales.getById(saleId);
-      setSelectedSale(data as any);
+      setSelectedSale(data as Sale);
       setViewDialogOpen(true);
-    } catch (err: any) {
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to load sale details");
     }
   };
@@ -228,7 +216,7 @@ export default function SalesPage() {
     setSaleItems(saleItems.filter((_, i) => i !== idx));
   };
 
-  const updateItem = (idx: number, field: string, value: any) => {
+  const updateItem = (idx: number, field: string, value: string | number) => {
     const updated = [...saleItems];
     updated[idx] = { ...updated[idx], [field]: value };
     if (field === "product_id" && value) {
@@ -264,13 +252,13 @@ export default function SalesPage() {
         discount_amount: newSale.discount_amount,
         status: newSale.status,
         items,
-      } as any);
+        } as SaleInput);
       toast.success("Sale created");
       setCreateDialogOpen(false);
       setNewSale({ customer_id: "", sale_date: "", due_date: "", notes: "", discount_amount: 0, status: "draft" });
       setSaleItems([{ product_id: "", product_name: "", qty: 1, unit_price: 0, discount: 0 }]);
       loadSales();
-    } catch (err: any) {
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to create sale");
     }
   };
@@ -286,7 +274,7 @@ export default function SalesPage() {
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Sales exported");
-    } catch (err: any) {
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to export sales");
     }
   };
@@ -544,7 +532,7 @@ export default function SalesPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedSale.items.map((item: any, idx: number) => (
+                      {selectedSale.items.map((item: SaleItem, idx: number) => (
                         <TableRow key={idx}>
                           <TableCell>{item.product_name}</TableCell>
                           <TableCell>{item.qty}</TableCell>

@@ -48,7 +48,7 @@ export default function TeamPage() {
       ]);
       setMembers(membersRes as Array<{ id: string; name: string; email: string; role: string }>);
       setInvitations(invitesRes as Array<{ id: string; email: string; role: string; status: string }>);
-    } catch (_e) {
+    } catch {
       setError("Failed to load team data");
     } finally {
       setLoading(false);
@@ -56,7 +56,6 @@ export default function TeamPage() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
-  }
 
   async function handleInvite() {
     setSubmitting(true);
@@ -67,7 +66,7 @@ export default function TeamPage() {
       setInviteDialog(false);
       setInviteForm({ email: "", role: "staff" });
       loadData();
-    } catch (err: any) {
+    } catch (err: Error) {
       setError(err.message || "Failed to send invitation");
     } finally {
       setSubmitting(false);
@@ -78,7 +77,7 @@ export default function TeamPage() {
     try {
       await api.team.revokeInvite(id);
       loadData();
-    } catch (err: any) {
+    } catch (err: Error) {
       setError(err.message);
     }
   }
@@ -87,7 +86,7 @@ export default function TeamPage() {
     try {
       await api.team.updateRole(id, role);
       loadData();
-    } catch (err: any) {
+    } catch (err: Error) {
       setError(err.message);
     }
   }
@@ -96,7 +95,7 @@ export default function TeamPage() {
     try {
       await api.team.updateMember(id, { is_active: !isActive });
       loadData();
-    } catch (err: any) {
+    } catch (err: Error) {
       setError(err.message);
     }
   }
@@ -332,3 +331,4 @@ export default function TeamPage() {
       </Dialog>
     </div>
   );
+}

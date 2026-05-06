@@ -76,7 +76,7 @@ export default function SupportPage() {
       ]);
       setTickets(ticketsData as Ticket[]);
       setStats((statsData as { stats: Stats }).stats || {} as Stats);
-    } catch (_e) {
+    } catch {
       setError("Failed to load tickets");
     } finally {
       setLoading(false);
@@ -87,7 +87,7 @@ export default function SupportPage() {
     try {
       const data = await api.customers.getAll();
       setCustomers(data as { id: string; name: string }[]);
-    } catch (_e) {}
+    } catch {}
   }, []);
 
   useEffect(() => { loadTickets(); loadCustomers(); }, [loadTickets, loadCustomers]);
@@ -95,8 +95,8 @@ export default function SupportPage() {
   async function loadCustomers() {
     try {
       const data = await api.customers.getAll();
-      setCustomers(data as any[]);
-    } catch (_e) {
+      setCustomers(data as { id: string; name: string }[]);
+    } catch {
       console.error("Failed to load customers");
     }
   }
@@ -109,27 +109,27 @@ export default function SupportPage() {
       setDialogOpen(false);
       setForm({ customer_id: "", subject: "", description: "", priority: "medium", category: "general", assigned_to: "" });
       loadTickets();
-    } catch (e) {
+    } catch {
       setError("Failed to create ticket");
     }
   }
 
-  async function updateStatus(ticket: any, status: string) {
+  async function updateStatus(ticket: Ticket, status: string) {
     try {
       await api.support.updateTicket(ticket.id, { status });
       loadTickets();
-    } catch (e) {
+    } catch {
       setError("Failed to update ticket");
     }
   }
 
-  async function loadTicketDetails(ticket: any) {
+  async function loadTicketDetails(ticket: Ticket) {
     setSelectedTicket(ticket);
     setDetailOpen(true);
     try {
       const data = await api.support.getReplies(ticket.id);
-      setReplies(data as any[]);
-    } catch (e) {
+      setReplies(data as Reply[]);
+    } catch {
       console.error("Failed to load replies");
     }
   }
@@ -140,9 +140,9 @@ export default function SupportPage() {
       await api.support.addReply(selectedTicket.id, { message: replyMessage });
       setReplyMessage("");
       const data = await api.support.getReplies(selectedTicket.id);
-      setReplies(data as any[]);
+      setReplies(data as Reply[]);
       loadTickets();
-    } catch (e) {
+    } catch {
       setError("Failed to send reply");
     }
   }

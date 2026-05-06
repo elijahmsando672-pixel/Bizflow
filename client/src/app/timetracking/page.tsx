@@ -59,7 +59,7 @@ export default function TimeTrackingPage() {
     try {
       const data = await api.projects.getProjects();
       setProjects(data as Array<{ id: string; name: string }>);
-    } catch (_e) {}
+    } catch {}
   }, []);
 
   const loadData = useCallback(async () => {
@@ -69,17 +69,9 @@ export default function TimeTrackingPage() {
         api.timetracking.getEntries(),
         api.timetracking.getSummary(),
       ]);
-      setEntries(entriesData as Array<{
-        id: string;
-        project_id: string;
-        task_id: string;
-        description: string;
-        date: string;
-        duration_minutes: number;
-        is_billable: boolean;
-      }>);
-      setSummary(summaryData as { total_hours: number; billable_hours: number });
-    } catch (_e) {
+      setEntries(entriesData as TimeEntry[]);
+      setSummary(summaryData as TimeSummary);
+    } catch {
       setError("Failed to load time entries");
     } finally {
       setLoading(false);
@@ -119,7 +111,7 @@ export default function TimeTrackingPage() {
       setDialogOpen(false);
       setForm({ project_id: "", task_id: "", description: "", date: new Date().toISOString().split("T")[0], duration_minutes: 0, is_billable: true });
       loadData();
-    } catch (e) {
+    } catch {
       setError("Failed to save time entry");
     }
   }
@@ -128,7 +120,7 @@ export default function TimeTrackingPage() {
     try {
       await api.timetracking.deleteEntry(id);
       loadData();
-    } catch (e) {
+    } catch {
       setError("Failed to delete entry");
     }
   }
@@ -202,7 +194,7 @@ export default function TimeTrackingPage() {
           <CardHeader><CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="h-4 w-4" />Hours by Project</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {summary.by_project.map((p: any) => (
+              {summary.by_project.map((p: ProjectHours) => (
                 <div key={p.project_name} className="flex items-center gap-3">
                   <span className="text-sm w-40 truncate">{p.project_name || "Unassigned"}</span>
                   <div className="flex-1 bg-gray-200 rounded-full h-2">

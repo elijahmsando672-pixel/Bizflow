@@ -57,7 +57,7 @@ export default function SubscriptionPage() {
       setPlans(plansRes as Plan[]);
       setCurrentSub(subRes as Subscription);
       setPayments(paymentsRes as Payment[]);
-    } catch (_err) {
+    } catch {
       setError("Failed to load subscription data");
     } finally {
       setLoading(false);

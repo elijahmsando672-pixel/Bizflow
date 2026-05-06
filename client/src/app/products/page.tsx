@@ -331,7 +331,7 @@ export default function ProductsPage() {
                 <Select value={productForm.category} onValueChange={(v) => setProductForm({ ...productForm, category: v })}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
-                    {categories.map((cat: any) => (
+                    {categories.map((cat: Category) => (
                       <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -384,7 +384,7 @@ export default function ProductsPage() {
                 <Select value={productForm.category} onValueChange={(v) => setProductForm({ ...productForm, category: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {categories.map((cat: any) => (
+                    {categories.map((cat: Category) => (
                       <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                     ))}
                   </SelectContent>

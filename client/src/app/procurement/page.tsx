@@ -97,7 +97,7 @@ export default function ProcurementPage() {
       ]);
       setVendors(vendorsData as Vendor[]);
       setPurchaseOrders(poData as PurchaseOrder[]);
-    } catch (_e) {
+    } catch {
       setError("Failed to load data");
     } finally {
       setLoading(false);
@@ -114,7 +114,7 @@ export default function ProcurementPage() {
       setVendorDialog(false);
       setVendorForm({ name: "", email: "", phone: "", address: "", contact_person: "", payment_terms: "", notes: "" });
       loadData();
-    } catch (_e) {
+    } catch {
       setError("Failed to create vendor");
     }
   }
@@ -138,7 +138,7 @@ export default function ProcurementPage() {
       setPoDialog(false);
       setPoForm({ vendor_id: "", expected_delivery: "", notes: "", items: [] });
       loadData();
-    } catch (_e) {
+    } catch {
       setError("Failed to create purchase order");
     }
   }
@@ -147,18 +147,18 @@ export default function ProcurementPage() {
     try {
       await api.procurement.updatePurchaseOrder(po.id, { status });
       loadData();
-    } catch (e) {
+    } catch {
       setError("Failed to update purchase order");
     }
   }
 
-  async function viewPO(po: any) {
+  async function viewPO(po: PurchaseOrder) {
     setSelectedPO(po);
     setDetailOpen(true);
     try {
       const data = await api.procurement.getPurchaseOrder(po.id);
-      setSelectedPO(data as any);
-    } catch (e) {}
+      setSelectedPO(data as PurchaseOrder);
+    } catch {}
   }
 
   function getStatusBadge(status: string) {
@@ -351,11 +351,11 @@ export default function ProcurementPage() {
               <div><span className="text-muted-foreground">Created:</span> {selectedPO?.created_at ? new Date(selectedPO.created_at).toLocaleDateString() : "—"}</div>
               <div><span className="text-muted-foreground">Expected:</span> {selectedPO?.expected_delivery ? new Date(selectedPO.expected_delivery).toLocaleDateString() : "—"}</div>
             </div>
-            {(selectedPO as any)?.items && (selectedPO as any).items.length > 0 && (
+            {(selectedPO as PurchaseOrder)?.items && (selectedPO as PurchaseOrder).items.length > 0 && (
               <Table>
                 <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Qty</TableHead><TableHead>Unit Price</TableHead><TableHead>Total</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {(selectedPO as any).items.map((item: any, idx: number) => (
+                  {(selectedPO as PurchaseOrder).items.map((item: PurchaseOrderItem, idx: number) => (
                     <TableRow key={idx}><TableCell className="text-sm">{item.product_name}</TableCell><TableCell className="text-sm">{item.qty}</TableCell><TableCell className="text-sm">KES {parseFloat(item.unit_price).toLocaleString()}</TableCell><TableCell className="text-sm font-medium">KES {parseFloat(item.total).toLocaleString()}</TableCell></TableRow>
                   ))}
                 </TableBody>

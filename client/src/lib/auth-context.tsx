@@ -167,8 +167,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           credentials: 'include',
         }
       );
-      } catch (_err) {
-        // Silently fail - server may be unreachable
+      } catch {
+        // Silently fail - server may be unreachable  
       } finally {
       setUser(null);
       setBusiness(null);

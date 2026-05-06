@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { FolderPlus, CheckSquare } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FolderPlus, CheckSquare, User, Clock } from "lucide-react";
 import api from "@/lib/api";
 
 interface Project {
@@ -75,7 +74,6 @@ export default function ProjectsPage() {
   const [projectForm, setProjectForm] = useState<ProjectForm>({ name: "", description: "", start_date: "", end_date: "", budget: 0, customer_id: "" });
   const [taskForm, setTaskForm] = useState<TaskForm>({ title: "", description: "", priority: "medium", assignee_id: "", due_date: "", estimated_hours: 0 });
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
-  const [team, setTeam] = useState<{ id: string; name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -85,7 +83,7 @@ export default function ProjectsPage() {
       const params = filterStatus !== "all" ? `?status=${filterStatus}` : "";
       const data = await api.projects.getProjects(params);
       setProjects(data as Project[]);
-    } catch (_e) {
+    } catch {
       setError("Failed to load projects");
     } finally {
       setLoading(false);
@@ -96,14 +94,14 @@ export default function ProjectsPage() {
     try {
       const data = await api.customers.getAll();
       setCustomers(data as { id: string; name: string }[]);
-    } catch (_e) {}
+    } catch {}
   }, []);
 
   const loadTeam = useCallback(async () => {
     try {
       const data = await api.team.getMembers();
       setTeam(data as { id: string; name: string }[]);
-    } catch (_e) {}
+    } catch {}
   }, []);
 
   useEffect(() => { loadProjects(); loadCustomers(); loadTeam(); }, [loadProjects, loadCustomers, loadTeam]);
@@ -114,7 +112,7 @@ export default function ProjectsPage() {
     try {
       const data = await api.projects.getTasks(project.id);
       setTasks(data as Task[]);
-    } catch (_e) {
+    } catch {
       setError("Failed to load tasks");
     }
   }
@@ -127,7 +125,7 @@ export default function ProjectsPage() {
       setProjectDialog(false);
       setProjectForm({ name: "", description: "", start_date: "", end_date: "", budget: 0, customer_id: "" });
       loadProjects();
-    } catch (_e) {
+    } catch {
       setError("Failed to create project");
     }
   }
@@ -140,16 +138,16 @@ export default function ProjectsPage() {
       setSuccess("Task created");
       setTaskForm({ title: "", description: "", priority: "medium", assignee_id: "", due_date: "", estimated_hours: 0 });
       loadTasks(selectedProject);
-    } catch (e) {
+    } catch {
       setError("Failed to create task");
     }
   }
 
-  async function updateTaskStatus(task: any, status: string) {
+  async function updateTaskStatus(task: Task, status: string) {
     try {
       await api.projects.updateTask(task.id, { status });
       if (selectedProject) loadTasks(selectedProject);
-    } catch (e) {
+    } catch {
       setError("Failed to update task");
     }
   }

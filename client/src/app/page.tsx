@@ -32,6 +32,28 @@ import {
 } from "lucide-react";
 import api from "@/lib/api";
 
+interface TopProduct {
+  id: string;
+  name: string;
+  category_name: string;
+  total_sold: number;
+  order_count: number;
+  total_revenue: number;
+  stock_qty: string;
+  reorder_level: string;
+}
+
+interface FrequentCustomer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  total_orders: number;
+  total_spent: number;
+  avg_order_value: number;
+  last_order_date: string;
+}
+
 interface DashboardData {
   stats: {
     totalCustomers: number;
@@ -244,7 +266,7 @@ function TopProducts({ data }: { data: Array<{
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((item: any, idx: number) => (
+            {data.map((item: TopProduct, idx: number) => (
               <TableRow key={item.id}>
                 <TableCell className="font-bold text-gray-400">{idx + 1}</TableCell>
                 <TableCell>
@@ -308,7 +330,7 @@ function FrequentCustomers({ data }: { data: Array<{
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((item: any, idx: number) => (
+            {data.map((item: FrequentCustomer, idx: number) => (
               <TableRow key={item.id}>
                 <TableCell className="font-bold text-gray-400">{idx + 1}</TableCell>
                 <TableCell>
@@ -328,13 +350,11 @@ function FrequentCustomers({ data }: { data: Array<{
   );
 }
 
-function RestockBudget({ budgetData, onCreated }: { budgetData: any; onCreated: () => void }) {
+function RestockBudget({ budgetData, onCreated }: { budgetData: { items: Array<{ id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }>; totalBudget: number; itemCount: number }; onCreated: () => void }) {
   const [multiplier, setMultiplier] = useState("2");
   const [loading, setLoading] = useState(false);
   const [created, setCreated] = useState(false);
-  const [selectedVendor, setSelectedVendor] = useState("");
-
-  const items = budgetData?.items || [];
+  const [selectedVendor] = useState<string>("");
   const total = budgetData?.totalBudget || 0;
   const count = budgetData?.itemCount || 0;
 
@@ -343,7 +363,7 @@ function RestockBudget({ budgetData, onCreated }: { budgetData: any; onCreated: 
     setLoading(true);
     try {
       await api.dashboard.createRestockBudget({
-        items: items.map((i: any) => ({ product_id: i.id, name: i.name, cost_price: i.cost_price, stock_qty: i.stock_qty, reorder_level: i.reorder_level })),
+        items: items.map((i: { id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }) => ({ product_id: i.id, name: i.name, cost_price: i.cost_price, stock_qty: i.stock_qty, reorder_level: i.reorder_level })),
         vendor_id: selectedVendor || null,
         multiplier: parseFloat(multiplier),
       });
@@ -401,7 +421,7 @@ function RestockBudget({ budgetData, onCreated }: { budgetData: any; onCreated: 
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item: any, i: number) => {
+                {items.map((item: { id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }, i: number) => {
                   const targetQty = Math.ceil(item.reorder_level * parseFloat(multiplier));
                   const orderQty = Math.max(0, targetQty - item.stock_qty);
                   const estCost = orderQty * parseFloat(item.cost_price || 0);
@@ -436,7 +456,7 @@ function RecentTransactions({ data }: { data: DashboardData }) {
           {data.recentSales.length === 0 ? (
             <p className="text-sm text-gray-500">No recent transactions</p>
           ) : (
-            data.recentSales.slice(0, 5).map((tx: any) => (
+            data.recentSales.slice(0, 5).map((tx: DashboardData["recentSales"][0]) => (
               <div
                 key={tx.id}
                 className="flex items-center justify-between border-b border-gray-100 pb-4 last:border-0"
@@ -582,10 +602,10 @@ export default function Home() {
           api.dashboard.getRestockBudget(2),
         ]);
         setDashboardData(stats as DashboardData);
-        setLowStock(low as any[]);
-        setTopProducts(top as any[]);
-        setFrequentCustomers(freq as any[]);
-        setRestockBudget(budget as any);
+        setLowStock(low as DashboardData["recentExpenses"]);
+        setTopProducts(top as TopProduct[]);
+        setFrequentCustomers(freq as FrequentCustomer[]);
+        setRestockBudget(budget as { items: Array<{ id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }>; totalBudget: number; itemCount: number });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load dashboard");
       } finally {
@@ -593,10 +613,10 @@ export default function Home() {
       }
     }
     fetchAll();
-  }, []);
+  }, [setLowStock, setTopProducts, setFrequentCustomers]);
 
   function handleBudgetCreated() {
-    api.dashboard.getRestockBudget(2).then((b: any) => setRestockBudget(b));
+    api.dashboard.getRestockBudget(2).then((b: { items: Array<{ id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }>; totalBudget: number; itemCount: number }) => setRestockBudget(b));
   }
 
   if (isLoading) {
