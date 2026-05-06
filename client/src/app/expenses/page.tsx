@@ -72,8 +72,9 @@ export default function ExpensesPage() {
       setLoading(true);
       const data = await api.expenses.getAll();
       setExpenses(data as Expense[]);
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to load expenses");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to load expenses";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -83,26 +84,11 @@ export default function ExpensesPage() {
     try {
       const data = await api.expenses.getCategories();
       setCategories(data as Category[]);
-    } catch (err: Error) {
-      console.error("Failed to load categories:", err);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to delete expense";
+      toast.error(message);
     }
   }, []);
-
-  useEffect(() => {
-    loadExpenses();
-    loadCategories();
-  }, [loadExpenses, loadCategories]);
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure?")) return;
-    try {
-      await api.expenses.delete(id);
-      toast.success("Expense deleted");
-      loadExpenses();
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to delete expense");
-    }
-  };
 
   const handleCreateExpense = async () => {
     if (!expenseForm.description || !expenseForm.amount) {
@@ -122,8 +108,9 @@ export default function ExpensesPage() {
       setDialogOpen(false);
       setExpenseForm({ description: "", amount: "", category: "", expense_date: "", status: "pending", receipt_url: "" });
       loadExpenses();
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to create expense");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to create expense";
+      toast.error(message);
     }
   };
 
@@ -137,8 +124,20 @@ export default function ExpensesPage() {
       await api.expenses.update(id, { status: "approved" });
       toast.success("Expense approved");
       loadExpenses();
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to approve expense");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to approve expense";
+      toast.error(message);
+    }
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    try {
+      await api.expenses.delete(id);
+      toast.success("Expense deleted");
+      loadExpenses();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to delete expense";
+      toast.error(message);
     }
   };
 
@@ -147,9 +146,9 @@ export default function ExpensesPage() {
     e.category?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
-  const approved = expenses.filter((e) => e.status === "approved").reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
-  const pending = expenses.filter((e) => e.status === "pending").reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
+  const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const approved = expenses.filter((e) => e.status === "approved").reduce((sum, e) => sum + (e.amount || 0), 0);
+  const pending = expenses.filter((e) => e.status === "pending").reduce((sum, e) => sum + (e.amount || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -267,7 +266,7 @@ export default function ExpensesPage() {
                             Approve
                           </Button>
                         )}
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(expense.id)}>
+                        <Button variant="ghost" size="sm" onClick={() => handleDeleteExpense(expense.id)}>
                           Delete
                         </Button>
                       </div>
@@ -357,7 +356,7 @@ export default function ExpensesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Amount</p>
-                  <p className="font-medium">KSh {parseFloat(selectedExpense.amount || 0).toLocaleString()}</p>
+                  <p className="font-medium">KSh {(selectedExpense.amount || 0).toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Category</p>

@@ -70,11 +70,12 @@ export default function AIPage() {
         api.ai.getPredictions(),
         api.ai.getHistory(),
       ]);
-      setInsights(insightsRes);
-      setPredictions(predictionsRes);
+      setInsights(insightsRes as InsightsData);
+      setPredictions(predictionsRes as { predictions: Prediction[] });
       setHistory(historyRes as HistoryItem[]);
-    } catch (err: Error) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to load AI data";
+      setError(message);
     } finally {
       setLoading(false);
     }

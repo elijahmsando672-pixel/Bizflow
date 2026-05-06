@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -111,7 +111,7 @@ export default function CRMPage() {
     total: leads.length,
     new: leads.filter(l => l.status === "new").length,
     qualified: leads.filter(l => l.status === "qualified").length,
-    totalValue: leads.reduce((sum, l) => sum + parseFloat(l.estimated_value || 0), 0),
+    totalValue: leads.reduce((sum, l) => sum + (l.estimated_value ? parseFloat(String(l.estimated_value)) : 0), 0),
   };
 
   return (
@@ -179,7 +179,7 @@ export default function CRMPage() {
                       <span className="text-xs">{lead.lead_score || 0}</span>
                     </div>
                   </TableCell>
-                  <TableCell>KES {parseFloat(lead.estimated_value || 0).toLocaleString()}</TableCell>
+                  <TableCell>KES {(lead.estimated_value || 0).toLocaleString()}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Select defaultValue={lead.status} onValueChange={v => updateLeadStatus(lead, v)}>

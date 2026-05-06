@@ -13,8 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Plus, Search, CreditCard, DollarSign, Clock, Loader2 } from "lucide-react";
-import api from "@/components/ui/toast";
 import { useToast } from "@/components/ui/toast";
+import api from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -64,8 +64,8 @@ export default function CreditorsPage() {
       setLoading(true);
       const data = await api.customers.getAll();
       setCreditors(data as Creditor[]);
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to load creditors");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to load creditors");
     } finally {
       setLoading(false);
     }
@@ -79,7 +79,7 @@ export default function CreditorsPage() {
     c.name?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalPayable = creditors.reduce((sum, c) => sum + parseFloat(c.balance || 0), 0);
+  const totalPayable = creditors.reduce((sum, c) => sum + (c.balance ? parseFloat(String(c.balance)) : 0), 0);
 
   const handleAddCreditor = async () => {
     if (!creditorForm.name) {
@@ -98,8 +98,9 @@ export default function CreditorsPage() {
       setAddDialogOpen(false);
       setCreditorForm({ name: "", email: "", phone: "", balance: "", notes: "" });
       loadCreditors();
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to add creditor");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to add creditor";
+      toast.error(message);
     }
   };
 
@@ -124,8 +125,9 @@ export default function CreditorsPage() {
       setPayDialogOpen(false);
       setSelectedCreditor(null);
       loadCreditors();
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to record payment");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to record payment";
+      toast.error(message);
     }
   };
 
@@ -273,7 +275,7 @@ export default function CreditorsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Record Payment to {selectedCreditor?.name}</DialogTitle>
-            <DialogDescription>Current balance: KSh {parseFloat(selectedCreditor?.balance || 0).toLocaleString()}</DialogDescription>
+            <DialogDescription>Current balance: KSh {(selectedCreditor?.balance || 0).toLocaleString()}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>

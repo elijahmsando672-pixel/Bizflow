@@ -30,6 +30,8 @@ interface Debtor {
   phone: string;
   address: string;
   balance: number;
+  total_owed: number;
+  total_paid: number;
 }
 
 interface Summary {
@@ -100,8 +102,9 @@ export default function DebtorsPage() {
       setDebtorDialog(false);
       setDebtorForm({ name: "", email: "", phone: "", address: "", notes: "" });
       loadData();
-    } catch (err: Error) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to add debtor";
+      setError(message);
     }
   }
 
@@ -111,8 +114,9 @@ export default function DebtorsPage() {
       setSuccess("Invoice created");
       setInvoiceDialog(false);
       loadData();
-    } catch (err: Error) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to create invoice";
+      setError(message);
     }
   }
 
@@ -123,8 +127,9 @@ export default function DebtorsPage() {
       setPaymentDialog(false);
       setPaymentForm({ amount: 0, date: new Date().toISOString().split("T")[0], reference: "", notes: "" });
       loadData();
-    } catch (err: Error) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to record payment";
+      setError(message);
     }
   }
 
@@ -209,10 +214,10 @@ export default function DebtorsPage() {
                     <TableCell>{debtor.email || "-"}</TableCell>
                     <TableCell>{debtor.phone || "-"}</TableCell>
                     <TableCell className="text-yellow-600 font-semibold">
-                      {parseFloat(debtor.total_owed || 0).toLocaleString()}
+                      {(debtor.total_owed || 0).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-green-600">
-                      {parseFloat(debtor.total_paid || 0).toLocaleString()}
+                      {(debtor.total_paid || 0).toLocaleString()}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">

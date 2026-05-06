@@ -32,6 +32,9 @@ interface Vendor {
   address: string;
   contact_person: string;
   payment_terms: string;
+  total_orders: number;
+  total_spent: number;
+  rating?: number;
 }
 
 interface POItem {
@@ -43,11 +46,17 @@ interface POItem {
 
 interface PurchaseOrder {
   id: string;
+  po_number: string;
   vendor_id: string;
+  vendor_name: string;
   expected_delivery: string;
+  created_at: string;
   notes: string;
   items: POItem[];
   status: string;
+  total: number;
+  subtotal?: number;
+  tax_amount?: number;
 }
 
 interface VendorForm {
@@ -184,7 +193,7 @@ export default function ProcurementPage() {
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Truck className="h-4 w-4" />Vendors</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{vendors.length}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Package className="h-4 w-4" />Total POs</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{purchaseOrders.length}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Pending</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-yellow-600">{purchaseOrders.filter(p => p.status === "pending").length}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total Spent</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-green-600">KES {purchaseOrders.reduce((s, p) => s + parseFloat(p.total || 0), 0).toLocaleString()}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total Spent</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-green-600">KES {purchaseOrders.reduce((s, p) => s + (p.total || 0), 0).toLocaleString()}</div></CardContent></Card>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -215,11 +224,11 @@ export default function ProcurementPage() {
                       <TableCell className="text-sm">{vendor.email || "—"}</TableCell>
                       <TableCell className="text-sm">{vendor.payment_terms || "—"}</TableCell>
                       <TableCell className="text-sm">{vendor.total_orders || 0}</TableCell>
-                      <TableCell>KES {parseFloat(vendor.total_spent || 0).toLocaleString()}</TableCell>
+                      <TableCell>KES {(vendor.total_spent || 0).toLocaleString()}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
-                          <span className="text-sm">{vendor.rating ? parseFloat(vendor.rating).toFixed(1) : "—"}</span>
+                          <span className="text-sm">{vendor.rating ? vendor.rating.toFixed(1) : "—"}</span>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -245,8 +254,8 @@ export default function ProcurementPage() {
                       <TableCell className="font-mono text-sm">{po.po_number}</TableCell>
                       <TableCell className="font-medium">{po.vendor_name || "—"}</TableCell>
                       <TableCell>{getStatusBadge(po.status)}</TableCell>
-                      <TableCell className="text-sm">KES {parseFloat(po.subtotal || 0).toLocaleString()}</TableCell>
-                      <TableCell className="font-semibold">KES {parseFloat(po.total || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-sm">KES {(po.subtotal || 0).toLocaleString()}</TableCell>
+                      <TableCell className="font-semibold">KES {(po.total || 0).toLocaleString()}</TableCell>
                       <TableCell className="text-sm">{po.expected_delivery ? new Date(po.expected_delivery).toLocaleDateString() : "—"}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -355,16 +364,16 @@ export default function ProcurementPage() {
               <Table>
                 <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Qty</TableHead><TableHead>Unit Price</TableHead><TableHead>Total</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {(selectedPO as PurchaseOrder).items.map((item: PurchaseOrderItem, idx: number) => (
-                    <TableRow key={idx}><TableCell className="text-sm">{item.product_name}</TableCell><TableCell className="text-sm">{item.qty}</TableCell><TableCell className="text-sm">KES {parseFloat(item.unit_price).toLocaleString()}</TableCell><TableCell className="text-sm font-medium">KES {parseFloat(item.total).toLocaleString()}</TableCell></TableRow>
+                  {(selectedPO as PurchaseOrder).items.map((item: POItem, idx: number) => (
+                    <TableRow key={idx}><TableCell className="text-sm">{item.product_name}</TableCell><TableCell className="text-sm">{item.qty}</TableCell><TableCell className="text-sm">KES {(item.unit_price).toLocaleString()}</TableCell><TableCell className="text-sm font-medium">KES {(item.total).toLocaleString()}</TableCell></TableRow>
                   ))}
                 </TableBody>
               </Table>
             )}
             <div className="text-right space-y-1">
-              <div className="text-sm">Subtotal: KES {parseFloat(selectedPO?.subtotal || 0).toLocaleString()}</div>
-              <div className="text-sm text-muted-foreground">Tax: KES {parseFloat(selectedPO?.tax_amount || 0).toLocaleString()}</div>
-              <div className="text-lg font-bold">Total: KES {parseFloat(selectedPO?.total || 0).toLocaleString()}</div>
+              <div className="text-sm">Subtotal: KES {(selectedPO?.subtotal || 0).toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground">Tax: KES {(selectedPO?.tax_amount || 0).toLocaleString()}</div>
+              <div className="text-lg font-bold">Total: KES {(selectedPO?.total || 0).toLocaleString()}</div>
             </div>
           </div>
         </DialogContent>

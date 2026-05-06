@@ -92,15 +92,6 @@ export default function SupportPage() {
 
   useEffect(() => { loadTickets(); loadCustomers(); }, [loadTickets, loadCustomers]);
 
-  async function loadCustomers() {
-    try {
-      const data = await api.customers.getAll();
-      setCustomers(data as { id: string; name: string }[]);
-    } catch {
-      console.error("Failed to load customers");
-    }
-  }
-
   async function handleSubmit() {
     setError(null);
     try {

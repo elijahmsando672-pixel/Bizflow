@@ -74,10 +74,9 @@ export default function ProductsPage() {
       setLoading(true);
       const data = await api.products.getAll();
       setProducts(data as Product[]);
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to load products");
-    } finally {
-      setLoading(false);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to load products";
+      toast.error(message);
     }
   }, [toast]);
 
@@ -85,7 +84,7 @@ export default function ProductsPage() {
     try {
       const data = await api.products.getCategories();
       setCategories(data as Category[]);
-    } catch (err: Error) {
+    } catch (err: unknown) {
       console.error("Failed to load categories:", err);
     }
   }, []);
@@ -114,8 +113,9 @@ export default function ProductsPage() {
       setDialogOpen(false);
       setProductForm({ name: "", sku: "", category: "", price: "", stock_qty: "", reorder_level: "", description: "" });
       loadProducts();
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to create product");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to create product";
+      toast.error(message);
     }
   };
 
@@ -125,7 +125,7 @@ export default function ProductsPage() {
       name: product.name || "",
       sku: product.sku || "",
       category: product.category || "",
-      price: product.price || "",
+      price: product.price?.toString() || "",
       stock_qty: product.stock_qty?.toString() || "",
       reorder_level: product.reorder_level?.toString() || "",
       description: product.description || "",
@@ -138,6 +138,7 @@ export default function ProductsPage() {
       toast.error("Name and price are required");
       return;
     }
+    if (!editingProduct) return;
     try {
       await api.products.update(editingProduct.id, {
         name: productForm.name,
@@ -152,8 +153,8 @@ export default function ProductsPage() {
       setEditDialogOpen(false);
       setEditingProduct(null);
       loadProducts();
-    } catch (_err: Error) {
-      toast.error(_err?.message || "Failed to update product");
+    } catch (_err: unknown) {
+      toast.error("Failed to update product");
     }
   };
 
@@ -163,8 +164,8 @@ export default function ProductsPage() {
       await api.products.delete(id);
       toast.success("Product deleted");
       loadProducts();
-    } catch (_err: Error) {
-      toast.error(_err?.message || "Failed to delete product");
+    } catch (_err: unknown) {
+      toast.error("Failed to update product");
     }
   };
 

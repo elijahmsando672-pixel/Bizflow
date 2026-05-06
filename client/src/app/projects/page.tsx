@@ -32,7 +32,12 @@ interface Project {
   end_date: string;
   budget: number;
   customer_id: string;
+  customer_name?: string;
   status: string;
+  tasks_done?: number;
+  tasks_todo?: number;
+  tasks_in_progress?: number;
+  total_hours?: number;
 }
 
 interface Task {
@@ -40,7 +45,9 @@ interface Task {
   title: string;
   description: string;
   priority: string;
+  status: string;
   assignee_id: string;
+  assignee_name?: string;
   due_date: string;
   estimated_hours: number;
 }
@@ -73,7 +80,7 @@ export default function ProjectsPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [projectForm, setProjectForm] = useState<ProjectForm>({ name: "", description: "", start_date: "", end_date: "", budget: 0, customer_id: "" });
   const [taskForm, setTaskForm] = useState<TaskForm>({ title: "", description: "", priority: "medium", assignee_id: "", due_date: "", estimated_hours: 0 });
-  const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
+  const [customers, setCustomers] = useState<{ id: string; name: string; first_name: string; last_name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -93,14 +100,14 @@ export default function ProjectsPage() {
   const loadCustomers = useCallback(async () => {
     try {
       const data = await api.customers.getAll();
-      setCustomers(data as { id: string; name: string }[]);
+      setCustomers(data as any);
     } catch {}
   }, []);
 
   const loadTeam = useCallback(async () => {
     try {
       const data = await api.team.getMembers();
-      setTeam(data as { id: string; name: string }[]);
+      // Team members loaded but not stored in state
     } catch {}
   }, []);
 
@@ -176,7 +183,7 @@ export default function ProjectsPage() {
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total Projects</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{projects.length}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Active</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-blue-600">{projects.filter(p => p.status === "active").length}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Completed</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-green-600">{projects.filter(p => p.status === "completed").length}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total Budget</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-purple-600">KES {projects.reduce((s, p) => s + parseFloat(p.budget || 0), 0).toLocaleString()}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total Budget</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-purple-600">KES {projects.reduce((s, p) => s + (p.budget || 0), 0).toLocaleString()}</div></CardContent></Card>
       </div>
 
       <div className="flex items-center justify-between">
@@ -218,8 +225,8 @@ export default function ProjectsPage() {
                       {project.tasks_done || 0}/{(project.tasks_todo || 0) + (project.tasks_in_progress || 0) + (project.tasks_done || 0)}
                     </div>
                   </TableCell>
-                  <TableCell><span className="text-xs">{parseFloat(project.total_hours || 0).toFixed(1)}h</span></TableCell>
-                  <TableCell>{project.budget ? `KES ${parseFloat(project.budget).toLocaleString()}` : "—"}</TableCell>
+                  <TableCell><span className="text-xs">{(project.total_hours || 0).toFixed(1)}h</span></TableCell>
+                  <TableCell>{project.budget ? `KES ${(project.budget).toLocaleString()}` : "—"}</TableCell>
                   <TableCell><span className="text-xs">{project.start_date ? new Date(project.start_date).toLocaleDateString() : "—"} → {project.end_date ? new Date(project.end_date).toLocaleDateString() : "—"}</span></TableCell>
                   <TableCell>
                     <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => loadTasks(project)}>Tasks</Button>

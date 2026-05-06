@@ -38,6 +38,8 @@ interface Customer {
   phone: string;
   address: string;
   status: string;
+  total_spent: number;
+  order_count: number;
 }
 
 interface CustomerForm {
@@ -63,10 +65,9 @@ export default function CustomersPage() {
       setLoading(true);
       const data = await api.customers.getAll();
       setCustomers(data as Customer[]);
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to load customers");
-    } finally {
-      setLoading(false);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to load customers";
+      toast.error(message);
     }
   }, [toast]);
 
@@ -80,8 +81,9 @@ export default function CustomersPage() {
       await api.customers.delete(id);
       toast.success("Customer deleted");
       loadCustomers();
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to delete customer");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to delete customer";
+      toast.error(message);
     }
   };
 
@@ -102,8 +104,9 @@ export default function CustomersPage() {
       setDialogOpen(false);
       setCustomerForm({ name: "", email: "", phone: "", address: "", status: "active" });
       loadCustomers();
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to create customer");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to create customer";
+      toast.error(message);
     }
   };
 
@@ -317,7 +320,7 @@ export default function CustomersPage() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Total Spent</p>
-                  <p className="font-medium">KSh {parseFloat(selectedCustomer.total_spent || 0).toLocaleString()}</p>
+                  <p className="font-medium">KSh {(selectedCustomer.total_spent || 0).toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Orders</p>

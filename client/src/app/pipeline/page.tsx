@@ -13,17 +13,21 @@ import api from "@/lib/api";
 interface Stage {
   id: string;
   name: string;
+  color: string;
+  win_probability?: number;
 }
 
 interface Deal {
   id: string;
   name: string;
   customer_id: string;
+  customer_name?: string;
   value: number;
   priority: string;
   stage_id: string;
   expected_close_date: string;
   assigned_to: string;
+  outcome?: string;
 }
 
 interface Summary {
@@ -51,7 +55,7 @@ export default function PipelinePage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>({ name: "", customer_id: "", value: 0, priority: "medium", expected_close_date: "", assigned_to: "", notes: "" });
-  const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
+  const [customers, setCustomers] = useState<{ id: string; name: string; first_name: string; last_name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -76,7 +80,7 @@ export default function PipelinePage() {
   const loadCustomers = useCallback(async () => {
     try {
       const data = await api.customers.getAll();
-      setCustomers(data as { id: string; name: string }[]);
+      setCustomers(data as any);
     } catch {
       console.error("Failed to load customers");
     }
@@ -127,8 +131,8 @@ export default function PipelinePage() {
       {success && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-md">{success}</div>}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Won Deals</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-green-600">{summary.won_deals || 0}</div><p className="text-xs text-muted-foreground">KES {parseFloat(summary.won_value || 0).toLocaleString()}</p></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Lost Deals</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-red-600">{summary.lost_deals || 0}</div><p className="text-xs text-muted-foreground">KES {parseFloat(summary.lost_value || 0).toLocaleString()}</p></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Won Deals</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-green-600">{summary.won_deals || 0}</div><p className="text-xs text-muted-foreground">KES {(summary.won_value || 0).toLocaleString()}</p></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Lost Deals</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-red-600">{summary.lost_deals || 0}</div><p className="text-xs text-muted-foreground">KES {(summary.lost_value || 0).toLocaleString()}</p></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Open Pipeline</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-blue-600">{deals.filter(d => !d.outcome).length}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Win Rate</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-purple-600">{summary.won_deals + summary.lost_deals > 0 ? Math.round((summary.won_deals / (summary.won_deals + summary.lost_deals)) * 100) : 0}%</div></CardContent></Card>
       </div>
@@ -141,7 +145,7 @@ export default function PipelinePage() {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {stages.map(stage => {
             const stageDeals = getDealsByStage(stage.id);
-            const stageValue = stageDeals.reduce((sum, d) => sum + parseFloat(d.value || 0), 0);
+            const stageValue = stageDeals.reduce((sum, d) => sum + (d.value || 0), 0);
             return (
               <Card key={stage.id} className="min-h-[400px]">
                 <CardHeader className="pb-2">
@@ -160,7 +164,7 @@ export default function PipelinePage() {
                           <h4 className="font-medium text-sm">{deal.name}</h4>
                           {getPriorityBadge(deal.priority)}
                         </div>
-                        <div className="text-sm font-semibold text-green-600">KES {parseFloat(deal.value || 0).toLocaleString()}</div>
+                        <div className="text-sm font-semibold text-green-600">KES {(deal.value || 0).toLocaleString()}</div>
                         {deal.customer_name && <div className="text-xs text-muted-foreground flex items-center gap-1"><User className="h-3 w-3" />{deal.customer_name}</div>}
                         {deal.expected_close_date && <div className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(deal.expected_close_date).toLocaleDateString()}</div>}
                         <Select defaultValue={deal.stage_id || ""} onValueChange={v => updateDealStage(deal, v)}>

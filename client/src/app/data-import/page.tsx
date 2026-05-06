@@ -63,8 +63,9 @@ export default function DataImportPage() {
         if (result.success > 0) setSuccess(`Imported ${result.success} records`);
         if (result.failed > 0) setError(`${result.failed} records failed`);
       }
-    } catch (e: Error) {
-      setError(e.message || "Failed to import data");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to import data";
+      setError(message);
     } finally {
       setImporting(false);
     }
@@ -85,8 +86,9 @@ export default function DataImportPage() {
       a.click();
       URL.revokeObjectURL(url);
       setSuccess(`Exported ${data.length} records`);
-    } catch (e: Error) {
-      setError(e.message || "Failed to export data");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to export data";
+      setError(message);
     } finally {
       setExporting(false);
     }
@@ -94,10 +96,11 @@ export default function DataImportPage() {
 
   function downloadTemplate(format: 'json' | 'csv') {
     if (!selectedResource) return;
-    api.importExport.getTemplate(selectedResource).then((template: TemplateRecord[]) => {
+    api.importExport.getTemplate(selectedResource)      .then((template: unknown) => {
+      const records = template as TemplateRecord[];
       if (format === 'csv') {
-        const headers = Object.keys(template[0] || {}).join(',');
-        const csvRows = template.map((row: TemplateRecord) =>
+        const headers = Object.keys(records[0] || {}).join(',');
+        const csvRows = records.map((row: TemplateRecord) =>
           Object.values(row).map(v => {
             const str = String(v ?? '');
             return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;

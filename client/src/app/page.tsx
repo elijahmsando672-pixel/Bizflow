@@ -39,7 +39,7 @@ interface TopProduct {
   total_sold: number;
   order_count: number;
   total_revenue: number;
-  stock_qty: string;
+  stock_qty: number;
   reorder_level: string;
 }
 
@@ -213,7 +213,7 @@ function LowStockAlerts({ data }: { data: Array<{
                   </TableCell>
                   <TableCell className="text-right">{item.reorder_level}</TableCell>
                   <TableCell className="text-right font-medium">{item.suggested_restock_qty}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(parseFloat(item.estimated_restock_cost || 0))}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(item.estimated_restock_cost || 0)}</TableCell>
                 </TableRow>
               );
             })}
@@ -275,9 +275,9 @@ function TopProducts({ data }: { data: Array<{
                 </TableCell>
                 <TableCell className="text-right font-semibold text-blue-600">{item.total_sold}</TableCell>
                 <TableCell className="text-right">{item.order_count}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(parseFloat(item.total_revenue || 0))}</TableCell>
+                <TableCell className="text-right font-medium">{formatCurrency(item.total_revenue || 0)}</TableCell>
                 <TableCell className="text-right">
-                  <Badge variant={parseInt(item.stock_qty) < parseInt(item.reorder_level || "0") ? "destructive" : "secondary"}>{item.stock_qty}</Badge>
+                  <Badge variant={item.stock_qty < parseInt(item.reorder_level || "0") ? "destructive" : "secondary"}>{item.stock_qty}</Badge>
                 </TableCell>
               </TableRow>
             ))}
@@ -338,8 +338,8 @@ function FrequentCustomers({ data }: { data: Array<{
                   <p className="text-xs text-gray-500">{item.email || item.phone || ""}</p>
                 </TableCell>
                 <TableCell className="text-right">{item.total_orders}</TableCell>
-                <TableCell className="text-right font-semibold text-green-600">{formatCurrency(parseFloat(item.total_spent || 0))}</TableCell>
-                <TableCell className="text-right">{formatCurrency(parseFloat(item.avg_order_value || 0))}</TableCell>
+                <TableCell className="text-right font-semibold text-green-600">{formatCurrency(item.total_spent || 0)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(item.avg_order_value || 0)}</TableCell>
                 <TableCell className="text-right text-sm text-gray-500">{item.last_order_date ? formatDate(item.last_order_date) : "-"}</TableCell>
               </TableRow>
             ))}
@@ -350,7 +350,7 @@ function FrequentCustomers({ data }: { data: Array<{
   );
 }
 
-function RestockBudget({ budgetData, onCreated }: { budgetData: { items: Array<{ id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }>; totalBudget: number; itemCount: number }; onCreated: () => void }) {
+function RestockBudget({ budgetData, onCreated }: { budgetData: { items: Array<{ id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }>; totalBudget: number; itemCount: number } | null; onCreated: () => void }) {
   const [multiplier, setMultiplier] = useState("2");
   const [loading, setLoading] = useState(false);
   const [created, setCreated] = useState(false);
@@ -359,11 +359,11 @@ function RestockBudget({ budgetData, onCreated }: { budgetData: { items: Array<{
   const count = budgetData?.itemCount || 0;
 
   async function handleCreateBudget() {
-    if (!items.length) return;
+    if (!budgetData?.items?.length) return;
     setLoading(true);
     try {
       await api.dashboard.createRestockBudget({
-        items: items.map((i: { id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }) => ({ product_id: i.id, name: i.name, cost_price: i.cost_price, stock_qty: i.stock_qty, reorder_level: i.reorder_level })),
+        items: budgetData.items.map((i: { id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }) => ({ product_id: i.id, name: i.name, cost_price: i.cost_price, stock_qty: i.stock_qty, reorder_level: i.reorder_level })),
         vendor_id: selectedVendor || null,
         multiplier: parseFloat(multiplier),
       });
@@ -377,7 +377,7 @@ function RestockBudget({ budgetData, onCreated }: { budgetData: { items: Array<{
     }
   }
 
-  if (!items.length) {
+  if (!budgetData?.items?.length) {
     return (
       <Card>
         <CardHeader>
@@ -421,10 +421,10 @@ function RestockBudget({ budgetData, onCreated }: { budgetData: { items: Array<{
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item: { id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }, i: number) => {
+                {budgetData.items.map((item: { id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }, i: number) => {
                   const targetQty = Math.ceil(item.reorder_level * parseFloat(multiplier));
                   const orderQty = Math.max(0, targetQty - item.stock_qty);
-                  const estCost = orderQty * parseFloat(item.cost_price || 0);
+                  const estCost = orderQty * (item.cost_price || 0);
                   return (
                     <TableRow key={`${item.id}-${i}`}>
                       <TableCell className="font-medium text-sm">{item.name}</TableCell>
@@ -548,7 +548,7 @@ function StatsOverview({ data }: { data: DashboardData }) {
 
 export default function Home() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [lowStock, setLowStock] = useState<Array<{
+  const [lowStock, setLowStock] = useState<{
     id: string;
     name: string;
     sku: string;
@@ -556,8 +556,8 @@ export default function Home() {
     reorder_level: number;
     suggested_restock_qty: number;
     estimated_restock_cost: number;
-  }>([]);
-  const [topProducts, setTopProducts] = useState<Array<{
+  }[]>([]);
+  const [topProducts, setTopProducts] = useState<{
     id: string;
     name: string;
     category_name: string;
@@ -566,8 +566,8 @@ export default function Home() {
     total_revenue: number;
     stock_qty: number;
     reorder_level: string;
-  }>([]);
-  const [frequentCustomers, setFrequentCustomers] = useState<Array<{
+  }[]>([]);
+  const [frequentCustomers, setFrequentCustomers] = useState<{
     id: string;
     name: string;
     email: string;
@@ -576,14 +576,14 @@ export default function Home() {
     total_spent: number;
     avg_order_value: number;
     last_order_date: string;
-  }>([]);
+  }[]>([]);
   const [restockBudget, setRestockBudget] = useState<{
     items: Array<{
       id: string;
       name: string;
       cost_price: number;
       stock_qty: number;
-      reorder_level: string;
+      reorder_level: number;
     }>;
     totalBudget: number;
     itemCount: number;
@@ -602,7 +602,7 @@ export default function Home() {
           api.dashboard.getRestockBudget(2),
         ]);
         setDashboardData(stats as DashboardData);
-        setLowStock(low as DashboardData["recentExpenses"]);
+        setLowStock(low as any);
         setTopProducts(top as TopProduct[]);
         setFrequentCustomers(freq as FrequentCustomer[]);
         setRestockBudget(budget as { items: Array<{ id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }>; totalBudget: number; itemCount: number });
@@ -616,7 +616,7 @@ export default function Home() {
   }, [setLowStock, setTopProducts, setFrequentCustomers]);
 
   function handleBudgetCreated() {
-    api.dashboard.getRestockBudget(2).then((b: { items: Array<{ id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }>; totalBudget: number; itemCount: number }) => setRestockBudget(b));
+    api.dashboard.getRestockBudget(2).then((b) => setRestockBudget(b as any));
   }
 
   if (isLoading) {

@@ -10,9 +10,11 @@ import { useToast } from "@/components/ui/toast";
 interface Notification {
   id: string;
   type: string;
+  title: string;
   message: string;
   read_at: string | null;
   created_at: string;
+  read?: boolean;
 }
 
 interface NotificationData {

@@ -39,8 +39,9 @@ function AcceptInviteContent() {
       localStorage.setItem("user", JSON.stringify(data.user));
       setSuccess(true);
       setTimeout(() => router.push("/"), 2000);
-    } catch (err: Error) {
-      setError(err.message || "Failed to accept invitation");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to accept invitation";
+      setError(message);
     } finally {
       setSubmitting(false);
     }

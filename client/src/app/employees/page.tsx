@@ -45,6 +45,9 @@ interface Attendance {
   date: string;
   clock_in: string;
   clock_out: string;
+  first_name: string;
+  last_name: string;
+  status: string;
 }
 
 interface Payroll {
@@ -56,6 +59,10 @@ interface Payroll {
   deductions: number;
   bonuses: number;
   tax_amount: number;
+  net_salary: number;
+  first_name: string;
+  last_name: string;
+  status: string;
 }
 
 interface EmployeeForm {
@@ -129,8 +136,9 @@ export default function EmployeesPage() {
       setEmployeeDialog(false);
       setForm({ first_name: "", last_name: "", email: "", phone: "", position: "", department: "", hire_date: new Date().toISOString().split("T")[0], salary: 0, salary_type: "monthly", status: "active" });
       loadData();
-    } catch (err: Error) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to create employee";
+      setError(message);
     }
   }
 
@@ -138,8 +146,9 @@ export default function EmployeesPage() {
     try {
       await api.employees.delete(id);
       loadData();
-    } catch (err: Error) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to delete employee";
+      setError(message);
     }
   }
 
@@ -147,8 +156,9 @@ export default function EmployeesPage() {
     try {
       await api.employees.clockIn(id);
       loadData();
-    } catch (err: Error) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to clock in";
+      setError(message);
     }
   }
 
@@ -156,8 +166,9 @@ export default function EmployeesPage() {
     try {
       await api.employees.clockOut(id);
       loadData();
-    } catch (err: Error) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to clock out";
+      setError(message);
     }
   }
 
@@ -167,8 +178,9 @@ export default function EmployeesPage() {
       setSuccess("Payroll created");
       setPayrollDialog(false);
       loadData();
-    } catch (err: Error) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to create payroll";
+      setError(message);
     }
   }
 
@@ -223,7 +235,7 @@ export default function EmployeesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {payroll.reduce((sum, p) => sum + parseFloat(p.net_salary || 0), 0).toLocaleString()}
+              {payroll.reduce((sum, p) => sum + (p.net_salary || 0), 0).toLocaleString()}
             </div>
           </CardContent>
         </Card>
@@ -258,7 +270,7 @@ export default function EmployeesPage() {
                       </TableCell>
                       <TableCell>{emp.position || "-"}</TableCell>
                       <TableCell>{emp.department || "-"}</TableCell>
-                      <TableCell>{parseFloat(emp.salary || 0).toLocaleString()}</TableCell>
+                      <TableCell>{(emp.salary || 0).toLocaleString()}</TableCell>
                       <TableCell>
                         <Badge
                           className={
@@ -384,10 +396,10 @@ export default function EmployeesPage() {
                         <TableCell>
                           {p.period_start} to {p.period_end}
                         </TableCell>
-                        <TableCell>{parseFloat(p.gross_salary || 0).toLocaleString()}</TableCell>
-                        <TableCell>{parseFloat(p.deductions || 0).toLocaleString()}</TableCell>
+                        <TableCell>{(p.gross_salary || 0).toLocaleString()}</TableCell>
+                        <TableCell>{(p.deductions || 0).toLocaleString()}</TableCell>
                         <TableCell className="font-bold">
-                          {parseFloat(p.net_salary || 0).toLocaleString()}
+                          {(p.net_salary || 0).toLocaleString()}
                         </TableCell>
                         <TableCell>
                           <Badge

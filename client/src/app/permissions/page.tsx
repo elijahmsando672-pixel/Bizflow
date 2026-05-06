@@ -58,18 +58,18 @@ export default function PermissionsPage() {
 
   function togglePerm(resource: string, field: string) {
     const key = `${selectedRole}-${resource}`;
-    const current = editing[key] || permissions.find(p => p.role_name === selectedRole && p.resource === resource) || {};
+    const current = editing[key] || permissions.find(p => p.role_name === selectedRole && p.resource === resource) || {} as Partial<Permission>;
     setEditing({
       ...editing,
-      [key]: { ...current, resource, [field]: !current[field] },
+      [key]: { ...current, resource, [field]: !current[field as keyof Permission] },
     });
   }
 
-  function getPermValue(resource: string, field: string) {
+  function getPermValue(resource: string, field: string): boolean {
     const key = `${selectedRole}-${resource}`;
-    if (editing[key] && editing[key][field] !== undefined) return editing[key][field];
+    if (editing[key] && editing[key][field as keyof Permission] !== undefined) return !!editing[key][field as keyof Permission];
     const perm = permissions.find(p => p.role_name === selectedRole && p.resource === resource);
-    return perm ? perm[field] : false;
+    return perm ? !!perm[field as keyof Permission] : false;
   }
 
   async function saveRole() {
