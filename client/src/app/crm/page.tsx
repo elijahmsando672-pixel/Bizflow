@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -21,36 +20,49 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserPlus, Users, TrendingUp, Target, Filter, MoreVertical } from "lucide-react";
+import { UserPlus, Filter } from "lucide-react";
 import api from "@/lib/api";
 
+interface Lead {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  company: string;
+  job_title: string;
+  source: string;
+  status: string;
+  lead_score: number;
+  estimated_value: number;
+}
+
 export default function CRMPage() {
-  const [leads, setLeads] = useState<any[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [convertDialog, setConvertDialog] = useState(false);
-  const [selectedLead, setSelectedLead] = useState<any>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "", company: "", job_title: "", source: "inbound", estimated_value: 0, notes: "" });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => { loadLeads(); }, [filterStatus]);
-
-  async function loadLeads() {
+  const loadLeads = useCallback(async () => {
     setLoading(true);
     try {
       const params = filterStatus !== "all" ? `?status=${filterStatus}` : "";
       const data = await api.crm.getLeads(params);
-      setLeads(data as any[]);
-    } catch (e) {
+      setLeads(data as Lead[]);
+    } catch {
       setError("Failed to load leads");
     } finally {
       setLoading(false);
     }
-  }
+  }, [filterStatus]);
+
+  useEffect(() => { loadLeads(); }, [loadLeads]);
 
   async function handleSubmit() {
     setError(null);
@@ -60,7 +72,7 @@ export default function CRMPage() {
       setDialogOpen(false);
       setForm({ first_name: "", last_name: "", email: "", phone: "", company: "", job_title: "", source: "inbound", estimated_value: 0, notes: "" });
       loadLeads();
-    } catch (e) {
+    } catch {
       setError("Failed to create lead");
     }
   }
@@ -76,16 +88,16 @@ export default function CRMPage() {
       setSuccess("Lead converted to customer");
       setConvertDialog(false);
       loadLeads();
-    } catch (e) {
+    } catch {
       setError("Failed to convert lead");
     }
   }
 
-  async function updateLeadStatus(lead: any, status: string) {
+  async function updateLeadStatus(lead: Lead, status: string) {
     try {
       await api.crm.updateLead(lead.id, { status });
       loadLeads();
-    } catch (e) {
+    } catch {
       setError("Failed to update lead");
     }
   }

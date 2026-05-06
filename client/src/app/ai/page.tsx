@@ -13,13 +13,49 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Brain, TrendingUp, AlertTriangle, Lightbulb, LineChart } from "lucide-react";
+import { Brain, TrendingUp, Lightbulb, LineChart } from "lucide-react";
 import api from "@/lib/api";
 
+interface RevenueData {
+  current: number;
+  change: string;
+}
+
+interface InsightsData {
+  aiSummary: string;
+  data: {
+    revenue: RevenueData;
+    expenses: number;
+    profit: number;
+    newCustomers: number;
+    lowStockProducts: number;
+    topProducts: Product[];
+  };
+}
+
+interface Prediction {
+  month: string;
+  predicted_revenue: number;
+  confidence: "high" | "medium" | "low";
+}
+
+interface Product {
+  name: string;
+  qty_sold: number;
+  revenue: string;
+}
+
+interface HistoryItem {
+  id: string;
+  created_at: string;
+  insight_type: string;
+  summary: string;
+}
+
 export default function AIPage() {
-  const [insights, setInsights] = useState<any>(null);
-  const [predictions, setPredictions] = useState<any>(null);
-  const [history, setHistory] = useState<any[]>([]);
+  const [insights, setInsights] = useState<InsightsData | null>(null);
+  const [predictions, setPredictions] = useState<{ predictions: Prediction[] } | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,8 +72,8 @@ export default function AIPage() {
       ]);
       setInsights(insightsRes);
       setPredictions(predictionsRes);
-      setHistory(historyRes as any[]);
-    } catch (err: any) {
+      setHistory(historyRes as HistoryItem[]);
+    } catch (err: Error) {
       setError(err.message);
     } finally {
       setLoading(false);
@@ -157,7 +193,7 @@ export default function AIPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {predictions.predictions.map((pred: any, i: number) => (
+                    {predictions.predictions.map((pred: Prediction, i: number) => (
                       <TableRow key={i}>
                         <TableCell className="font-medium">{pred.month}</TableCell>
                         <TableCell>
@@ -214,7 +250,7 @@ export default function AIPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    insights?.data.topProducts?.map((product: any, i: number) => (
+                    insights?.data.topProducts?.map((product: Product, i: number) => (
                       <TableRow key={i}>
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell>{product.qty_sold}</TableCell>

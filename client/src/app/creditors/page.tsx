@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Plus, Search, CreditCard, DollarSign, Clock, Loader2 } from "lucide-react";
-import api from "@/lib/api";
+import api from "@/components/ui/toast";
 import { useToast } from "@/components/ui/toast";
 import {
   Dialog,
@@ -25,32 +25,55 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
+interface Creditor {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  balance: number;
+  status: string;
+}
+
+interface CreditorForm {
+  name: string;
+  email: string;
+  phone: string;
+  balance: string;
+  notes: string;
+}
+
+interface PaymentForm {
+  amount: string;
+  date: string;
+  notes: string;
+}
+
 export default function CreditorsPage() {
-  const [creditors, setCreditors] = useState<any[]>([]);
+  const [creditors, setCreditors] = useState<Creditor[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [payDialogOpen, setPayDialogOpen] = useState(false);
-  const [selectedCreditor, setSelectedCreditor] = useState<any>(null);
-  const [creditorForm, setCreditorForm] = useState({ name: "", email: "", phone: "", balance: "", notes: "" });
-  const [paymentForm, setPaymentForm] = useState({ amount: "", date: "", notes: "" });
+  const [selectedCreditor, setSelectedCreditor] = useState<Creditor | null>(null);
+  const [creditorForm, setCreditorForm] = useState<CreditorForm>({ name: "", email: "", phone: "", balance: "", notes: "" });
+  const [paymentForm, setPaymentForm] = useState<PaymentForm>({ amount: "", date: "", notes: "" });
   const toast = useToast();
 
-  const loadCreditors = async () => {
+  const loadCreditors = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.customers.getAll();
-      setCreditors(data as any[]);
-    } catch (err: any) {
+      setCreditors(data as Creditor[]);
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to load creditors");
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadCreditors();
-  }, []);
+  }, [loadCreditors]);
 
   const filteredCreditors = creditors.filter((c) =>
     c.name?.toLowerCase().includes(search.toLowerCase())
@@ -75,14 +98,14 @@ export default function CreditorsPage() {
       setAddDialogOpen(false);
       setCreditorForm({ name: "", email: "", phone: "", balance: "", notes: "" });
       loadCreditors();
-    } catch (err: any) {
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to add creditor");
     }
   };
 
-  const handlePayCreditor = (creditor: any) => {
+  const handlePayCreditor = (creditor: Creditor) => {
     setSelectedCreditor(creditor);
-    setPaymentForm({ amount: creditor.balance || "", date: new Date().toISOString().split("T")[0], notes: "" });
+    setPaymentForm({ amount: creditor.balance?.toString() || "", date: new Date().toISOString().split("T")[0], notes: "" });
     setPayDialogOpen(true);
   };
 
@@ -101,7 +124,7 @@ export default function CreditorsPage() {
       setPayDialogOpen(false);
       setSelectedCreditor(null);
       loadCreditors();
-    } catch (err: any) {
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to record payment");
     }
   };
