@@ -8,6 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import api from "@/lib/api";
 
+interface AcceptInviteResponse {
+  token: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
 function AcceptInviteContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -25,11 +34,12 @@ function AcceptInviteContent() {
 
     try {
       const result = await api.team.accept({ token: token!, name, password });
-      localStorage.setItem("token", (result as any).token);
-      localStorage.setItem("user", JSON.stringify((result as any).user));
+      const data = result as AcceptInviteResponse;
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
       setSuccess(true);
       setTimeout(() => router.push("/"), 2000);
-    } catch (err: any) {
+    } catch (err: Error) {
       setError(err.message || "Failed to accept invitation");
     } finally {
       setSubmitting(false);

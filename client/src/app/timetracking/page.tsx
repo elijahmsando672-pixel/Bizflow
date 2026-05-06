@@ -16,7 +16,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -26,42 +25,68 @@ import { Clock, Timer, Play, Square, BarChart3 } from "lucide-react";
 import api from "@/lib/api";
 
 export default function TimeTrackingPage() {
-  const [entries, setEntries] = useState<any[]>([]);
-  const [summary, setSummary] = useState<any>({});
+  const [entries, setEntries] = useState<Array<{
+    id: string;
+    project_id: string;
+    task_id: string;
+    description: string;
+    date: string;
+    duration_minutes: number;
+    is_billable: boolean;
+  }>>([]);
+  const [summary, setSummary] = useState<{
+    total_hours: number;
+    billable_hours: number;
+  }>({ total_hours: 0, billable_hours: 0 });
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(0);
-  const [timerInterval, setTimerInterval] = useState<any>(null);
-  const [form, setForm] = useState({ project_id: "", task_id: "", description: "", date: new Date().toISOString().split("T")[0], duration_minutes: 0, is_billable: true });
-  const [projects, setProjects] = useState<any[]>([]);
+  const [timerInterval, setTimerInterval] = useState<ReturnType<typeof setInterval> | null>(null);
+  const [form, setForm] = useState<{
+    project_id: string;
+    task_id: string;
+    description: string;
+    date: string;
+    duration_minutes: number;
+    is_billable: boolean;
+  }>({ project_id: "", task_id: "", description: "", date: new Date().toISOString().split("T")[0], duration_minutes: 0, is_billable: true });
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => { loadData(); loadProjects(); }, []);
+  const loadProjects = useCallback(async () => {
+    try {
+      const data = await api.projects.getProjects();
+      setProjects(data as Array<{ id: string; name: string }>);
+    } catch (_e) {}
+  }, []);
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [entriesData, summaryData] = await Promise.all([
         api.timetracking.getEntries(),
         api.timetracking.getSummary(),
       ]);
-      setEntries(entriesData as any[]);
-      setSummary(summaryData as any);
-    } catch (e) {
+      setEntries(entriesData as Array<{
+        id: string;
+        project_id: string;
+        task_id: string;
+        description: string;
+        date: string;
+        duration_minutes: number;
+        is_billable: boolean;
+      }>);
+      setSummary(summaryData as { total_hours: number; billable_hours: number });
+    } catch (_e) {
       setError("Failed to load time entries");
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  async function loadProjects() {
-    try {
-      const data = await api.projects.getProjects();
-      setProjects(data as any[]);
-    } catch (e) {}
-  }
+  useEffect(() => { loadData(); loadProjects(); }, [loadData, loadProjects]);
 
   function startTimer() {
     setTimerRunning(true);

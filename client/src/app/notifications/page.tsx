@@ -1,30 +1,44 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bell, Check, Clock, AlertTriangle, Info, CheckCircle, Loader2 } from "lucide-react";
 import api from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 
+interface Notification {
+  id: string;
+  type: string;
+  message: string;
+  read_at: string | null;
+  created_at: string;
+}
+
+interface NotificationData {
+  overdueSales: Notification[];
+  lowStockProducts: Notification[];
+  systemNotifications: Notification[];
+}
+
 export default function NotificationsPage() {
-  const [data, setData] = useState<{ overdueSales: any[]; lowStockProducts: any[]; systemNotifications: any[] } | null>(null);
+  const [data, setData] = useState<NotificationData | null>(null);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
 
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.notifications.getAll();
-      setData(response as { overdueSales: any[]; lowStockProducts: any[]; systemNotifications: any[] });
+      setData(response as NotificationData);
     } catch (err: unknown) {
       toast.error((err as Error)?.message || "Failed to load notifications");
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
-  useEffect(() => { loadNotifications(); }, []);
+  useEffect(() => { loadNotifications(); }, [loadNotifications]);
 
   const markAllRead = async () => {
     try {
@@ -37,7 +51,6 @@ export default function NotificationsPage() {
   };
 
   const notifications = data?.systemNotifications || [];
-  const unread = notifications.filter((n) => !n.read_at).length;
   const warnings = (data?.overdueSales?.length || 0) + (data?.lowStockProducts?.length || 0);
 
   return (

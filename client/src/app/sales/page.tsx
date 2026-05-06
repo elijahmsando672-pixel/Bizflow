@@ -94,56 +94,82 @@ function ReceiptModal({ isOpen, onClose, receiptHtml, receiptNumber, loading }: 
   );
 }
 
+interface Sale {
+  id: string;
+  customer_id: string;
+  sale_date: string;
+  due_date: string;
+  status: string;
+  total: number;
+}
+
+interface SaleItem {
+  product_id: string;
+  product_name: string;
+  qty: number;
+  unit_price: number;
+  discount: number;
+}
+
+interface NewSale {
+  customer_id: string;
+  sale_date: string;
+  due_date: string;
+  notes: string;
+  discount_amount: number;
+  status: string;
+}
+
 export default function SalesPage() {
-  const [sales, setSales] = useState<any[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [receiptModal, setReceiptModal] = useState({ isOpen: false, receiptHtml: null as string | null, receiptNumber: null as string | null, loading: false });
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [selectedSale, setSelectedSale] = useState<any>(null);
-  const [newSale, setNewSale] = useState({ customer_id: "", sale_date: "", due_date: "", notes: "", discount_amount: 0, status: "draft" });
-  const [saleItems, setSaleItems] = useState([{ product_id: "", product_name: "", qty: 1, unit_price: 0, discount: 0 }]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [newSale, setNewSale] = useState<NewSale>({ customer_id: "", sale_date: "", due_date: "", notes: "", discount_amount: 0, status: "draft" });
+  const [saleItems, setSaleItems] = useState<SaleItem[]>([{ product_id: "", product_name: "", qty: 1, unit_price: 0, discount: 0 }]);
+  const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
+  const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
   const toast = useToast();
 
-  const loadSales = async () => {
+  const loadProducts = useCallback(async () => {
+    try {
+      const data = await api.products.getAll();
+      setProducts(data as { id: string; name: string }[]);
+    } catch (err: Error) {
+      console.error("Failed to load products:", err);
+    }
+  }, []);
+
+  const loadCustomers = useCallback(async () => {
+    try {
+      const data = await api.customers.getAll();
+      setCustomers(data as { id: string; name: string }[]);
+    } catch (err: Error) {
+      console.error("Failed to load customers:", err);
+    }
+  }, []);
+
+  const loadSales = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.sales.getAll(statusFilter);
-      setSales(data as any[]);
-    } catch (err: any) {
+      setSales(data as Sale[]);
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to load sales");
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, toast]);
 
   useEffect(() => {
     loadSales();
     loadProducts();
     loadCustomers();
-  }, []);
-
-  const loadProducts = async () => {
-    try {
-      const data = await api.products.getAll();
-      setProducts(data as any[]);
-    } catch (err: any) {
-      console.error("Failed to load products:", err);
-    }
-  };
-
-  const loadCustomers = async () => {
-    try {
-      const data = await api.customers.getAll();
-      setCustomers(data as any[]);
-    } catch (err: any) {
-      console.error("Failed to load customers:", err);
-    }
-  };
+  }, [loadSales, loadProducts, loadCustomers]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure?")) return;
@@ -151,8 +177,8 @@ export default function SalesPage() {
       await api.sales.delete(id);
       toast.success("Sale deleted");
       loadSales();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to delete sale");
+    } catch (_err: Error) {
+      toast.error(_err?.message || "Failed to delete sale");
     }
   };
 
@@ -168,8 +194,8 @@ export default function SalesPage() {
         receiptNumber: receiptAny?.receipt_number || null,
         loading: false,
       });
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load receipt");
+    } catch (_err: Error) {
+      toast.error(_err?.message || "Failed to load receipt");
       setReceiptModal({ isOpen: true, receiptHtml: null, receiptNumber: null, loading: false });
     }
   };

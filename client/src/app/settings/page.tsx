@@ -30,30 +30,29 @@ export default function SettingsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [theme, setTheme] = useState("Light");
   const [accentColor, setAccentColor] = useState("blue");
-  const [loginHistory, setLoginHistory] = useState<any[]>([]);
+  const [loginHistory, setLoginHistory] = useState<Array<{ id: string; created_at: string; ip_address: string }>>([]);
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       const me = await api.auth.me();
-      const meAny = me as any;
-      setProfile({ name: meAny.name || "", email: meAny.email || "" });
+      setProfile({ name: me.name || "", email: me.email || "" });
       setBusiness({
-        name: meAny.business_name || "",
-        email: meAny.business_email || "",
-        phone: meAny.phone || "",
-        address: meAny.address || "",
-        tax_id: meAny.tax_id || "",
+        name: me.business_name || "",
+        email: me.business_email || "",
+        phone: me.phone || "",
+        address: me.address || "",
+        tax_id: me.tax_id || "",
       });
-    } catch (err: any) {
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to load settings");
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const handleSaveBusiness = async () => {
     toast.success("Business settings saved (demo)");
@@ -114,7 +113,7 @@ export default function SettingsPage() {
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Data exported");
-    } catch (err: any) {
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to export data");
     }
   };

@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -21,42 +20,78 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserPlus, DollarSign, AlertTriangle, CheckCircle } from "lucide-react";
 import api from "@/lib/api";
 
+interface Debtor {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  balance: number;
+}
+
+interface Summary {
+  totalOwed: number;
+  totalPaid: number;
+  overdueCount: number;
+}
+
+interface DebtorForm {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  notes: string;
+}
+
+interface InvoiceForm {
+  reference: string;
+  amount: number;
+  due_date: string;
+  notes: string;
+}
+
+interface PaymentForm {
+  amount: number;
+  date: string;
+  reference: string;
+  notes: string;
+}
+
 export default function DebtorsPage() {
-  const [debtors, setDebtors] = useState<any[]>([]);
-  const [summary, setSummary] = useState<any>({ totalOwed: 0, totalPaid: 0, overdueCount: 0 });
+  const [debtors, setDebtors] = useState<Debtor[]>([]);
+  const [summary, setSummary] = useState<Summary>({ totalOwed: 0, totalPaid: 0, overdueCount: 0 });
   const [loading, setLoading] = useState(true);
   const [debtorDialog, setDebtorDialog] = useState(false);
   const [invoiceDialog, setInvoiceDialog] = useState(false);
   const [paymentDialog, setPaymentDialog] = useState(false);
-  const [selectedDebtor, setSelectedDebtor] = useState<any>(null);
-  const [debtorForm, setDebtorForm] = useState({ name: "", email: "", phone: "", address: "", notes: "" });
-  const [invoiceForm, setInvoiceForm] = useState({ reference: "", amount: 0, due_date: "", notes: "" });
-  const [paymentForm, setPaymentForm] = useState({ amount: 0, date: new Date().toISOString().split("T")[0], reference: "", notes: "" });
+  const [selectedDebtor, setSelectedDebtor] = useState<Debtor | null>(null);
+  const [debtorForm, setDebtorForm] = useState<DebtorForm>({ name: "", email: "", phone: "", address: "", notes: "" });
+  const [invoiceForm, setInvoiceForm] = useState<InvoiceForm>({ reference: "", amount: 0, due_date: "", notes: "" });
+  const [paymentForm, setPaymentForm] = useState<PaymentForm>({ amount: 0, date: new Date().toISOString().split("T")[0], reference: "", notes: "" });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const [debtorsRes, summaryRes] = await Promise.all([
         api.debtors.getAll(),
         api.debtors.getSummary(),
       ]);
-      setDebtors(debtorsRes as any[]);
-      setSummary(summaryRes as any);
-    } catch (err) {
+      setDebtors(debtorsRes as Debtor[]);
+      setSummary(summaryRes as Summary);
+    } catch {
       setError("Failed to load data");
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   async function handleCreateDebtor() {
     try {
@@ -65,30 +100,30 @@ export default function DebtorsPage() {
       setDebtorDialog(false);
       setDebtorForm({ name: "", email: "", phone: "", address: "", notes: "" });
       loadData();
-    } catch (err: any) {
+    } catch (err: Error) {
       setError(err.message);
     }
   }
 
   async function handleCreateInvoice() {
     try {
-      await api.debtors.createInvoice(selectedDebtor.id, invoiceForm);
+      await api.debtors.createInvoice(selectedDebtor!.id, invoiceForm);
       setSuccess("Invoice created");
       setInvoiceDialog(false);
       loadData();
-    } catch (err: any) {
+    } catch (err: Error) {
       setError(err.message);
     }
   }
 
   async function handleRecordPayment() {
     try {
-      await api.debtors.recordPayment(selectedDebtor.id, paymentForm);
+      await api.debtors.recordPayment(selectedDebtor!.id, paymentForm);
       setSuccess("Payment recorded");
       setPaymentDialog(false);
       setPaymentForm({ amount: 0, date: new Date().toISOString().split("T")[0], reference: "", notes: "" });
       loadData();
-    } catch (err: any) {
+    } catch (err: Error) {
       setError(err.message);
     }
   }

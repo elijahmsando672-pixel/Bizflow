@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -23,47 +22,105 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserPlus, Clock, DollarSign, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import api from "@/lib/api";
 
+interface Employee {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  position: string;
+  department: string;
+  hire_date: string;
+  salary: number;
+  salary_type: string;
+  status: string;
+}
+
+interface Attendance {
+  id: string;
+  employee_id: string;
+  date: string;
+  clock_in: string;
+  clock_out: string;
+}
+
+interface Payroll {
+  id: string;
+  employee_id: string;
+  period_start: string;
+  period_end: string;
+  gross_salary: number;
+  deductions: number;
+  bonuses: number;
+  tax_amount: number;
+}
+
+interface EmployeeForm {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  position: string;
+  department: string;
+  hire_date: string;
+  salary: number;
+  salary_type: string;
+  status: string;
+}
+
+interface PayrollForm {
+  employee_id: string;
+  period_start: string;
+  period_end: string;
+  gross_salary: number;
+  deductions: number;
+  bonuses: number;
+  tax_amount: number;
+  notes: string;
+}
+
 export default function EmployeesPage() {
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [attendance, setAttendance] = useState<any[]>([]);
-  const [payroll, setPayroll] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [payroll, setPayroll] = useState<Payroll[]>([]);
   const [loading, setLoading] = useState(true);
   const [employeeDialog, setEmployeeDialog] = useState(false);
   const [payrollDialog, setPayrollDialog] = useState(false);
-  const [form, setForm] = useState<any>({
+  const [form, setForm] = useState<EmployeeForm>({
     first_name: "", last_name: "", email: "", phone: "",
     position: "", department: "", hire_date: new Date().toISOString().split("T")[0],
     salary: 0, salary_type: "monthly", status: "active",
   });
-  const [payrollForm, setPayrollForm] = useState<any>({
+  const [payrollForm, setPayrollForm] = useState<PayrollForm>({
     employee_id: "", period_start: "", period_end: "",
     gross_salary: 0, deductions: 0, bonuses: 0, tax_amount: 0, notes: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const [empRes, attRes, payRes] = await Promise.all([
         api.employees.getAll(),
         api.employees.getAttendance(`date=${new Date().toISOString().split("T")[0]}`),
         api.employees.getPayroll(),
       ]);
-      setEmployees(empRes as any[]);
-      setAttendance(attRes as any[]);
-      setPayroll(payRes as any[]);
-    } catch (err) {
+      setEmployees(empRes as Employee[]);
+      setAttendance(attRes as Attendance[]);
+      setPayroll(payRes as Payroll[]);
+    } catch {
       setError("Failed to load data");
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   async function handleCreateEmployee() {
     try {
@@ -72,7 +129,7 @@ export default function EmployeesPage() {
       setEmployeeDialog(false);
       setForm({ first_name: "", last_name: "", email: "", phone: "", position: "", department: "", hire_date: new Date().toISOString().split("T")[0], salary: 0, salary_type: "monthly", status: "active" });
       loadData();
-    } catch (err: any) {
+    } catch (err: Error) {
       setError(err.message);
     }
   }
@@ -81,7 +138,7 @@ export default function EmployeesPage() {
     try {
       await api.employees.delete(id);
       loadData();
-    } catch (err: any) {
+    } catch (err: Error) {
       setError(err.message);
     }
   }
@@ -90,7 +147,7 @@ export default function EmployeesPage() {
     try {
       await api.employees.clockIn(id);
       loadData();
-    } catch (err: any) {
+    } catch (err: Error) {
       setError(err.message);
     }
   }
@@ -99,7 +156,7 @@ export default function EmployeesPage() {
     try {
       await api.employees.clockOut(id);
       loadData();
-    } catch (err: any) {
+    } catch (err: Error) {
       setError(err.message);
     }
   }
@@ -110,7 +167,7 @@ export default function EmployeesPage() {
       setSuccess("Payroll created");
       setPayrollDialog(false);
       loadData();
-    } catch (err: any) {
+    } catch (err: Error) {
       setError(err.message);
     }
   }

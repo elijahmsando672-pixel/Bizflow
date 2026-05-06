@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,67 +16,105 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FolderPlus, CheckSquare, Calendar, User, Clock } from "lucide-react";
+import { FolderPlus, CheckSquare, User, Clock } from "lucide-react";
 import api from "@/lib/api";
 
+interface Project {
+  id: string;
+  name: string;
+  description: string;
+  start_date: string;
+  end_date: string;
+  budget: number;
+  customer_id: string;
+  status: string;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  priority: string;
+  assignee_id: string;
+  due_date: string;
+  estimated_hours: number;
+}
+
+interface ProjectForm {
+  name: string;
+  description: string;
+  start_date: string;
+  end_date: string;
+  budget: number;
+  customer_id: string;
+}
+
+interface TaskForm {
+  title: string;
+  description: string;
+  priority: string;
+  assignee_id: string;
+  due_date: string;
+  estimated_hours: number;
+}
+
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [projectDialog, setProjectDialog] = useState(false);
   const [taskDialog, setTaskDialog] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<any>(null);
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [filterStatus, setFilterStatus] = useState("all");
-  const [projectForm, setProjectForm] = useState({ name: "", description: "", start_date: "", end_date: "", budget: 0, customer_id: "" });
-  const [taskForm, setTaskForm] = useState({ title: "", description: "", priority: "medium", assignee_id: "", due_date: "", estimated_hours: 0 });
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [team, setTeam] = useState<any[]>([]);
+  const [projectForm, setProjectForm] = useState<ProjectForm>({ name: "", description: "", start_date: "", end_date: "", budget: 0, customer_id: "" });
+  const [taskForm, setTaskForm] = useState<TaskForm>({ title: "", description: "", priority: "medium", assignee_id: "", due_date: "", estimated_hours: 0 });
+  const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
+  const [team, setTeam] = useState<{ id: string; name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => { loadProjects(); loadCustomers(); loadTeam(); }, [filterStatus]);
-
-  async function loadProjects() {
+  const loadProjects = useCallback(async () => {
     setLoading(true);
     try {
       const params = filterStatus !== "all" ? `?status=${filterStatus}` : "";
       const data = await api.projects.getProjects(params);
-      setProjects(data as any[]);
-    } catch (e) {
+      setProjects(data as Project[]);
+    } catch (_e) {
       setError("Failed to load projects");
     } finally {
       setLoading(false);
     }
-  }
+  }, [filterStatus]);
 
-  async function loadCustomers() {
+  const loadCustomers = useCallback(async () => {
     try {
       const data = await api.customers.getAll();
-      setCustomers(data as any[]);
-    } catch (e) {}
-  }
+      setCustomers(data as { id: string; name: string }[]);
+    } catch (_e) {}
+  }, []);
 
-  async function loadTeam() {
+  const loadTeam = useCallback(async () => {
     try {
       const data = await api.team.getMembers();
-      setTeam(data as any[]);
-    } catch (e) {}
-  }
+      setTeam(data as { id: string; name: string }[]);
+    } catch (_e) {}
+  }, []);
 
-  async function loadTasks(project: any) {
+  useEffect(() => { loadProjects(); loadCustomers(); loadTeam(); }, [loadProjects, loadCustomers, loadTeam]);
+
+  async function loadTasks(project: Project) {
     setSelectedProject(project);
     setTaskDialog(true);
     try {
       const data = await api.projects.getTasks(project.id);
-      setTasks(data as any[]);
-    } catch (e) {
+      setTasks(data as Task[]);
+    } catch (_e) {
       setError("Failed to load tasks");
     }
   }
@@ -89,7 +127,7 @@ export default function ProjectsPage() {
       setProjectDialog(false);
       setProjectForm({ name: "", description: "", start_date: "", end_date: "", budget: 0, customer_id: "" });
       loadProjects();
-    } catch (e) {
+    } catch (_e) {
       setError("Failed to create project");
     }
   }

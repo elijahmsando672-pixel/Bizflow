@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -12,42 +11,50 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Shield, Check, X, Save } from "lucide-react";
 import api from "@/lib/api";
 
+interface Permission {
+  role_name: string;
+  resource: string;
+  can_create: boolean;
+  can_read: boolean;
+  can_update: boolean;
+  can_delete: boolean;
+}
+
 const RESOURCES = ["customers", "products", "sales", "expenses", "invoices", "leads", "deals", "tickets", "projects", "vendors", "purchase_orders", "employees", "team", "reports"];
 
 export default function PermissionsPage() {
-  const [permissions, setPermissions] = useState<any[]>([]);
+  const [permissions, setPermissions] = useState<Permission[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
   const [selectedRole, setSelectedRole] = useState("admin");
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<Record<string, any>>({});
+  const [editing, setEditing] = useState<Record<string, Partial<Permission>>>({});
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => { loadData(); }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [permsData, rolesData] = await Promise.all([
         api.permissions.getPermissions(),
         api.permissions.getRoles(),
       ]);
-      setPermissions(permsData as any[]);
+      setPermissions(permsData as Permission[]);
       setRoles(rolesData as string[]);
       if (rolesData && (rolesData as string[]).length > 0) {
         setSelectedRole((rolesData as string[])[0]);
       }
-    } catch (e) {
+    } catch (_e) {
       setError("Failed to load permissions");
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   function togglePerm(resource: string, field: string) {
     const key = `${selectedRole}-${resource}`;
@@ -77,7 +84,7 @@ export default function PermissionsPage() {
       setSuccess(`Permissions saved for ${selectedRole}`);
       setEditing({});
       loadData();
-    } catch (e) {
+    } catch (_e) {
       setError("Failed to save permissions");
     }
   }

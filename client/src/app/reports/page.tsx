@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,25 +17,58 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, TrendingUp, TrendingDown, DollarSign, Package, FileDown } from "lucide-react";
 import api from "@/lib/api";
 
+interface ProfitLoss {
+  revenue: number;
+  cogs: number;
+  gross_profit: number;
+  gross_margin: number;
+  net_profit: number;
+  net_margin: number;
+  expenses_by_category: Array<{ category: string; total: number }>;
+}
+
+interface SalesReport {
+  total_sales: number;
+  total_revenue: number;
+  by_channel: Array<{ channel: string; total: number }>;
+  top_products: Array<{ name: string; total_sold: number; revenue: number }>;
+}
+
+interface InventoryReport {
+  total_products: number;
+  total_stock_value: number;
+  low_stock: number;
+  items: Array<{ name: string; stock_qty: number; reorder_level: number }>;
+}
+
+interface CashflowReport {
+  inflow: number;
+  outflow: number;
+  net: number;
+  by_month: Array<{ month: string; inflow: number; outflow: number }>;
+}
+
+interface TaxSummary {
+  total_tax: number;
+  by_month: Array<{ month: string; amount: number }>;
+}
+
+interface DateRange {
+  start_date: string;
+  end_date: string;
+}
+
 export default function ReportsPage() {
-  const [pl, setPL] = useState<any>(null);
-  const [salesReport, setSalesReport] = useState<any>(null);
-  const [inventory, setInventory] = useState<any>(null);
-  const [cashflow, setCashflow] = useState<any>(null);
-  const [taxSummary, setTaxSummary] = useState<any>(null);
+  const [pl, setPL] = useState<ProfitLoss | null>(null);
+  const [salesReport, setSalesReport] = useState<SalesReport | null>(null);
+  const [inventory, setInventory] = useState<InventoryReport | null>(null);
+  const [cashflow, setCashflow] = useState<CashflowReport | null>(null);
+  const [taxSummary, setTaxSummary] = useState<TaxSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState({ start_date: "", end_date: "" });
+  const [dateRange, setDateRange] = useState<DateRange>({ start_date: "", end_date: "" });
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), 0, 1).toISOString().split("T")[0];
-    const end = now.toISOString().split("T")[0];
-    setDateRange({ start_date: start, end_date: end });
-    loadReports(start, end);
-  }, []);
-
-  async function loadReports(start: string, end: string) {
+  const loadReports = useCallback(async (start: string, end: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -47,17 +80,25 @@ export default function ReportsPage() {
         api.reports.getCashflowReport(params),
         api.reports.getTaxSummary(new Date().getFullYear().toString()),
       ]);
-      setPL(plRes);
-      setSalesReport(salesRes);
-      setInventory(invRes);
-      setCashflow(cfRes);
-      setTaxSummary(taxRes);
-    } catch (err: any) {
+      setPL(plRes as ProfitLoss);
+      setSalesReport(salesRes as SalesReport);
+      setInventory(invRes as InventoryReport);
+      setCashflow(cfRes as CashflowReport);
+      setTaxSummary(taxRes as TaxSummary);
+    } catch (err: Error) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 1).toISOString().split("T")[0];
+    const end = now.toISOString().split("T")[0];
+    setDateRange({ start_date: start, end_date: end });
+    loadReports(start, end);
+  }, [loadReports]);
 
   function handleRefresh() {
     loadReports(dateRange.start_date, dateRange.end_date);
@@ -174,7 +215,10 @@ export default function ReportsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {pl.expenses_by_category.map((cat: any, i: number) => (
+                      {pl.expenses_by_category.map((cat: {
+                        category: string;
+                        total: number;
+                      }, i: number) => (
                         <TableRow key={i}>
                           <TableCell className="font-medium">
                             {cat.category || "Uncategorized"}
@@ -210,7 +254,11 @@ export default function ReportsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {salesReport.top_customers.map((c: any, i: number) => (
+                        {salesReport.top_customers.map((c: {
+                              name: string;
+                              purchase_count: number;
+                              total_spent: number;
+                            }, i: number) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{c.name}</TableCell>
                             <TableCell>{c.purchase_count}</TableCell>

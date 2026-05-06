@@ -8,12 +8,22 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, Download, FileSpreadsheet, Database, CheckCircle, AlertCircle, FileJson } from "lucide-react";
 import api from "@/lib/api";
 
+interface ImportResult {
+  success: number;
+  failed: number;
+  errors: { row: number; error: string }[];
+}
+
+interface TemplateRecord {
+  [key: string]: string | number | boolean | null;
+}
+
 export default function DataImportPage() {
   const [selectedResource, setSelectedResource] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ success: number; failed: number; errors: { row: number; error: string }[] } | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -41,19 +51,19 @@ export default function DataImportPage() {
       const text = await file.text();
 
       if (fileExt === 'csv') {
-        const result = await api.importExport.importCsv(selectedResource, text) as any;
+        const result = await api.importExport.importCsv(selectedResource, text) as ImportResult;
         setImportResult(result);
         if (result.success > 0) setSuccess(`Imported ${result.success} records`);
         if (result.failed > 0) setError(`${result.failed} records failed`);
       } else {
         const data = JSON.parse(text);
         if (!Array.isArray(data)) throw new Error("File must contain a JSON array");
-        const result = await api.importExport.importData(selectedResource, data) as any;
+        const result = await api.importExport.importData(selectedResource, data) as ImportResult;
         setImportResult(result);
         if (result.success > 0) setSuccess(`Imported ${result.success} records`);
         if (result.failed > 0) setError(`${result.failed} records failed`);
       }
-    } catch (e: any) {
+    } catch (e: Error) {
       setError(e.message || "Failed to import data");
     } finally {
       setImporting(false);
@@ -66,7 +76,7 @@ export default function DataImportPage() {
     setError(null);
 
     try {
-      const data = await api.importExport.exportData(selectedResource, 'json') as any[];
+      const data = await api.importExport.exportData(selectedResource, 'json') as TemplateRecord[];
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -75,7 +85,7 @@ export default function DataImportPage() {
       a.click();
       URL.revokeObjectURL(url);
       setSuccess(`Exported ${data.length} records`);
-    } catch (e: any) {
+    } catch (e: Error) {
       setError(e.message || "Failed to export data");
     } finally {
       setExporting(false);
@@ -84,10 +94,10 @@ export default function DataImportPage() {
 
   function downloadTemplate(format: 'json' | 'csv') {
     if (!selectedResource) return;
-    api.importExport.getTemplate(selectedResource).then((template: any) => {
+    api.importExport.getTemplate(selectedResource).then((template: TemplateRecord[]) => {
       if (format === 'csv') {
         const headers = Object.keys(template[0] || {}).join(',');
-        const csvRows = template.map((row: any) =>
+        const csvRows = template.map((row: TemplateRecord) =>
           Object.values(row).map(v => {
             const str = String(v ?? '');
             return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;

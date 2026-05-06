@@ -2,7 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Bell, Search, User, Plus, LogOut } from "lucide-react";
+import { Bell, Search, Plus, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 export function Topbar() {

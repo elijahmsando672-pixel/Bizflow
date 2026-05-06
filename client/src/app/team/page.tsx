@@ -28,36 +28,34 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { UserPlus, Mail, Trash2, Users, CheckCircle, XCircle } from "lucide-react";
+import { UserPlus, Mail, Trash2, Users, CheckCircle } from "lucide-react";
 import api from "@/lib/api";
 
 export default function TeamPage() {
-  const [members, setMembers] = useState<any[]>([]);
-  const [invitations, setInvitations] = useState<any[]>([]);
+  const [members, setMembers] = useState<Array<{ id: string; name: string; email: string; role: string }>>([]);
+  const [invitations, setInvitations] = useState<Array<{ id: string; email: string; role: string; status: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [inviteDialog, setInviteDialog] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: "", role: "staff" });
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const [membersRes, invitesRes] = await Promise.all([
         api.team.getMembers(),
         api.team.getInvitations(),
       ]);
-      setMembers(membersRes as any[]);
-      setInvitations(invitesRes as any[]);
-    } catch (err) {
+      setMembers(membersRes as Array<{ id: string; name: string; email: string; role: string }>);
+      setInvitations(invitesRes as Array<{ id: string; email: string; role: string; status: string }>);
+    } catch (_e) {
       setError("Failed to load team data");
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
   }
 
   async function handleInvite() {
@@ -334,4 +332,3 @@ export default function TeamPage() {
       </Dialog>
     </div>
   );
-}

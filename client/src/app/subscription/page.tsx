@@ -15,41 +15,65 @@ import {
 import { Check, Crown, AlertCircle, CreditCard } from "lucide-react";
 import api from "@/lib/api";
 
+interface Plan {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  interval: string;
+  features: string[];
+}
+
+interface Subscription {
+  id: string;
+  plan_id: string;
+  status: string;
+  current_period_end: string;
+}
+
+interface Payment {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  created_at: string;
+}
+
 export default function SubscriptionPage() {
-  const [plans, setPlans] = useState<any[]>([]);
-  const [currentSub, setCurrentSub] = useState<any>(null);
-  const [payments, setPayments] = useState<any[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [currentSub, setCurrentSub] = useState<Subscription | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const [plansRes, subRes, paymentsRes] = await Promise.all([
         api.subscriptions.getPlans(),
         api.subscriptions.getCurrent(),
         api.subscriptions.getPayments(),
       ]);
-      setPlans(plansRes as any[]);
-      setCurrentSub(subRes as any);
-      setPayments(paymentsRes as any[]);
-    } catch (err) {
+      setPlans(plansRes as Plan[]);
+      setCurrentSub(subRes as Subscription);
+      setPayments(paymentsRes as Payment[]);
+    } catch (_err) {
       setError("Failed to load subscription data");
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   async function handleActivate(planId: string) {
     try {
       await api.subscriptions.activate(planId);
       setSuccess("Subscription activated");
       loadData();
-    } catch (err: any) {
+    } catch (err: Error) {
       setError(err.message);
     }
   }
@@ -59,8 +83,8 @@ export default function SubscriptionPage() {
       await api.subscriptions.cancel();
       setSuccess("Subscription cancelled");
       loadData();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (_err: Error) {
+      setError(_err.message);
     }
   }
 

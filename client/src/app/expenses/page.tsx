@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, DollarSign, TrendingDown, Loader2, X } from "lucide-react";
+import { Plus, Search, DollarSign, TrendingDown, Loader2 } from "lucide-react";
 import api from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -32,42 +32,66 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+interface Expense {
+  id: string;
+  description: string;
+  amount: number;
+  category: string;
+  expense_date: string;
+  status: string;
+  receipt_url: string;
+}
+
+interface ExpenseForm {
+  description: string;
+  amount: string;
+  category: string;
+  expense_date: string;
+  status: string;
+  receipt_url: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+}
+
 export default function ExpensesPage() {
-  const [expenses, setExpenses] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [selectedExpense, setSelectedExpense] = useState<any>(null);
-  const [expenseForm, setExpenseForm] = useState({ description: "", amount: "", category: "", expense_date: "", status: "pending", receipt_url: "" });
-  const [categories, setCategories] = useState<any[]>([]);
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [expenseForm, setExpenseForm] = useState<ExpenseForm>({ description: "", amount: "", category: "", expense_date: "", status: "pending", receipt_url: "" });
+  const [categories, setCategories] = useState<Category[]>([]);
   const toast = useToast();
 
-  const loadExpenses = async () => {
+  const loadExpenses = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.expenses.getAll();
-      setExpenses(data as any[]);
-    } catch (err: any) {
+      setExpenses(data as Expense[]);
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to load expenses");
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  const loadCategories = useCallback(async () => {
+    try {
+      const data = await api.expenses.getCategories();
+      setCategories(data as Category[]);
+    } catch (err: Error) {
+      console.error("Failed to load categories:", err);
+    }
+  }, []);
 
   useEffect(() => {
     loadExpenses();
     loadCategories();
-  }, []);
-
-  const loadCategories = async () => {
-    try {
-      const data = await api.expenses.getCategories();
-      setCategories(data as any[]);
-    } catch (err: any) {
-      console.error("Failed to load categories:", err);
-    }
-  };
+  }, [loadExpenses, loadCategories]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure?")) return;
@@ -75,7 +99,7 @@ export default function ExpensesPage() {
       await api.expenses.delete(id);
       toast.success("Expense deleted");
       loadExpenses();
-    } catch (err: any) {
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to delete expense");
     }
   };
@@ -98,22 +122,22 @@ export default function ExpensesPage() {
       setDialogOpen(false);
       setExpenseForm({ description: "", amount: "", category: "", expense_date: "", status: "pending", receipt_url: "" });
       loadExpenses();
-    } catch (err: any) {
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to create expense");
     }
   };
 
-  const handleViewExpense = (expense: any) => {
+  const handleViewExpense = (expense: Expense) => {
     setSelectedExpense(expense);
     setViewDialogOpen(true);
   };
 
   const handleApproveExpense = async (id: string) => {
     try {
-      await api.expenses.update(id, { status: "approved" } as any);
+      await api.expenses.update(id, { status: "approved" });
       toast.success("Expense approved");
       loadExpenses();
-    } catch (err: any) {
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to approve expense");
     }
   };
@@ -284,7 +308,7 @@ export default function ExpensesPage() {
                 <Select value={expenseForm.category} onValueChange={(v) => setExpenseForm({ ...expenseForm, category: v })}>
                   <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                   <SelectContent>
-                    {categories.map((cat: any) => (
+                    {categories.map((cat: Category) => (
                       <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                     ))}
                   </SelectContent>

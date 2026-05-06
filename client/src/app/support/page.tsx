@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -25,24 +24,49 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TicketPlus, AlertCircle, CheckCircle, Clock, MessageSquare } from "lucide-react";
 import api from "@/lib/api";
 
+interface Ticket {
+  id: string;
+  customer_id: string;
+  subject: string;
+  description: string;
+  priority: string;
+  category: string;
+  assigned_to: string;
+  status: string;
+}
+
+interface Stats {
+  total: number;
+  open: number;
+  in_progress: number;
+  resolved: number;
+}
+
+interface Form {
+  customer_id: string;
+  subject: string;
+  description: string;
+  priority: string;
+  category: string;
+  assigned_to: string;
+}
+
 export default function SupportPage() {
-  const [tickets, setTickets] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>({});
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [stats, setStats] = useState<Stats>({} as Stats);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState<any>(null);
-  const [replies, setReplies] = useState<any[]>([]);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [replies, setReplies] = useState<Array<{ id: string; message: string; created_at: string }>>([]);
   const [replyMessage, setReplyMessage] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [form, setForm] = useState({ customer_id: "", subject: "", description: "", priority: "medium", category: "general", assigned_to: "" });
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [form, setForm] = useState<Form>({ customer_id: "", subject: "", description: "", priority: "medium", category: "general", assigned_to: "" });
+  const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => { loadTickets(); loadCustomers(); }, [filterStatus]);
-
-  async function loadTickets() {
+  const loadTickets = useCallback(async () => {
     setLoading(true);
     try {
       const params = filterStatus !== "all" ? `?status=${filterStatus}` : "";
@@ -50,20 +74,29 @@ export default function SupportPage() {
         api.support.getTickets(params),
         api.support.getStats(),
       ]);
-      setTickets(ticketsData as any[]);
-      setStats((statsData as any).stats || {});
-    } catch (e) {
+      setTickets(ticketsData as Ticket[]);
+      setStats((statsData as { stats: Stats }).stats || {} as Stats);
+    } catch (_e) {
       setError("Failed to load tickets");
     } finally {
       setLoading(false);
     }
-  }
+  }, [filterStatus]);
+
+  const loadCustomers = useCallback(async () => {
+    try {
+      const data = await api.customers.getAll();
+      setCustomers(data as { id: string; name: string }[]);
+    } catch (_e) {}
+  }, []);
+
+  useEffect(() => { loadTickets(); loadCustomers(); }, [loadTickets, loadCustomers]);
 
   async function loadCustomers() {
     try {
       const data = await api.customers.getAll();
       setCustomers(data as any[]);
-    } catch (e) {
+    } catch (_e) {
       console.error("Failed to load customers");
     }
   }

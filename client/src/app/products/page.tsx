@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, AlertTriangle, Package, Loader2, X } from "lucide-react";
+import { Plus, Search, AlertTriangle, Package, Loader2 } from "lucide-react";
 import api from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -32,42 +32,68 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+interface Product {
+  id: string;
+  name: string;
+  sku: string;
+  category: string;
+  price: number;
+  stock_qty: number;
+  reorder_level: number;
+  description: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+}
+
+interface ProductForm {
+  name: string;
+  sku: string;
+  category: string;
+  price: string;
+  stock_qty: string;
+  reorder_level: string;
+  description: string;
+}
+
 export default function ProductsPage() {
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<any>(null);
-  const [productForm, setProductForm] = useState({ name: "", sku: "", category: "", price: "", stock_qty: "", reorder_level: "", description: "" });
-  const [categories, setCategories] = useState<any[]>([]);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productForm, setProductForm] = useState<ProductForm>({ name: "", sku: "", category: "", price: "", stock_qty: "", reorder_level: "", description: "" });
+  const [categories, setCategories] = useState<Category[]>([]);
   const toast = useToast();
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.products.getAll();
-      setProducts(data as any[]);
-    } catch (err: any) {
+      setProducts(data as Product[]);
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to load products");
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  const loadCategories = useCallback(async () => {
+    try {
+      const data = await api.products.getCategories();
+      setCategories(data as Category[]);
+    } catch (err: Error) {
+      console.error("Failed to load categories:", err);
+    }
+  }, []);
 
   useEffect(() => {
     loadProducts();
     loadCategories();
-  }, []);
-
-  const loadCategories = async () => {
-    try {
-      const data = await api.products.getCategories();
-      setCategories(data as any[]);
-    } catch (err: any) {
-      console.error("Failed to load categories:", err);
-    }
-  };
+  }, [loadProducts, loadCategories]);
 
   const handleCreateProduct = async () => {
     if (!productForm.name || !productForm.price) {
@@ -88,12 +114,12 @@ export default function ProductsPage() {
       setDialogOpen(false);
       setProductForm({ name: "", sku: "", category: "", price: "", stock_qty: "", reorder_level: "", description: "" });
       loadProducts();
-    } catch (err: any) {
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to create product");
     }
   };
 
-  const handleEditProduct = (product: any) => {
+  const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
     setProductForm({
       name: product.name || "",
@@ -126,8 +152,8 @@ export default function ProductsPage() {
       setEditDialogOpen(false);
       setEditingProduct(null);
       loadProducts();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to update product");
+    } catch (_err: Error) {
+      toast.error(_err?.message || "Failed to update product");
     }
   };
 
@@ -137,8 +163,8 @@ export default function ProductsPage() {
       await api.products.delete(id);
       toast.success("Product deleted");
       loadProducts();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to delete product");
+    } catch (_err: Error) {
+      toast.error(_err?.message || "Failed to delete product");
     }
   };
 

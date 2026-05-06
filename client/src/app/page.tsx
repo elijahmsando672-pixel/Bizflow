@@ -43,8 +43,19 @@ interface DashboardData {
     totalInflow: number;
     totalOutflow: number;
   };
-  recentSales: any[];
-  recentExpenses: any[];
+  recentSales: Array<{
+    id: string;
+    customer_name: string;
+    sale_date: string;
+    status: string;
+    total: number;
+  }>;
+  recentExpenses: Array<{
+    id: string;
+    description: string;
+    amount: number;
+    expense_date: string;
+  }>;
 }
 
 function formatCurrency(amount: number) {
@@ -119,7 +130,15 @@ function DashboardCards({ data }: { data: DashboardData }) {
   );
 }
 
-function LowStockAlerts({ data }: { data: any[] }) {
+function LowStockAlerts({ data }: { data: Array<{
+  id: string;
+  name: string;
+  sku: string;
+  stock_qty: number;
+  reorder_level: number;
+  suggested_restock_qty: number;
+  estimated_restock_cost: number;
+}> }) {
   if (!data.length) {
     return (
       <Card>
@@ -152,7 +171,15 @@ function LowStockAlerts({ data }: { data: any[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((item: any) => {
+             {data.map((item: {
+                id: string;
+                name: string;
+                sku: string;
+                stock_qty: number;
+                reorder_level: number;
+                suggested_restock_qty: number;
+                estimated_restock_cost: number;
+              }) => {
               const stockPercent = (item.stock_qty / item.reorder_level) * 100;
               const severity = stockPercent < 25 ? "bg-red-100 text-red-700" : stockPercent < 50 ? "bg-orange-100 text-orange-700" : "bg-yellow-100 text-yellow-700";
               return (
@@ -175,7 +202,16 @@ function LowStockAlerts({ data }: { data: any[] }) {
   );
 }
 
-function TopProducts({ data }: { data: any[] }) {
+function TopProducts({ data }: { data: Array<{
+  id: string;
+  name: string;
+  category_name: string;
+  total_sold: number;
+  order_count: number;
+  total_revenue: number;
+  stock_qty: number;
+  reorder_level: string;
+}> }) {
   if (!data.length) {
     return (
       <Card>
@@ -230,7 +266,16 @@ function TopProducts({ data }: { data: any[] }) {
   );
 }
 
-function FrequentCustomers({ data }: { data: any[] }) {
+function FrequentCustomers({ data }: { data: Array<{
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  total_orders: number;
+  total_spent: number;
+  avg_order_value: number;
+  last_order_date: string;
+}> }) {
   if (!data.length) {
     return (
       <Card>
@@ -483,10 +528,46 @@ function StatsOverview({ data }: { data: DashboardData }) {
 
 export default function Home() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [lowStock, setLowStock] = useState<any[]>([]);
-  const [topProducts, setTopProducts] = useState<any[]>([]);
-  const [frequentCustomers, setFrequentCustomers] = useState<any[]>([]);
-  const [restockBudget, setRestockBudget] = useState<any>(null);
+  const [lowStock, setLowStock] = useState<Array<{
+    id: string;
+    name: string;
+    sku: string;
+    stock_qty: number;
+    reorder_level: number;
+    suggested_restock_qty: number;
+    estimated_restock_cost: number;
+  }>([]);
+  const [topProducts, setTopProducts] = useState<Array<{
+    id: string;
+    name: string;
+    category_name: string;
+    total_sold: number;
+    order_count: number;
+    total_revenue: number;
+    stock_qty: number;
+    reorder_level: string;
+  }>([]);
+  const [frequentCustomers, setFrequentCustomers] = useState<Array<{
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    total_orders: number;
+    total_spent: number;
+    avg_order_value: number;
+    last_order_date: string;
+  }>([]);
+  const [restockBudget, setRestockBudget] = useState<{
+    items: Array<{
+      id: string;
+      name: string;
+      cost_price: number;
+      stock_qty: number;
+      reorder_level: string;
+    }>;
+    totalBudget: number;
+    itemCount: number;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

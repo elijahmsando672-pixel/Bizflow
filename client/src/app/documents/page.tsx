@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, FileText, Download, Eye, Trash2, Upload } from "lucide-react";
+import { Search, FileText, Download, Eye, Trash2, Upload } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import {
   Dialog,
@@ -30,7 +30,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const documents = [
+interface Document {
+  id: number;
+  name: string;
+  type: string;
+  size: string;
+  date: string;
+  status: string;
+  content: string;
+}
+
+const documents: Document[] = [
   { id: 1, name: "Invoice_2024_001.pdf", type: "Invoice", size: "45 KB", date: "2024-01-15", status: "Generated", content: "Sample invoice content" },
   { id: 2, name: "Invoice_2024_000.pdf", type: "Invoice", size: "42 KB", date: "2024-01-14", status: "Generated", content: "Sample invoice content" },
   { id: 3, name: "Contract_JohnDoe.pdf", type: "Contract", size: "128 KB", date: "2024-01-10", status: "Signed", content: "Sample contract content" },
@@ -38,13 +48,19 @@ const documents = [
   { id: 5, name: "Report_Dec2023.pdf", type: "Report", size: "256 KB", date: "2024-01-01", status: "Generated", content: "Sample report content" },
 ];
 
+interface UploadForm {
+  name: string;
+  type: string;
+  file: File | null;
+}
+
 export default function DocumentsPage() {
   const [search, setSearch] = useState("");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [selectedDoc, setSelectedDoc] = useState<any>(null);
-  const [uploadForm, setUploadForm] = useState({ name: "", type: "", file: null as File | null });
-  const [docs, setDocs] = useState(documents);
+  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
+  const [uploadForm, setUploadForm] = useState<UploadForm>({ name: "", type: "", file: null });
+  const [docs, setDocs] = useState<Document[]>(documents);
   const toast = useToast();
 
   const filteredDocs = docs.filter((d) =>
@@ -72,12 +88,12 @@ export default function DocumentsPage() {
     setUploadForm({ name: "", type: "", file: null });
   };
 
-  const handleViewDoc = (doc: any) => {
+  const handleViewDoc = (doc: Document) => {
     setSelectedDoc(doc);
     setViewDialogOpen(true);
   };
 
-  const handleDownloadDoc = (doc: any) => {
+  const handleDownloadDoc = (doc: Document) => {
     const blob = new Blob([doc.content || "Sample document content"], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

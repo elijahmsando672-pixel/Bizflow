@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, Users, UserCheck, UserX, Loader2, X } from "lucide-react";
+import { Plus, Search, Users, UserCheck, UserX, Loader2 } from "lucide-react";
 import api from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -31,31 +31,48 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+interface Customer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  status: string;
+}
+
+interface CustomerForm {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  status: string;
+}
+
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
-  const [customerForm, setCustomerForm] = useState({ name: "", email: "", phone: "", address: "", status: "active" });
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customerForm, setCustomerForm] = useState<CustomerForm>({ name: "", email: "", phone: "", address: "", status: "active" });
   const toast = useToast();
 
-  const loadCustomers = async () => {
+  const loadCustomers = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.customers.getAll();
-      setCustomers(data as any[]);
-    } catch (err: any) {
+      setCustomers(data as Customer[]);
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to load customers");
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadCustomers();
-  }, []);
+  }, [loadCustomers]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure?")) return;
@@ -63,7 +80,7 @@ export default function CustomersPage() {
       await api.customers.delete(id);
       toast.success("Customer deleted");
       loadCustomers();
-    } catch (err: any) {
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to delete customer");
     }
   };
@@ -85,12 +102,12 @@ export default function CustomersPage() {
       setDialogOpen(false);
       setCustomerForm({ name: "", email: "", phone: "", address: "", status: "active" });
       loadCustomers();
-    } catch (err: any) {
+    } catch (err: Error) {
       toast.error(err?.message || "Failed to create customer");
     }
   };
 
-  const handleViewCustomer = (customer: any) => {
+  const handleViewCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
     setViewDialogOpen(true);
   };

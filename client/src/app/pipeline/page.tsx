@@ -1,37 +1,61 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, DollarSign, TrendingUp, Calendar, User } from "lucide-react";
+import { Plus, Calendar, User } from "lucide-react";
 import api from "@/lib/api";
 
+interface Stage {
+  id: string;
+  name: string;
+}
+
+interface Deal {
+  id: string;
+  name: string;
+  customer_id: string;
+  value: number;
+  priority: string;
+  stage_id: string;
+  expected_close_date: string;
+  assigned_to: string;
+}
+
+interface Summary {
+  won_deals: number;
+  won_value: number;
+  lost_deals: number;
+  lost_value: number;
+}
+
+interface FormData {
+  name: string;
+  customer_id: string;
+  value: number;
+  priority: string;
+  expected_close_date: string;
+  assigned_to: string;
+  notes: string;
+}
+
 export default function PipelinePage() {
-  const [stages, setStages] = useState<any[]>([]);
-  const [deals, setDeals] = useState<any[]>([]);
-  const [summary, setSummary] = useState<any>({ won_deals: 0, won_value: 0, lost_deals: 0, lost_value: 0 });
+  const [stages, setStages] = useState<Stage[]>([]);
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [summary, setSummary] = useState<Summary>({ won_deals: 0, won_value: 0, lost_deals: 0, lost_value: 0 });
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", customer_id: "", value: 0, priority: "medium", expected_close_date: "", assigned_to: "", notes: "" });
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [form, setForm] = useState<FormData>({ name: "", customer_id: "", value: 0, priority: "medium", expected_close_date: "", assigned_to: "", notes: "" });
+  const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => { loadPipeline(); loadCustomers(); }, []);
-
-  async function loadPipeline() {
+  const loadPipeline = useCallback(async () => {
     setLoading(true);
     try {
       const [stagesData, dealsData, summaryData] = await Promise.all([
@@ -39,24 +63,26 @@ export default function PipelinePage() {
         api.pipeline.getDeals(),
         api.pipeline.getSummary(),
       ]);
-      setStages(stagesData as any[]);
-      setDeals(dealsData as any[]);
-      setSummary((summaryData as any).summary || {});
-    } catch (e) {
+      setStages(stagesData as Stage[]);
+      setDeals(dealsData as Deal[]);
+      setSummary((summaryData as { summary: Summary }).summary || {});
+    } catch (_e) {
       setError("Failed to load pipeline");
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  async function loadCustomers() {
+  const loadCustomers = useCallback(async () => {
     try {
       const data = await api.customers.getAll();
-      setCustomers(data as any[]);
-    } catch (e) {
+      setCustomers(data as { id: string; name: string }[]);
+    } catch (_e) {
       console.error("Failed to load customers");
     }
-  }
+  }, []);
+
+  useEffect(() => { loadPipeline(); loadCustomers(); }, [loadPipeline, loadCustomers]);
 
   async function handleSubmit() {
     setError(null);
@@ -67,18 +93,18 @@ export default function PipelinePage() {
       setDialogOpen(false);
       setForm({ name: "", customer_id: "", value: 0, priority: "medium", expected_close_date: "", assigned_to: "", notes: "" });
       loadPipeline();
-    } catch (e) {
+    } catch (_e) {
       setError("Failed to create deal");
     }
   }
 
-  async function updateDealStage(deal: any, newStageId: string) {
+  async function updateDealStage(deal: Deal, newStageId: string) {
     try {
       const stage = stages.find(s => s.id === newStageId);
       const outcome = stage?.name.includes("Won") ? "won" : stage?.name.includes("Lost") ? "lost" : undefined;
       await api.pipeline.updateDeal(deal.id, { stage_id: newStageId, outcome });
       loadPipeline();
-    } catch (e) {
+    } catch (_e) {
       setError("Failed to update deal");
     }
   }

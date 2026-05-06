@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -16,7 +15,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -26,38 +24,87 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Package, Truck, Plus, Minus, Star } from "lucide-react";
 import api from "@/lib/api";
 
+interface Vendor {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  contact_person: string;
+  payment_terms: string;
+}
+
+interface POItem {
+  product_name: string;
+  qty: number;
+  unit_price: number;
+  total: number;
+}
+
+interface PurchaseOrder {
+  id: string;
+  vendor_id: string;
+  expected_delivery: string;
+  notes: string;
+  items: POItem[];
+  status: string;
+}
+
+interface VendorForm {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  contact_person: string;
+  payment_terms: string;
+  notes: string;
+}
+
+interface POForm {
+  vendor_id: string;
+  expected_delivery: string;
+  notes: string;
+  items: POItem[];
+}
+
+interface ItemForm {
+  product_name: string;
+  qty: number;
+  unit_price: number;
+}
+
 export default function ProcurementPage() {
-  const [vendors, setVendors] = useState<any[]>([]);
-  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [vendorDialog, setVendorDialog] = useState(false);
   const [poDialog, setPoDialog] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [selectedPO, setSelectedPO] = useState<any>(null);
+  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [activeTab, setActiveTab] = useState("vendors");
-  const [vendorForm, setVendorForm] = useState({ name: "", email: "", phone: "", address: "", contact_person: "", payment_terms: "", notes: "" });
-  const [poForm, setPoForm] = useState({ vendor_id: "", expected_delivery: "", notes: "", items: [] as any[] });
-  const [itemForm, setItemForm] = useState({ product_name: "", qty: 1, unit_price: 0 });
+  const [vendorForm, setVendorForm] = useState<VendorForm>({ name: "", email: "", phone: "", address: "", contact_person: "", payment_terms: "", notes: "" });
+  const [poForm, setPoForm] = useState<POForm>({ vendor_id: "", expected_delivery: "", notes: "", items: [] });
+  const [itemForm, setItemForm] = useState<ItemForm>({ product_name: "", qty: 1, unit_price: 0 });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => { loadData(); }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [vendorsData, poData] = await Promise.all([
         api.procurement.getVendors(),
         api.procurement.getPurchaseOrders(),
       ]);
-      setVendors(vendorsData as any[]);
-      setPurchaseOrders(poData as any[]);
-    } catch (e) {
+      setVendors(vendorsData as Vendor[]);
+      setPurchaseOrders(poData as PurchaseOrder[]);
+    } catch (_e) {
       setError("Failed to load data");
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   async function createVendor() {
     setError(null);
@@ -67,7 +114,7 @@ export default function ProcurementPage() {
       setVendorDialog(false);
       setVendorForm({ name: "", email: "", phone: "", address: "", contact_person: "", payment_terms: "", notes: "" });
       loadData();
-    } catch (e) {
+    } catch (_e) {
       setError("Failed to create vendor");
     }
   }
@@ -91,12 +138,12 @@ export default function ProcurementPage() {
       setPoDialog(false);
       setPoForm({ vendor_id: "", expected_delivery: "", notes: "", items: [] });
       loadData();
-    } catch (e) {
+    } catch (_e) {
       setError("Failed to create purchase order");
     }
   }
 
-  async function updatePOStatus(po: any, status: string) {
+  async function updatePOStatus(po: PurchaseOrder, status: string) {
     try {
       await api.procurement.updatePurchaseOrder(po.id, { status });
       loadData();
