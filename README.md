@@ -1,104 +1,83 @@
-# BizFlow
+# BizFlow - Business Management System
 
-A modern business management dashboard for small to medium businesses.
+Modern business management dashboard built with Next.js, Express, and PostgreSQL.
 
-## Features
-
-- **Dashboard** - Overview of your business with today's sales, expenses, profit, and low stock alerts
-- **Sales** - Track and manage sales transactions
-- **Products** - Manage product inventory with stock levels
-- **Expenses** - Track business expenses by category
-- **Customers** - Manage customer relationships
-- **Creditors** - Manage payable accounts
-- **Reports** - Analytics and insights with charts
-- **Documents** - Manage business documents
-- **Notifications** - Stay updated with alerts
-- **Settings** - Configure your business
-
-## Tech Stack
-
-- **Frontend**: Next.js 16, Tailwind CSS, shadcn/ui, Recharts
-- **Backend**: Node.js, Express, PostgreSQL
-- **Database**: PostgreSQL
-
-## Getting Started
+## Quick Start
 
 ### Prerequisites
-
 - Node.js 18+
-- PostgreSQL 14+
+- PostgreSQL
+- npm/yarn
 
-### Installation
-
-1. Clone the repository
+### 1. Clone & Install
 ```bash
 git clone https://github.com/elijahmsando672-pixel/Bizflow.git
 cd Bizflow
-```
-
-2. Install dependencies
-```bash
-# Frontend
-cd client && npm install
-
-# Backend (root directory)
 npm install
+cd client && npm install && cd ..
 ```
 
-3. Configure environment variables
+### 2. Environment Setup
+Copy `.env.example` to `.env` and configure:
 ```bash
-# Edit .env file
 cp .env.example .env
-# Update with your database credentials
+# Edit .env with your database and JWT settings
 ```
 
-4. Start the development servers
-
-**Backend** (port 5000):
+### 3. Database Setup
 ```bash
+# The server auto-initializes the database schema on first run
 npm run server
-# or
-node server/index.js
 ```
 
-**Frontend** (port 3000):
+### 4. Run Development
 ```bash
-cd client && npm run dev
+# Terminal 1: Backend
+npm run server
+
+# Terminal 2: Frontend  
+npm run dev
 ```
+Visit http://localhost:3000
 
-5. Open http://localhost:3000
+## Login Credentials
+- Email: `elijah@bizflow.com`
+- Password: `test123`
 
-## Project Structure
+## Deployment
 
-```
-Bizflow/
-├── client/                 # Next.js frontend
-│   ├── src/
-│   │   ├── app/          # App router pages
-│   │   ├── components/   # React components
-│   │   └── lib/         # Utilities
-│   └── package.json
-├── server/                # Express backend
-│   ├── config/          # Database config
-│   ├── middleware/     # Auth middleware
-│   ├── routes/        # API routes
-│   ├── utils/         # Utilities
-│   └── index.js       # Server entry
-├── .env                 # Environment variables
-└── package.json
-```
+### Frontend (Vercel)
+1. Import GitHub repo to Vercel
+2. Set **Root Directory** to `client/`
+3. Add environment variable: `NEXT_PUBLIC_API_URL=https://your-backend.railway.app/api`
+4. Deploy
 
-## API Endpoints
+### Backend (Railway)
+1. Create new project on Railway
+2. Connect GitHub repo
+3. Set **Root Directory** to `server/`
+4. Add PostgreSQL database
+5. Set environment variables:
+   - `PORT=5000`
+   - `JWT_SECRET=your-production-secret`
+   - `NODE_ENV=production`
+   - `CLIENT_URL=https://your-vercel-app.vercel.app`
+   - `DATABASE_URL` (auto-set by Railway PostgreSQL)
+6. Deploy
 
-- `GET /api/health` - Health check
-- `/api/auth` - Authentication
-- `/api/customers` - Customer management
-- `/api/products` - Product management
-- `/api/sales` - Sales transactions
-- `/api/expenses` - Expense tracking
-- `/api/dashboard` - Dashboard data
-- `/api/notifications` - Notifications
+## Features
+- **Dashboard** - Revenue, expenses, profit tracking
+- **Sales & Invoicing** - Create sales, manage invoices
+- **CRM** - Customer management, lead tracking
+- **Inventory** - Product management, stock tracking
+- **Projects** - Project management with tasks
+- **Team** - Team members, roles, permissions
+- **Time Tracking** - Track work hours
+- **Reports** - Profit/loss, tax summaries
+- **AI Insights** - Business predictions (requires Google API key)
+- **Subscriptions** - Manage billing plans
 
-## License
-
-MIT
+## Tech Stack
+- **Frontend**: Next.js 16, React 19, TypeScript, Tailwind CSS
+- **Backend**: Express, PostgreSQL, JWT auth
+- **Deployment**: Vercel (frontend), Railway (backend)
