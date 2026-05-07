@@ -160,8 +160,8 @@ function LowStockAlerts({ data }: { data: Array<{
   reorder_level: number;
   suggested_restock_qty: number;
   estimated_restock_cost: number;
-}> }) {
-  if (!data.length) {
+} | null> }) {
+  if (!data || !data.length) {
     return (
       <Card>
         <CardHeader>
@@ -193,7 +193,7 @@ function LowStockAlerts({ data }: { data: Array<{
             </TableRow>
           </TableHeader>
           <TableBody>
-             {data.map((item: {
+             {data?.filter((item): item is {
                 id: string;
                 name: string;
                 sku: string;
@@ -201,7 +201,7 @@ function LowStockAlerts({ data }: { data: Array<{
                 reorder_level: number;
                 suggested_restock_qty: number;
                 estimated_restock_cost: number;
-              }) => {
+              } => item !== null).map((item) => {
               const stockPercent = (item.stock_qty / item.reorder_level) * 100;
               const severity = stockPercent < 25 ? "bg-red-100 text-red-700" : stockPercent < 50 ? "bg-orange-100 text-orange-700" : "bg-yellow-100 text-yellow-700";
               return (
@@ -233,8 +233,8 @@ function TopProducts({ data }: { data: Array<{
   total_revenue: number;
   stock_qty: number;
   reorder_level: string;
-}> }) {
-  if (!data.length) {
+} | null> }) {
+  if (!data || !data.length) {
     return (
       <Card>
         <CardHeader>
@@ -266,21 +266,21 @@ function TopProducts({ data }: { data: Array<{
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((item: TopProduct, idx: number) => (
-              <TableRow key={item.id}>
-                <TableCell className="font-bold text-gray-400">{idx + 1}</TableCell>
-                <TableCell>
-                  <p className="font-medium">{item.name}</p>
-                  <p className="text-xs text-gray-500">{item.category_name || "Uncategorized"}</p>
-                </TableCell>
-                <TableCell className="text-right font-semibold text-blue-600">{item.total_sold}</TableCell>
-                <TableCell className="text-right">{item.order_count}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(item.total_revenue || 0)}</TableCell>
-                <TableCell className="text-right">
-                  <Badge variant={item.stock_qty < parseInt(item.reorder_level || "0") ? "destructive" : "secondary"}>{item.stock_qty}</Badge>
-                </TableCell>
-              </TableRow>
-            ))}
+             {data?.filter((item): item is TopProduct => item !== null).map((item, idx) => (
+               <TableRow key={item.id}>
+                 <TableCell className="font-bold text-gray-400">{idx + 1}</TableCell>
+                 <TableCell>
+                   <p className="font-medium">{item.name}</p>
+                   <p className="text-xs text-gray-500">{item.category_name || "Uncategorized"}</p>
+                 </TableCell>
+                 <TableCell className="text-right font-semibold text-blue-600">{item.total_sold}</TableCell>
+                 <TableCell className="text-right">{item.order_count}</TableCell>
+                 <TableCell className="text-right font-medium">{formatCurrency(item.total_revenue || 0)}</TableCell>
+                 <TableCell className="text-right">
+                   <Badge variant={item.stock_qty < parseInt(item.reorder_level || "0") ? "destructive" : "secondary"}>{item.stock_qty}</Badge>
+                 </TableCell>
+               </TableRow>
+             ))}
           </TableBody>
         </Table>
       </CardContent>
@@ -297,8 +297,8 @@ function FrequentCustomers({ data }: { data: Array<{
   total_spent: number;
   avg_order_value: number;
   last_order_date: string;
-}> }) {
-  if (!data.length) {
+} | null> }) {
+  if (!data || !data.length) {
     return (
       <Card>
         <CardHeader>
@@ -330,19 +330,19 @@ function FrequentCustomers({ data }: { data: Array<{
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((item: FrequentCustomer, idx: number) => (
-              <TableRow key={item.id}>
-                <TableCell className="font-bold text-gray-400">{idx + 1}</TableCell>
-                <TableCell>
-                  <p className="font-medium">{item.name}</p>
-                  <p className="text-xs text-gray-500">{item.email || item.phone || ""}</p>
-                </TableCell>
-                <TableCell className="text-right">{item.total_orders}</TableCell>
-                <TableCell className="text-right font-semibold text-green-600">{formatCurrency(item.total_spent || 0)}</TableCell>
-                <TableCell className="text-right">{formatCurrency(item.avg_order_value || 0)}</TableCell>
-                <TableCell className="text-right text-sm text-gray-500">{item.last_order_date ? formatDate(item.last_order_date) : "-"}</TableCell>
-              </TableRow>
-            ))}
+             {data?.filter((item): item is FrequentCustomer => item !== null).map((item, idx) => (
+               <TableRow key={item.id}>
+                 <TableCell className="font-bold text-gray-400">{idx + 1}</TableCell>
+                 <TableCell>
+                   <p className="font-medium">{item.name}</p>
+                   <p className="text-xs text-gray-500">{item.email || item.phone || ""}</p>
+                 </TableCell>
+                 <TableCell className="text-right">{item.total_orders}</TableCell>
+                 <TableCell className="text-right font-semibold text-green-600">{formatCurrency(item.total_spent || 0)}</TableCell>
+                 <TableCell className="text-right">{formatCurrency(item.avg_order_value || 0)}</TableCell>
+                 <TableCell className="text-right text-sm text-gray-500">{item.last_order_date ? formatDate(item.last_order_date) : "-"}</TableCell>
+               </TableRow>
+             ))}
           </TableBody>
         </Table>
       </CardContent>
@@ -548,7 +548,7 @@ function StatsOverview({ data }: { data: DashboardData }) {
 
 export default function Home() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [lowStock, setLowStock] = useState<{
+  const [lowStock, setLowStock] = useState<Array<{
     id: string;
     name: string;
     sku: string;
@@ -556,38 +556,10 @@ export default function Home() {
     reorder_level: number;
     suggested_restock_qty: number;
     estimated_restock_cost: number;
-  }[]>([]);
-  const [topProducts, setTopProducts] = useState<{
-    id: string;
-    name: string;
-    category_name: string;
-    total_sold: number;
-    order_count: number;
-    total_revenue: number;
-    stock_qty: number;
-    reorder_level: string;
-  }[]>([]);
-  const [frequentCustomers, setFrequentCustomers] = useState<{
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-    total_orders: number;
-    total_spent: number;
-    avg_order_value: number;
-    last_order_date: string;
-  }[]>([]);
-  const [restockBudget, setRestockBudget] = useState<{
-    items: Array<{
-      id: string;
-      name: string;
-      cost_price: number;
-      stock_qty: number;
-      reorder_level: number;
-    }>;
-    totalBudget: number;
-    itemCount: number;
-  } | null>(null);
+  } | null>>([]);
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [frequentCustomers, setFrequentCustomers] = useState<FrequentCustomer[]>([]);
+  const [restockBudget, setRestockBudget] = useState<{ items: Array<{ id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }>; totalBudget: number; itemCount: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -602,7 +574,15 @@ export default function Home() {
           api.dashboard.getRestockBudget(2),
         ]);
         setDashboardData(stats as DashboardData);
-        setLowStock(low as any);
+        setLowStock(low as Array<{
+          id: string;
+          name: string;
+          sku: string;
+          stock_qty: number;
+          reorder_level: number;
+          suggested_restock_qty: number;
+          estimated_restock_cost: number;
+        }>);
         setTopProducts(top as TopProduct[]);
         setFrequentCustomers(freq as FrequentCustomer[]);
         setRestockBudget(budget as { items: Array<{ id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }>; totalBudget: number; itemCount: number });
@@ -613,10 +593,10 @@ export default function Home() {
       }
     }
     fetchAll();
-  }, [setLowStock, setTopProducts, setFrequentCustomers]);
+  }, []);
 
   function handleBudgetCreated() {
-    api.dashboard.getRestockBudget(2).then((b) => setRestockBudget(b as any));
+    api.dashboard.getRestockBudget(2).then((b) => setRestockBudget(b as { items: Array<{ id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }>; totalBudget: number; itemCount: number }));
   }
 
   if (isLoading) {

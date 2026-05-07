@@ -80,7 +80,7 @@ export default function PipelinePage() {
   const loadCustomers = useCallback(async () => {
     try {
       const data = await api.customers.getAll();
-      setCustomers(data as any);
+      setCustomers(data as { id: string; name: string; first_name: string; last_name: string }[]);
     } catch {
       console.error("Failed to load customers");
     }

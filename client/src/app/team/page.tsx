@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,13 +32,14 @@ import { UserPlus, Mail, Trash2, Users, CheckCircle } from "lucide-react";
 import api from "@/lib/api";
 
 export default function TeamPage() {
-  const [members, setMembers] = useState<Array<{ id: string; name: string; email: string; role: string }>>([]);
-  const [invitations, setInvitations] = useState<Array<{ id: string; email: string; role: string; status: string }>>([]);
+  const [members, setMembers] = useState<Array<{ id: string; name: string; email: string; role: string; is_active?: boolean; last_login?: string }>>([]);
+  const [invitations, setInvitations] = useState<Array<{ id: string; email: string; role: string; status: string; invited_by_name?: string; expires_at?: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [inviteDialog, setInviteDialog] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: "", role: "staff" });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -66,8 +67,8 @@ export default function TeamPage() {
       setInviteDialog(false);
       setInviteForm({ email: "", role: "staff" });
       loadData();
-    } catch (err: Error) {
-      setError(err.message || "Failed to send invitation");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to send invitation");
     } finally {
       setSubmitting(false);
     }
@@ -77,8 +78,8 @@ export default function TeamPage() {
     try {
       await api.team.revokeInvite(id);
       loadData();
-    } catch (err: Error) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to revoke");
     }
   }
 
@@ -86,8 +87,8 @@ export default function TeamPage() {
     try {
       await api.team.updateRole(id, role);
       loadData();
-    } catch (err: Error) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update role");
     }
   }
 
@@ -95,8 +96,8 @@ export default function TeamPage() {
     try {
       await api.team.updateMember(id, { is_active: !isActive });
       loadData();
-    } catch (err: Error) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update member");
     }
   }
 
@@ -217,7 +218,7 @@ export default function TeamPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleToggleActive(member.id, member.is_active)}
+                      onClick={() => handleToggleActive(member.id, member.is_active ?? false)}
                     >
                       {member.is_active ? "Deactivate" : "Activate"}
                     </Button>
@@ -264,7 +265,7 @@ export default function TeamPage() {
                       </TableCell>
                       <TableCell>{invite.invited_by_name || "Unknown"}</TableCell>
                       <TableCell>
-                        {new Date(invite.expires_at).toLocaleDateString()}
+                        {invite.expires_at ? new Date(invite.expires_at).toLocaleDateString() : "-"}
                       </TableCell>
                       <TableCell>
                         <Button

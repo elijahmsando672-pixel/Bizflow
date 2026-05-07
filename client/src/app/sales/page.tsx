@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, Filter, Download, Loader2, Receipt, Eye, X, Printer } from "lucide-react";
+import { Plus, Search, Filter, Download, Loader2, Eye, X, Printer, Receipt as ReceiptIcon } from "lucide-react";
 import api from "@/lib/api";
+import { Sale, SaleInput, SaleItem } from "@/types/sales";
 import { useToast } from "@/components/ui/toast";
 import {
   Dialog,
@@ -56,7 +57,7 @@ function ReceiptModal({ isOpen, onClose, receiptHtml, receiptNumber, loading }: 
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-2">
-            <Receipt className="h-5 w-5 text-blue-600" />
+            <ReceiptIcon className="h-5 w-5 text-blue-600" />
             <h3 className="text-lg font-semibold">Receipt {receiptNumber || ""}</h3>
           </div>
           <div className="flex items-center gap-2">
@@ -94,33 +95,16 @@ function ReceiptModal({ isOpen, onClose, receiptHtml, receiptNumber, loading }: 
   );
 }
 
-interface Sale {
-  id: string;
-  customer_id: string;
-  sale_date: string;
-  due_date: string;
-  status: string;
-  total: number;
-}
-
-interface SaleItem {
-  product_id: string;
-  product_name: string;
-  qty: number;
-  unit_price: number;
-  discount: number;
-}
-
-interface NewSale {
-  customer_id: string;
-  sale_date: string;
-  due_date: string;
-  notes: string;
-  discount_amount: number;
-  status: string;
-}
-
 export default function SalesPage() {
+  interface NewSale {
+    customer_id: string;
+    sale_date: string;
+    due_date: string;
+    notes: string;
+    discount_amount: number;
+    status: string;
+  }
+
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -131,15 +115,15 @@ export default function SalesPage() {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [newSale, setNewSale] = useState<NewSale>({ customer_id: "", sale_date: "", due_date: "", notes: "", discount_amount: 0, status: "draft" });
   const [saleItems, setSaleItems] = useState<SaleItem[]>([{ product_id: "", product_name: "", qty: 1, unit_price: 0, discount: 0 }]);
-  const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
+  const [products, setProducts] = useState<{ id: string; name: string; price?: number }[]>([]);
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
   const toast = useToast();
 
   const loadProducts = useCallback(async () => {
     try {
       const data = await api.products.getAll();
-      setProducts(data as { id: string; name: string }[]);
-    } catch (err: Error) {
+      setProducts(data as { id: string; name: string; price?: number }[]);
+    } catch (err: unknown) {
       console.error("Failed to load products:", err);
     }
   }, []);
@@ -148,7 +132,7 @@ export default function SalesPage() {
     try {
       const data = await api.customers.getAll();
       setCustomers(data as { id: string; name: string }[]);
-    } catch (err: Error) {
+    } catch (err: unknown) {
       console.error("Failed to load customers:", err);
     }
   }, []);
@@ -158,8 +142,8 @@ export default function SalesPage() {
       setLoading(true);
       const data = await api.sales.getAll(statusFilter);
       setSales(data as Sale[]);
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to load sales");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to load sales");
     } finally {
       setLoading(false);
     }
@@ -179,22 +163,22 @@ export default function SalesPage() {
       setReceiptModal({
         isOpen: true,
         receiptHtml: htmlResponse as string,
-        receiptNumber: (receipt as Sale).receipt_number || null,
+        receiptNumber: (receipt as Sale & { receipt_number?: string }).receipt_number || null,
         loading: false,
       });
-    } catch (_err: Error) {
-      toast.error(_err?.message || "Failed to load receipt");
+    } catch (_err: unknown) {
+      toast.error(_err instanceof Error ? _err.message : "Failed to load receipt");
       setReceiptModal({ isOpen: true, receiptHtml: null, receiptNumber: null, loading: false });
     }
   };
 
   const handleMarkPaid = async (saleId: string) => {
     try {
-      await api.sales.update(saleId, { status: "paid" } as SaleInput);
+      await api.sales.update(saleId, { status: "paid" });
       toast.success("Sale marked as paid");
       loadSales();
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to update sale");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to update sale");
     }
   };
 
@@ -203,8 +187,8 @@ export default function SalesPage() {
       const data = await api.sales.getById(saleId);
       setSelectedSale(data as Sale);
       setViewDialogOpen(true);
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to load sale details");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to load sale details");
     }
   };
 
@@ -223,7 +207,7 @@ export default function SalesPage() {
       const product = products.find((p) => p.id === value);
       if (product) {
         updated[idx].product_name = product.name;
-        updated[idx].unit_price = parseFloat(product.price || 0);
+        updated[idx].unit_price = product.price || 0;
       }
     }
     setSaleItems(updated);
@@ -239,7 +223,8 @@ export default function SalesPage() {
           qty: item.qty,
           unit_price: item.unit_price,
           discount: item.discount || 0,
-        }));
+          total: item.qty * item.unit_price,
+        } as SaleItem));
       if (items.length === 0) {
         toast.error("Add at least one valid item");
         return;
@@ -256,10 +241,10 @@ export default function SalesPage() {
       toast.success("Sale created");
       setCreateDialogOpen(false);
       setNewSale({ customer_id: "", sale_date: "", due_date: "", notes: "", discount_amount: 0, status: "draft" });
-      setSaleItems([{ product_id: "", product_name: "", qty: 1, unit_price: 0, discount: 0 }]);
+      setSaleItems([{ product_id: "", product_name: "", qty: 1, unit_price: 0, discount: 0, total: 0 } as SaleItem]);
       loadSales();
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to create sale");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to create sale");
     }
   };
 
@@ -274,8 +259,8 @@ export default function SalesPage() {
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Sales exported");
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to export sales");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to export sales");
     }
   };
 
@@ -343,7 +328,7 @@ export default function SalesPage() {
                   <TableRow key={sale.id}>
                     <TableCell className="font-medium">{sale.invoice_number}</TableCell>
                     <TableCell>{sale.customer_name || "Walk-in"}</TableCell>
-                    <TableCell>KSh {parseFloat(sale.total || 0).toLocaleString()}</TableCell>
+                    <TableCell>KSh {sale.total.toLocaleString()}</TableCell>
                     <TableCell>
                       <span
                         className={`rounded-full px-2 py-1 text-xs font-medium ${
@@ -368,7 +353,7 @@ export default function SalesPage() {
                             size="sm"
                             onClick={() => handleViewReceipt(sale.id)}
                           >
-                            <Receipt className="mr-1 h-4 w-4" />
+                            <ReceiptIcon className="mr-1 h-4 w-4" />
                             Receipt
                           </Button>
                         )}
@@ -516,7 +501,7 @@ export default function SalesPage() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Total</p>
-                  <p className="font-medium text-lg">KSh {parseFloat(selectedSale.total || 0).toLocaleString()}</p>
+                  <p className="font-medium text-lg">KSh {selectedSale.total.toLocaleString()}</p>
                 </div>
               </div>
               {selectedSale.items && selectedSale.items.length > 0 && (
@@ -536,8 +521,8 @@ export default function SalesPage() {
                         <TableRow key={idx}>
                           <TableCell>{item.product_name}</TableCell>
                           <TableCell>{item.qty}</TableCell>
-                          <TableCell>KSh {parseFloat(item.unit_price || 0).toLocaleString()}</TableCell>
-                          <TableCell className="text-right">KSh {parseFloat(item.total || 0).toLocaleString()}</TableCell>
+                          <TableCell>KSh {item.unit_price.toLocaleString()}</TableCell>
+                          <TableCell className="text-right">KSh {item.total?.toLocaleString()}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

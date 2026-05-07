@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,11 +30,11 @@ export default function SettingsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [theme, setTheme] = useState("Light");
   const [accentColor, setAccentColor] = useState("blue");
-  const [loginHistory, setLoginHistory] = useState<Array<{ id: string; created_at: string; ip_address: string }>>([]);
+  const [loginHistory, setLoginHistory] = useState<Array<{ id: string; created_at: string; ip_address: string; ip?: string; device?: string; date?: string; status?: string }>>([]);
 
   const loadSettings = useCallback(async () => {
     try {
-      const me = await api.auth.me();
+      const me = await api.auth.me() as { name?: string; email?: string; business_name?: string; business_email?: string; phone?: string; address?: string; tax_id?: string };
       setProfile({ name: me.name || "", email: me.email || "" });
       setBusiness({
         name: me.business_name || "",
@@ -43,8 +43,8 @@ export default function SettingsPage() {
         address: me.address || "",
         tax_id: me.tax_id || "",
       });
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to load settings");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to load settings");
     } finally {
       setLoading(false);
     }
@@ -95,9 +95,9 @@ export default function SettingsPage() {
 
   const handleViewLoginHistory = async () => {
     setLoginHistory([
-      { ip: "192.168.1.1", device: "Chrome on Linux", date: new Date().toISOString(), status: "Success" },
-      { ip: "192.168.1.2", device: "Firefox on Windows", date: new Date(Date.now() - 86400000).toISOString(), status: "Success" },
-      { ip: "10.0.0.5", device: "Safari on Mac", date: new Date(Date.now() - 172800000).toISOString(), status: "Failed" },
+      { id: "1", created_at: new Date().toISOString(), ip_address: "192.168.1.1", ip: "192.168.1.1", device: "Chrome on Linux", date: new Date().toISOString(), status: "Success" },
+      { id: "2", created_at: new Date(Date.now() - 86400000).toISOString(), ip_address: "192.168.1.2", ip: "192.168.1.2", device: "Firefox on Windows", date: new Date(Date.now() - 86400000).toISOString(), status: "Success" },
+      { id: "3", created_at: new Date(Date.now() - 172800000).toISOString(), ip_address: "10.0.0.5", ip: "10.0.0.5", device: "Safari on Mac", date: new Date(Date.now() - 172800000).toISOString(), status: "Failed" },
     ]);
     setLoginHistoryDialog(true);
   };
@@ -113,8 +113,8 @@ export default function SettingsPage() {
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Data exported");
-    } catch (err: Error) {
-      toast.error(err?.message || "Failed to export data");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to export data");
     }
   };
 
@@ -374,7 +374,7 @@ export default function SettingsPage() {
                   <span className={`rounded-full px-2 py-1 text-xs font-medium ${entry.status === "Success" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                     {entry.status}
                   </span>
-                  <p className="text-xs text-gray-500 mt-1">{new Date(entry.date).toLocaleString()}</p>
+                  <p className="text-xs text-gray-500 mt-1">{entry.date ? new Date(entry.date).toLocaleString() : "-"}</p>
                 </div>
               </div>
             ))}

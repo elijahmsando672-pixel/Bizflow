@@ -16,49 +16,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, TrendingUp, TrendingDown, DollarSign, Package, FileDown } from "lucide-react";
 import api from "@/lib/api";
+import { ProfitLoss, SalesReport, InventoryReport, CashflowReport, TaxSummary } from "@/types/reports";
 
-interface ProfitLoss {
-  revenue: number;
-  cogs: number;
-  gross_profit: number;
-  gross_margin: number;
-  net_profit: number;
-  net_margin: number;
-  expenses_by_category: Array<{ category: string; total: number }>;
-}
 
-interface SalesReport {
-  total_sales: number;
-  total_revenue: number;
-  by_channel: Array<{ channel: string; total: number }>;
-  top_products: Array<{ name: string; total_sold: number; revenue: number }>;
-}
-
-interface InventoryReport {
-  total_products: number;
-  total_stock_value: number;
-  low_stock: number;
-  items: Array<{ name: string; stock_qty: number; reorder_level: number }>;
-}
-
-interface CashflowReport {
-  inflow: number;
-  outflow: number;
-  net: number;
-  by_month: Array<{ month: string; inflow: number; outflow: number }>;
-}
-
-interface TaxSummary {
-  year: number;
-  total_tax: number;
-  monthy_sales: MonthlySale[];
-}
-
-interface MonthlySale {
-  month: string;
-  count: number;
-  revenue: number;
-}
 
 interface DateRange {
   start_date: string;
@@ -68,8 +28,8 @@ interface DateRange {
 export default function ReportsPage() {
   const [pl, setPL] = useState<ProfitLoss | null>(null);
   const [salesReport, setSalesReport] = useState<SalesReport | null>(null);
-  const [inventory, setInventory] = useState<InventoryData | null>(null);
-  const [cashflow, setCashflow] = useState<CashflowData | null>(null);
+  const [inventory, setInventory] = useState<InventoryReport | null>(null);
+  const [cashflow, setCashflow] = useState<CashflowReport | null>(null);
   const [taxSummary, setTaxSummary] = useState<TaxSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>({ start_date: "", end_date: "" });
@@ -92,8 +52,8 @@ export default function ReportsPage() {
       setInventory(invRes as InventoryReport);
       setCashflow(cfRes as CashflowReport);
       setTaxSummary(taxRes as TaxSummary);
-    } catch (err: Error) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLoading(false);
     }
@@ -293,7 +253,7 @@ export default function ReportsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {salesReport.top_products.map((p: TopProduct, i: number) => (
+                        {salesReport.top_products.map((p: { name: string; qty_sold: number; revenue: number }, i: number) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{p.name}</TableCell>
                             <TableCell>{p.qty_sold}</TableCell>
@@ -381,7 +341,7 @@ export default function ReportsPage() {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        inventory.recent_movements.map((m: InventoryMovement, i: number) => (
+                        inventory.recent_movements.map((m: { product_name: string; qty_change: number; reason: string; created_at: string }, i: number) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{m.product_name}</TableCell>
                             <TableCell>
@@ -469,7 +429,7 @@ export default function ReportsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {cashflow.inflows_by_source.map((s: CashflowSource, i: number) => (
+                        {cashflow.inflows_by_source.map((s: { source: string; count: number; total: number }, i: number) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{s.source}</TableCell>
                             <TableCell>{s.count}</TableCell>
@@ -497,7 +457,7 @@ export default function ReportsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {cashflow.outflows_by_source.map((s: CashflowSource, i: number) => (
+                        {cashflow.outflows_by_source.map((s: { source: string; count: number; total: number }, i: number) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{s.source}</TableCell>
                             <TableCell>{s.count}</TableCell>
@@ -544,7 +504,7 @@ export default function ReportsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {taxSummary.monthly_sales.map((m: MonthlySale, i: number) => {
+                      {taxSummary.monthly_sales.map((m: { month: string; count: number; revenue: number }, i: number) => {
                         const monthNames = [
                           "Jan", "Feb", "Mar", "Apr", "May", "Jun",
                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",

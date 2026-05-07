@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,27 @@ interface Stats {
   open: number;
   in_progress: number;
   resolved: number;
+  total_tickets?: number;
+  open_tickets?: number;
+  in_progress_tickets?: number;
+  resolved_tickets?: number;
+  breached_tickets?: number;
+}
+
+interface Ticket {
+  id: string;
+  customer_id: string;
+  subject: string;
+  description: string;
+  priority: string;
+  category: string;
+  assigned_to: string;
+  status: string;
+  ticket_number?: string;
+  customer_name?: string;
+  assigned_name?: string;
+  sla_breached?: boolean;
+  sla_deadline?: string;
 }
 
 interface Form {
@@ -58,7 +79,7 @@ export default function SupportPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-  const [replies, setReplies] = useState<Array<{ id: string; message: string; created_at: string }>>([]);
+  const [replies, setReplies] = useState<Array<{ id: string; message: string; created_at: string; is_internal?: boolean; author_name?: string }>>([]);
   const [replyMessage, setReplyMessage] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [form, setForm] = useState<Form>({ customer_id: "", subject: "", description: "", priority: "medium", category: "general", assigned_to: "" });
@@ -119,7 +140,7 @@ export default function SupportPage() {
     setDetailOpen(true);
     try {
       const data = await api.support.getReplies(ticket.id);
-      setReplies(data as Reply[]);
+      setReplies(data as Array<{ id: string; message: string; created_at: string; is_internal?: boolean; author_name?: string }>);
     } catch {
       console.error("Failed to load replies");
     }
@@ -131,7 +152,7 @@ export default function SupportPage() {
       await api.support.addReply(selectedTicket.id, { message: replyMessage });
       setReplyMessage("");
       const data = await api.support.getReplies(selectedTicket.id);
-      setReplies(data as Reply[]);
+      setReplies(data as Array<{ id: string; message: string; created_at: string; is_internal?: boolean; author_name?: string }>);
       loadTickets();
     } catch {
       setError("Failed to send reply");
@@ -240,7 +261,7 @@ export default function SupportPage() {
             <Select value={form.customer_id} onValueChange={v => setForm({ ...form, customer_id: v })}>
               <SelectTrigger><SelectValue placeholder="Select customer (optional)" /></SelectTrigger>
               <SelectContent>
-                {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.first_name} {c.last_name}</SelectItem>)}
+                {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <Input placeholder="Subject *" value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} />

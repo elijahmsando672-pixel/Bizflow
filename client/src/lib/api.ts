@@ -146,8 +146,12 @@ interface CategoryData {
 
 interface SaleData {
   customer_id?: string;
-  items: Array<{ product_id: string; quantity: number; price: number }>;
-  total: number;
+  sale_date?: string;
+  due_date?: string;
+  items?: Array<{ product_id?: string; product_name: string; qty: number; unit_price: number; discount?: number }>;
+  notes?: string;
+  discount_amount?: number;
+  total?: number;
   status?: string;
 }
 

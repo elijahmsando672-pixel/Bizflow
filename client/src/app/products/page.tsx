@@ -153,7 +153,7 @@ export default function ProductsPage() {
       setEditDialogOpen(false);
       setEditingProduct(null);
       loadProducts();
-    } catch (_err: unknown) {
+    } catch {
       toast.error("Failed to update product");
     }
   };
@@ -164,7 +164,7 @@ export default function ProductsPage() {
       await api.products.delete(id);
       toast.success("Product deleted");
       loadProducts();
-    } catch (_err: unknown) {
+    } catch {
       toast.error("Failed to update product");
     }
   };

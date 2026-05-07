@@ -85,10 +85,15 @@ export default function ExpensesPage() {
       const data = await api.expenses.getCategories();
       setCategories(data as Category[]);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to delete expense";
+      const message = err instanceof Error ? err.message : "Failed to load categories";
       toast.error(message);
     }
-  }, []);
+  }, [toast, setCategories]);
+
+  useEffect(() => {
+    loadExpenses();
+    loadCategories();
+  }, [loadExpenses, loadCategories]);
 
   const handleCreateExpense = async () => {
     if (!expenseForm.description || !expenseForm.amount) {

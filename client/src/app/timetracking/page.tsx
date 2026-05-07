@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,15 +28,19 @@ export default function TimeTrackingPage() {
   const [entries, setEntries] = useState<Array<{
     id: string;
     project_id: string;
+    project_name?: string;
     task_id: string;
     description: string;
     date: string;
     duration_minutes: number;
     is_billable: boolean;
+    user_name?: string;
   }>>([]);
   const [summary, setSummary] = useState<{
     total_hours: number;
     billable_hours: number;
+    summary?: { total_hours?: number; billable_hours?: number; total_entries?: number; non_billable_hours?: number };
+    by_project?: Array<{ project_name: string; hours: number }>;
   }>({ total_hours: 0, billable_hours: 0 });
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -69,8 +73,24 @@ export default function TimeTrackingPage() {
         api.timetracking.getEntries(),
         api.timetracking.getSummary(),
       ]);
-      setEntries(entriesData as TimeEntry[]);
-      setSummary(summaryData as TimeSummary);
+      setEntries(entriesData as Array<{
+        id: string;
+        project_id: string;
+        task_id: string;
+        description: string;
+        date: string;
+        duration_minutes: number;
+        is_billable: boolean;
+        project_name?: string;
+        user_name?: string;
+      }>);
+      const summaryTyped = summaryData as { total_hours: number; billable_hours: number; summary?: { total_hours?: number; billable_hours?: number; total_entries?: number; non_billable_hours?: number }; by_project?: Array<{ project_name: string; hours: number }> };
+      setSummary({
+        total_hours: summaryTyped.total_hours ?? 0,
+        billable_hours: summaryTyped.billable_hours ?? 0,
+        summary: summaryTyped.summary,
+        by_project: summaryTyped.by_project
+      });
     } catch {
       setError("Failed to load time entries");
     } finally {
@@ -125,8 +145,11 @@ export default function TimeTrackingPage() {
     }
   }
 
-  const totalHours = parseFloat(summary.summary?.total_hours || 0).toFixed(1);
-  const billableHours = parseFloat(summary.summary?.billable_hours || 0).toFixed(1);
+  const totalHoursNum = summary.total_hours;
+  const totalHours = totalHoursNum.toFixed(1);
+  const billableHours = summary.billable_hours.toFixed(1);
+  const totalEntries = (summary.summary?.total_entries ?? 0);
+  const nonBillableHours = (summary.summary?.non_billable_hours ?? 0).toFixed(1);
 
   return (
     <div className="space-y-6">
@@ -141,8 +164,8 @@ export default function TimeTrackingPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Clock className="h-4 w-4" />Total Hours</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{totalHours}h</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Timer className="h-4 w-4 text-green-500" />Billable</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-green-600">{billableHours}h</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Entries</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{summary.summary?.total_entries || 0}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Non-Billable</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-orange-600">{parseFloat(summary.summary?.non_billable_hours || 0).toFixed(1)}h</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Entries</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{totalEntries}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Non-Billable</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-orange-600">{nonBillableHours}h</div></CardContent></Card>
       </div>
 
       <div className="flex items-center justify-between">
@@ -175,7 +198,7 @@ export default function TimeTrackingPage() {
                   <TableCell className="font-medium">{entry.project_name || "—"}</TableCell>
                   <TableCell className="max-w-[200px] truncate text-sm">{entry.description || "—"}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{Math.round(entry.duration_minutes || 0)} min ({(entry.duration_minutes / 60).toFixed(1)}h)</Badge>
+                    <Badge variant="secondary">{Math.round(entry.duration_minutes || 0)} min {(entry.duration_minutes / 60).toFixed(1)}h)</Badge>
                   </TableCell>
                   <TableCell>{entry.is_billable ? <span className="text-green-600 text-sm">Yes</span> : <span className="text-orange-600 text-sm">No</span>}</TableCell>
                   <TableCell className="text-sm">{entry.user_name || "—"}</TableCell>
@@ -194,13 +217,13 @@ export default function TimeTrackingPage() {
           <CardHeader><CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="h-4 w-4" />Hours by Project</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {summary.by_project.map((p: ProjectHours) => (
+              {summary.by_project.map((p: { project_name: string; hours: number }) => (
                 <div key={p.project_name} className="flex items-center gap-3">
                   <span className="text-sm w-40 truncate">{p.project_name || "Unassigned"}</span>
                   <div className="flex-1 bg-gray-200 rounded-full h-2">
-                    <div className="h-2 rounded-full bg-blue-500" style={{ width: `${Math.min((parseFloat(p.hours) / parseFloat(totalHours || "1")) * 100, 100)}%` }} />
+                    <div className="h-2 rounded-full bg-blue-500" style={{ width: `${Math.min((p.hours / (totalHoursNum || 1)) * 100, 100)}%` }} />
                   </div>
-                  <span className="text-sm font-medium w-16 text-right">{parseFloat(p.hours).toFixed(1)}h</span>
+                  <span className="text-sm font-medium w-16 text-right">{p.hours.toFixed(1)}h</span>
                 </div>
               ))}
             </div>

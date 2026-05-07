@@ -100,14 +100,13 @@ export default function ProjectsPage() {
   const loadCustomers = useCallback(async () => {
     try {
       const data = await api.customers.getAll();
-      setCustomers(data as any);
+      setCustomers(data as { id: string; name: string; first_name: string; last_name: string }[]);
     } catch {}
   }, []);
 
   const loadTeam = useCallback(async () => {
     try {
-      const data = await api.team.getMembers();
-      // Team members loaded but not stored in state
+      await api.team.getMembers();
     } catch {}
   }, []);
 

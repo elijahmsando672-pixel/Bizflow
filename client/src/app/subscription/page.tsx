@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,20 +15,15 @@ import {
 import { Check, Crown, AlertCircle, CreditCard } from "lucide-react";
 import api from "@/lib/api";
 
-interface Plan {
-  id: string;
-  name: string;
-  price: number;
-  currency: string;
-  interval: string;
-  features: string[];
-}
-
 interface Subscription {
   id: string;
   plan_id: string;
   status: string;
   current_period_end: string;
+  plan_name?: string;
+  next_billing_date?: string;
+  amount?: number;
+  trial_ends_at?: string;
 }
 
 interface Payment {
@@ -37,6 +32,22 @@ interface Payment {
   currency: string;
   status: string;
   created_at: string;
+  paid_at?: string;
+  payment_method?: string;
+  transaction_id?: string;
+}
+
+interface Plan {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  interval: string;
+  features: string[];
+  description?: string;
+  billing_cycle?: string;
+  max_users?: number;
+  trial_days?: number;
 }
 
 export default function SubscriptionPage() {
@@ -73,8 +84,8 @@ export default function SubscriptionPage() {
       await api.subscriptions.activate(planId);
       setSuccess("Subscription activated");
       loadData();
-    } catch (err: Error) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to activate");
     }
   }
 
@@ -83,8 +94,8 @@ export default function SubscriptionPage() {
       await api.subscriptions.cancel();
       setSuccess("Subscription cancelled");
       loadData();
-    } catch (_err: Error) {
-      setError(_err.message);
+    } catch (_err: unknown) {
+      setError(_err instanceof Error ? _err.message : "Failed to cancel");
     }
   }
 
@@ -135,7 +146,7 @@ export default function SubscriptionPage() {
               <div>
                 <p className="text-sm text-gray-500">Amount</p>
                 <p className="text-lg font-semibold">
-                  {currentSub.amount ? `${parseFloat(currentSub.amount).toLocaleString()}` : "N/A"}
+                  {currentSub.amount ? `${String(currentSub.amount).toLocaleString()}` : "N/A"}
                 </p>
               </div>
               <div>
@@ -183,12 +194,12 @@ export default function SubscriptionPage() {
                 <CardHeader>
                   <CardTitle>{plan.name}</CardTitle>
                   <CardDescription>{plan.description}</CardDescription>
-                  <div className="text-3xl font-bold">
-                    {plan.currency} {parseFloat(plan.price).toLocaleString()}
-                    <span className="text-sm font-normal text-gray-500">
-                      /{plan.billing_cycle}
-                    </span>
-                  </div>
+<div className="text-3xl font-bold">
+                     {plan.currency} <span className="text-3xl font-bold">{String(plan.price).toLocaleString()}</span>
+                     <span className="text-sm font-normal text-gray-500">
+                       /{plan.billing_cycle}
+                     </span>
+                   </div>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2 mb-4">
@@ -204,7 +215,7 @@ export default function SubscriptionPage() {
                       <Check className="h-4 w-4 text-green-500" />
                       Up to {plan.max_users || "unlimited"} users
                     </li>
-                    {plan.trial_days > 0 && (
+                    {plan.trial_days && plan.trial_days > 0 && (
                       <li className="flex items-center gap-2 text-sm">
                         <Check className="h-4 w-4 text-green-500" />
                         {plan.trial_days} day free trial
@@ -255,7 +266,7 @@ export default function SubscriptionPage() {
                         : "-"}
                     </TableCell>
                     <TableCell className="font-semibold">
-                      {payment.currency} {parseFloat(payment.amount).toLocaleString()}
+                      {payment.currency} {payment.amount.toLocaleString()}
                     </TableCell>
                     <TableCell>{payment.payment_method || "-"}</TableCell>
                     <TableCell className="text-sm">{payment.transaction_id || "-"}</TableCell>
