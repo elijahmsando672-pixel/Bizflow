@@ -153,6 +153,15 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Version info - used by frontend to detect deployment mismatches
+app.get('/api/version', (req, res) => {
+  res.json({
+    version: process.env.npm_package_version || '1.0.0',
+    name: 'bizflow-server',
+    environment: process.env.NODE_ENV || 'development',
+  });
+});
+
 // Security.txt - contact for reporting security vulnerabilities
 app.get('/.well-known/security.txt', (req, res) => {
   const securityText = `

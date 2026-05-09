@@ -9,7 +9,9 @@
     "dev:all": "concurrently \"npm --prefix client run dev\" \"npm run server\"",
     "build": "npm --prefix client run build",
     "start": "npm --prefix client run start",
-    "lint": "npm --prefix client run lint"
+    "lint": "npm --prefix client run lint",
+    "validate": "node scripts/validate-endpoints.js",
+    "version:sync": "node -e \"const v=require('./package.json').version; const p=require('./client/package.json'); p.version=v; require('fs').writeFileSync('./client/package.json', JSON.stringify(p, null, 2)+'\\n'); console.log('Synced client version to '+v);\""
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
