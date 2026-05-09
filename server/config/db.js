@@ -6,20 +6,20 @@ dotenv.config();
 const { Pool } = pg;
 
 export const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'bizflow',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  max: 20, // maximum number of clients
+  // Support DATABASE_URL (Railway, Heroku, etc.)
+  connectionString: process.env.DATABASE_URL || undefined,
+  // Fallback to individual env vars when no DATABASE_URL
+  host: process.env.DATABASE_URL ? undefined : (process.env.DB_HOST || 'localhost'),
+  port: process.env.DATABASE_URL ? undefined : parseInt(process.env.DB_PORT || '5432', 10),
+  database: process.env.DATABASE_URL ? undefined : (process.env.DB_NAME || 'bizflow'),
+  user: process.env.DATABASE_URL ? undefined : (process.env.DB_USER || 'postgres'),
+  password: process.env.DATABASE_URL ? undefined : (process.env.DB_PASSWORD || 'postgres'),
+  max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
-  ...(process.env.NODE_ENV === 'production' && {
-    ssl: {
-      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true',
-      ca: process.env.DB_SSL_CA ? process.env.DB_SSL_CA : undefined,
-    },
-  }),
+  ssl: process.env.NODE_ENV === 'production'
+    ? { rejectUnauthorized: false }
+    : undefined,
 });
 
 export const query = async (text, params) => {
