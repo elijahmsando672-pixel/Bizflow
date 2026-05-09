@@ -36,8 +36,10 @@ interface Product {
   id: string;
   name: string;
   sku: string;
-  category: string;
-  price: number;
+  category_name: string;
+  category_id: string;
+  selling_price: number;
+  cost_price: number;
   stock_qty: number;
   reorder_level: number;
   description: string;
@@ -51,8 +53,8 @@ interface Category {
 interface ProductForm {
   name: string;
   sku: string;
-  category: string;
-  price: string;
+  category_id: string;
+  selling_price: string;
   stock_qty: string;
   reorder_level: string;
   description: string;
@@ -65,7 +67,7 @@ export default function ProductsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [productForm, setProductForm] = useState<ProductForm>({ name: "", sku: "", category: "", price: "", stock_qty: "", reorder_level: "", description: "" });
+  const [productForm, setProductForm] = useState<ProductForm>({ name: "", sku: "", category_id: "", selling_price: "", stock_qty: "", reorder_level: "", description: "" });
   const [categories, setCategories] = useState<Category[]>([]);
   const toast = useToast();
 
@@ -95,23 +97,23 @@ export default function ProductsPage() {
   }, [loadProducts, loadCategories]);
 
   const handleCreateProduct = async () => {
-    if (!productForm.name || !productForm.price) {
-      toast.error("Name and price are required");
+    if (!productForm.name || !productForm.selling_price) {
+      toast.error("Name and selling price are required");
       return;
     }
     try {
       await api.products.create({
         name: productForm.name,
         sku: productForm.sku || undefined,
-        category: productForm.category,
-        price: parseFloat(productForm.price),
+        category_id: productForm.category_id || undefined,
+        selling_price: parseFloat(productForm.selling_price),
         stock_qty: parseInt(productForm.stock_qty) || 0,
         reorder_level: parseInt(productForm.reorder_level) || 0,
         description: productForm.description || undefined,
       });
       toast.success("Product created");
       setDialogOpen(false);
-      setProductForm({ name: "", sku: "", category: "", price: "", stock_qty: "", reorder_level: "", description: "" });
+      setProductForm({ name: "", sku: "", category_id: "", selling_price: "", stock_qty: "", reorder_level: "", description: "" });
       loadProducts();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create product";
@@ -124,8 +126,8 @@ export default function ProductsPage() {
     setProductForm({
       name: product.name || "",
       sku: product.sku || "",
-      category: product.category || "",
-      price: product.price?.toString() || "",
+      category_id: product.category_id || "",
+      selling_price: product.selling_price?.toString() || "",
       stock_qty: product.stock_qty?.toString() || "",
       reorder_level: product.reorder_level?.toString() || "",
       description: product.description || "",
@@ -134,8 +136,8 @@ export default function ProductsPage() {
   };
 
   const handleUpdateProduct = async () => {
-    if (!productForm.name || !productForm.price) {
-      toast.error("Name and price are required");
+    if (!productForm.name || !productForm.selling_price) {
+      toast.error("Name and selling price are required");
       return;
     }
     if (!editingProduct) return;
@@ -143,8 +145,8 @@ export default function ProductsPage() {
       await api.products.update(editingProduct.id, {
         name: productForm.name,
         sku: productForm.sku || undefined,
-        category: productForm.category,
-        price: parseFloat(productForm.price),
+        category_id: productForm.category_id || undefined,
+        selling_price: parseFloat(productForm.selling_price),
         stock_qty: parseInt(productForm.stock_qty) || 0,
         reorder_level: parseInt(productForm.reorder_level) || 0,
         description: productForm.description || undefined,
@@ -184,7 +186,7 @@ export default function ProductsPage() {
           <h2 className="text-3xl font-bold text-gray-900">Products</h2>
           <p className="text-gray-500">Manage your product inventory</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => { setProductForm({ name: "", sku: "", category: "", price: "", stock_qty: "", reorder_level: "", description: "" }); setDialogOpen(true); }}>
+        <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => { setProductForm({ name: "", sku: "", category_id: "", selling_price: "", stock_qty: "", reorder_level: "", description: "" }); setDialogOpen(true); }}>
           <Plus className="mr-2 h-4 w-4" />
           Add Product
         </Button>
@@ -268,8 +270,8 @@ export default function ProductsPage() {
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell className="text-gray-500">{product.sku}</TableCell>
-                    <TableCell>{product.category}</TableCell>
-                    <TableCell>${product.price}</TableCell>
+                    <TableCell>{product.category_name || "—"}</TableCell>
+                    <TableCell>KSh {product.selling_price?.toLocaleString()}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span
@@ -329,11 +331,11 @@ export default function ProductsPage() {
               </div>
               <div>
                 <Label>Category</Label>
-                <Select value={productForm.category} onValueChange={(v) => setProductForm({ ...productForm, category: v })}>
+                <Select value={productForm.category_id} onValueChange={(v) => setProductForm({ ...productForm, category_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
                     {categories.map((cat: Category) => (
-                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -341,8 +343,8 @@ export default function ProductsPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Price</Label>
-                <Input type="number" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} placeholder="0.00" />
+                <Label>Selling Price</Label>
+                <Input type="number" value={productForm.selling_price} onChange={(e) => setProductForm({ ...productForm, selling_price: e.target.value })} placeholder="0.00" />
               </div>
               <div>
                 <Label>Stock Qty</Label>
@@ -382,11 +384,11 @@ export default function ProductsPage() {
               </div>
               <div>
                 <Label>Category</Label>
-                <Select value={productForm.category} onValueChange={(v) => setProductForm({ ...productForm, category: v })}>
+                <Select value={productForm.category_id} onValueChange={(v) => setProductForm({ ...productForm, category_id: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {categories.map((cat: Category) => (
-                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -394,8 +396,8 @@ export default function ProductsPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Price</Label>
-                <Input type="number" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} />
+                <Label>Selling Price</Label>
+                <Input type="number" value={productForm.selling_price} onChange={(e) => setProductForm({ ...productForm, selling_price: e.target.value })} />
               </div>
               <div>
                 <Label>Stock Qty</Label>

@@ -198,7 +198,7 @@ export default function TimeTrackingPage() {
                   <TableCell className="font-medium">{entry.project_name || "—"}</TableCell>
                   <TableCell className="max-w-[200px] truncate text-sm">{entry.description || "—"}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{Math.round(entry.duration_minutes || 0)} min {(entry.duration_minutes / 60).toFixed(1)}h)</Badge>
+                    <Badge variant="secondary">{Math.round(entry.duration_minutes || 0)} min ({(entry.duration_minutes / 60).toFixed(1)}h)</Badge>
                   </TableCell>
                   <TableCell>{entry.is_billable ? <span className="text-green-600 text-sm">Yes</span> : <span className="text-orange-600 text-sm">No</span>}</TableCell>
                   <TableCell className="text-sm">{entry.user_name || "—"}</TableCell>

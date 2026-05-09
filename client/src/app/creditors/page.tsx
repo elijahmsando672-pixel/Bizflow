@@ -62,7 +62,7 @@ export default function CreditorsPage() {
   const loadCreditors = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await api.customers.getAll();
+      const data = await api.creditors.getAll();
       setCreditors(data as Creditor[]);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to load creditors");
@@ -87,12 +87,12 @@ export default function CreditorsPage() {
       return;
     }
     try {
-      await api.customers.create({
+      await api.creditors.create({
         name: creditorForm.name,
         email: creditorForm.email || undefined,
         phone: creditorForm.phone || undefined,
-        address: creditorForm.notes || undefined,
-        status: "active",
+        opening_balance: creditorForm.balance ? parseFloat(creditorForm.balance) : 0,
+        notes: creditorForm.notes || undefined,
       });
       toast.success("Creditor added");
       setAddDialogOpen(false);
@@ -116,7 +116,7 @@ export default function CreditorsPage() {
       return;
     }
     try {
-      await api.debtors.recordPayment(selectedCreditor.id, {
+      await api.creditors.recordPayment(selectedCreditor.id, {
         amount: parseFloat(paymentForm.amount),
         date: paymentForm.date,
         notes: paymentForm.notes,

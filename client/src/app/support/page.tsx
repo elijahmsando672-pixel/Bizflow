@@ -96,7 +96,7 @@ export default function SupportPage() {
         api.support.getStats(),
       ]);
       setTickets(ticketsData as Ticket[]);
-      setStats((statsData as { stats: Stats }).stats || {} as Stats);
+      setStats(statsData ? (statsData as { stats: Stats }).stats : { total: 0, open: 0, in_progress: 0, resolved: 0 });
     } catch {
       setError("Failed to load tickets");
     } finally {

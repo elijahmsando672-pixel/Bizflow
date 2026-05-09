@@ -132,11 +132,13 @@ interface CustomerData {
 interface ProductData {
   name: string;
   sku?: string;
-  category?: string;
-  price: number;
+  category_id?: string;
+  selling_price: number;
+  cost_price?: number;
   stock_qty?: number;
   reorder_level?: number;
   description?: string;
+  image_url?: string;
 }
 
 interface CategoryData {
@@ -272,6 +274,13 @@ const api = {
     cancel: () => fetchApi('/subscriptions/cancel', { method: 'POST' }),
     getPayments: () => fetchApi('/subscriptions/payments'),
     recordPayment: (data: unknown) => fetchApi('/subscriptions/payments/record', { method: 'POST', body: JSON.stringify(data) }),
+  },
+  creditors: {
+    getAll: () => fetchApi('/creditors'),
+    create: (data: unknown) => fetchApi('/creditors', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: unknown) => fetchApi(`/creditors/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchApi(`/creditors/${id}`, { method: 'DELETE' }),
+    recordPayment: (id: string, data: unknown) => fetchApi(`/creditors/${id}/payments`, { method: 'POST', body: JSON.stringify(data) }),
   },
   debtors: {
     getAll: (params?: string) => fetchApi(`/debtors${params ? `?${params}` : ''}`),

@@ -271,11 +271,11 @@ export default function SettingsPage() {
             <div>
               <Label className="text-sm font-medium">Accent Color</Label>
               <div className="mt-2 flex gap-2">
-                {["blue", "green", "purple", "red"].map((color) => (
+                {[{ name: "blue", class: "bg-blue-600" }, { name: "green", class: "bg-green-600" }, { name: "purple", class: "bg-purple-600" }, { name: "red", class: "bg-red-600" }].map((color) => (
                   <button
-                    key={color}
-                    className={`h-8 w-8 rounded-full bg-${color}-600 ${accentColor === color ? "ring-2 ring-offset-2" : ""}`}
-                    onClick={() => { setAccentColor(color); toast.success(`Accent color set to ${color}`); }}
+                    key={color.name}
+                    className={`h-8 w-8 rounded-full ${color.class} ${accentColor === color.name ? "ring-2 ring-offset-2" : ""}`}
+                    onClick={() => { setAccentColor(color.name); toast.success(`Accent color set to ${color.name}`); }}
                   />
                 ))}
               </div>

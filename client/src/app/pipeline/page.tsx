@@ -69,7 +69,7 @@ export default function PipelinePage() {
       ]);
       setStages(stagesData as Stage[]);
       setDeals(dealsData as Deal[]);
-      setSummary((summaryData as { summary: Summary }).summary || {});
+      setSummary(summaryData ? (summaryData as { summary: Summary }).summary : { won_deals: 0, won_value: 0, lost_deals: 0, lost_value: 0 });
     } catch {
       setError("Failed to load pipeline");
     } finally {

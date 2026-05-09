@@ -291,7 +291,7 @@ export default function SalesPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button variant="outline" onClick={() => { setStatusFilter(""); loadSales(); }}>
+        <Button variant="outline" onClick={() => setStatusFilter("")}>
           <Filter className="mr-2 h-4 w-4" />
           {statusFilter || "All"}
         </Button>

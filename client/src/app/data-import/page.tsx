@@ -96,34 +96,36 @@ export default function DataImportPage() {
 
   function downloadTemplate(format: 'json' | 'csv') {
     if (!selectedResource) return;
-    api.importExport.getTemplate(selectedResource)      .then((template: unknown) => {
-      const records = template as TemplateRecord[];
-      if (format === 'csv') {
-        const headers = Object.keys(records[0] || {}).join(',');
-        const csvRows = records.map((row: TemplateRecord) =>
-          Object.values(row).map(v => {
-            const str = String(v ?? '');
-            return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
-          }).join(',')
-        );
-        const content = [headers, ...csvRows].join('\n');
-        const blob = new Blob([content], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${selectedResource}_template.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-      } else {
-        const blob = new Blob([JSON.stringify(template, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${selectedResource}_template.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    });
+    api.importExport.getTemplate(selectedResource)
+      .then((template: unknown) => {
+        const records = template as TemplateRecord[];
+        if (format === 'csv') {
+          const headers = Object.keys(records[0] || {}).join(',');
+          const csvRows = records.map((row: TemplateRecord) =>
+            Object.values(row).map(v => {
+              const str = String(v ?? '');
+              return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
+            }).join(',')
+          );
+          const content = [headers, ...csvRows].join('\n');
+          const blob = new Blob([content], { type: "text/csv" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${selectedResource}_template.csv`;
+          a.click();
+          URL.revokeObjectURL(url);
+        } else {
+          const blob = new Blob([JSON.stringify(template, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${selectedResource}_template.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+      })
+      .catch(() => setError("Failed to download template"));
   }
 
   return (

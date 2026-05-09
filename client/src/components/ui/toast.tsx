@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useMemo } from "react";
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from "lucide-react";
 
 type ToastType = "success" | "error" | "warning" | "info";
@@ -73,10 +73,11 @@ function Toast({ message, type, onClose }: { message: string; type: ToastType; o
 export function useToast() {
   const context = useContext(ToastContext);
   if (!context) throw new Error("useToast must be used within ToastProvider");
-  return {
-    success: (msg: string) => context.addToast(msg, "success"),
-    error: (msg: string) => context.addToast(msg, "error"),
-    warning: (msg: string) => context.addToast(msg, "warning"),
-    info: (msg: string) => context.addToast(msg, "info"),
-  };
+  const { addToast } = context;
+  return useMemo(() => ({
+    success: (msg: string) => addToast(msg, "success"),
+    error: (msg: string) => addToast(msg, "error"),
+    warning: (msg: string) => addToast(msg, "warning"),
+    info: (msg: string) => addToast(msg, "info"),
+  }), [addToast]);
 }
