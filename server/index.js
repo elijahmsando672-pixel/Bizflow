@@ -67,11 +67,15 @@ if (process.env.NODE_ENV === 'production') {
 app.use(cookieParser());
 
 // CORS configuration
-const allowedOrigins = process.env.CORS_ORIGINS?.split(',') || [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://127.0.0.1:3000',
-  'http://127.0.0.1:5173',
+const allowedOrigins = [
+  ...(process.env.CORS_ORIGINS?.split(',').filter(Boolean) || [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5173',
+  ]),
+  ...(process.env.APP_URL ? [process.env.APP_URL.replace(/\/+$/, '')] : []),
+  ...(process.env.NEXT_PUBLIC_API_URL ? [process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '')] : []),
 ];
 
 app.use(cors({
@@ -80,7 +84,7 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.warn(`Blocked CORS request from origin: ${origin}`);
+      console.warn(`Blocked CORS request from origin: ${origin}. Allowed: ${allowedOrigins.join(', ')}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
