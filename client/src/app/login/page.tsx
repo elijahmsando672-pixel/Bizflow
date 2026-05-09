@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign } from "lucide-react";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -121,7 +122,7 @@ export default function LoginPage() {
                 : (isForgotPassword ? "Send Reset Link" : "Sign In")}
             </Button>
             {!isForgotPassword ? (
-              <div className="text-center">
+              <div className="text-center space-y-2">
                 <button
                   type="button"
                   onClick={() => setIsForgotPassword(true)}
@@ -129,6 +130,11 @@ export default function LoginPage() {
                 >
                   Forgot Password?
                 </button>
+                <div>
+                  <Link href="/signup" className="text-sm text-blue-600 hover:underline">
+                    Don't have an account? Sign up
+                  </Link>
+                </div>
               </div>
             ) : (
               <div className="text-center">

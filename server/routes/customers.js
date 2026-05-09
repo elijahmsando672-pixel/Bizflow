@@ -36,6 +36,20 @@ router.post('/', async (req, res) => {
    }
 });
 
+router.get('/:id', async (req, res) => {
+  try {
+    const result = await query(
+      'SELECT * FROM customers WHERE id = $1 AND business_id = $2',
+      [req.params.id, req.business_id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
+    res.json(result.rows[0]);
+   } catch (err) {
+     console.error('Customers route error:', err);
+     res.status(500).json({ error: 'Internal server error' });
+   }
+});
+
 router.put('/:id', async (req, res) => {
   try {
     const { name, email, phone, address, company, notes, credit_limit } = req.body;

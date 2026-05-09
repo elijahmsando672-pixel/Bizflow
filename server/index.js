@@ -113,7 +113,7 @@ app.use(express.urlencoded({
 // Global rate limiter (skip health and auth)
 import { globalRateLimiter, authRateLimiter, passwordResetRateLimiter } from './middleware/security.js';
 app.use('/api/health', (req, res, next) => next());
-app.use('/api/auth/refresh', (req, res, next) => next()); // Refresh uses cookie auth
+app.use('/api/auth/refresh-token', (req, res, next) => next()); // Refresh uses cookie auth
 app.use(globalRateLimiter);
 
 // Apply stricter rate limiting to auth endpoints

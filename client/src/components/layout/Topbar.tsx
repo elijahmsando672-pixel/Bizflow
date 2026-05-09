@@ -3,11 +3,13 @@
 import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Bell, Search, Plus, LogOut, FileText, ShoppingCart, Package, User, FileEdit } from "lucide-react";
+import { Bell, Search, Plus, LogOut, FileText, ShoppingCart, Package, User, FileEdit, Sun, Moon } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-provider";
 
 export function Topbar() {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -73,6 +75,9 @@ export function Topbar() {
             </div>
           )}
         </div>
+        <Button variant="ghost" size="icon" onClick={toggleTheme} title={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}>
+          {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+        </Button>
         <Button variant="ghost" size="icon">
           <Bell className="h-5 w-5" />
         </Button>

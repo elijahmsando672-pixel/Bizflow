@@ -42,7 +42,7 @@ export const securityHeaders = helmet({
 export const globalRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
+  message: { error: 'Too many requests from this IP, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -51,7 +51,7 @@ export const globalRateLimiter = rateLimit({
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // limit each IP to 5 login/register attempts per windowMs
-  message: 'Too many authentication attempts, please try again later.',
+  message: { error: 'Too many authentication attempts, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true, // only count failed attempts
@@ -61,7 +61,7 @@ export const authRateLimiter = rateLimit({
 export const passwordResetRateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 3, // limit each IP to 3 password reset requests per hour
-  message: 'Too many password reset requests, please try again later.',
+  message: { error: 'Too many password reset requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });

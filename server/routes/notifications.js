@@ -86,7 +86,7 @@ router.post('/low-stock-alert/:productId', async (req, res) => {
   }
 });
 
-router.post('/mark-read/:id', async (req, res) => {
+router.post('/:id/read', async (req, res) => {
   try {
     await query(
       'UPDATE notifications SET read_at = NOW() WHERE id = $1 AND business_id = $2',
@@ -99,7 +99,7 @@ router.post('/mark-read/:id', async (req, res) => {
   }
 });
 
-router.post('/mark-all-read', async (req, res) => {
+router.post('/read-all', async (req, res) => {
   try {
     await query(
       'UPDATE notifications SET read_at = NOW() WHERE business_id = $1 AND read_at IS NULL',

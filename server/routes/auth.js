@@ -397,25 +397,6 @@ router.post('/reset-password', auditLogger('auth.reset-password'), async (req, r
   }
 });
 
-// Logout - invalidate refresh token
-router.post('/logout', authenticate, auditLogger('auth.logout'), async (req, res) => {
-  try {
-    const refreshToken = req.cookies?.refreshToken;
-    
-    if (refreshToken) {
-      await query('DELETE FROM refresh_tokens WHERE token = $1', [refreshToken]);
-    }
-
-    // Clear cookie
-    res.clearCookie('refreshToken', { path: '/api/auth/refresh' });
-
-    res.json({ message: 'Logged out successfully' });
-  } catch (err) {
-    console.error('Logout error:', err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
 // Refresh Token - rotate and get new access token (reads from cookie)
 router.post('/refresh-token', auditLogger('auth.refresh-token'), async (req, res) => {
   try {

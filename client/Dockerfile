@@ -1,10 +1,7 @@
 # Client Dockerfile
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
-
-# Production build environment
-ENV NODE_ENV=production
 
 # Build arguments for environment variables
 ARG NEXT_PUBLIC_API_URL
@@ -13,11 +10,14 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY package*.json ./
 RUN npm ci
 
+# Production build environment (after npm ci to include devDeps for build)
+ENV NODE_ENV=production
+
 COPY . .
 RUN npm run build
 
 # Production image
-FROM node:18-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 
