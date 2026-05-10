@@ -150,6 +150,15 @@ app.use('/api/export', protect, importExportRoutes);
 // Auth routes (no CSRF, have their own protections)
 app.use('/api/auth', authRoutes);
 
+app.get('/', (req, res) => {
+  res.json({
+    name: 'BizFlow API',
+    version: process.env.npm_package_version || '1.0.0',
+    status: 'running',
+    docs: '/api/health',
+  });
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

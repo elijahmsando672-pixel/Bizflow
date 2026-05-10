@@ -4,6 +4,7 @@ services:
     env: node
     region: ohio
     plan: free
+    rootDir: server
     buildCommand: npm install
     startCommand: node index.js
     healthCheckPath: /api/health
@@ -12,14 +13,30 @@ services:
         value: production
       - key: JWT_SECRET
         generateValue: true
-      - key: DATABASE_URL
+      - key: DB_HOST
         fromDatabase:
           name: bizflow-db
-          property: connectionString
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: bizflow-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: bizflow-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: bizflow-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: bizflow-db
+          property: password
       - key: CORS_ORIGINS
-        value: https://YOUR_VERCEL_FRONTEND.vercel.app
+        sync: false
       - key: APP_URL
-        value: https://YOUR_VERCEL_FRONTEND.vercel.app
+        sync: false
 
 databases:
   - name: bizflow-db
