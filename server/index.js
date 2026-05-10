@@ -32,7 +32,6 @@ import { requirePermission } from './middleware/rbac.js';
 
 dotenv.config();
 
-// Validate required environment variables
 const requiredEnvVars = ['JWT_SECRET', 'DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
 const missing = requiredEnvVars.filter(key => !process.env[key]);
 if (missing.length > 0) {
@@ -46,7 +45,6 @@ const PORT = process.env.PORT || 5000;
 // Hide Express identifier
 app.disable('x-powered-by');
 
-// Trust proxy for IP address detection (needed for rate limiting and lockout)
 // Set to 1 if behind one proxy (nginx, Heroku, etc.)
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
@@ -64,7 +62,6 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Parse cookies
 app.use(cookieParser());
 
 // CORS configuration

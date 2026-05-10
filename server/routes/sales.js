@@ -148,8 +148,6 @@ async function generateReceipt(businessId, saleId) {
   }
 }
 
-// ========== MODULE 3: SALES / INVOICES ==========
-
 router.get('/', async (req, res) => {
   try {
     const { status } = req.query;

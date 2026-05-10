@@ -4,8 +4,6 @@ import { sendInvoiceEmail, sendPaymentReminderEmail } from '../utils/email.js';
 
 const router = express.Router();
 
-// All routes protected by global `protect` middleware with CSRF
-
 router.get('/', async (req, res) => {
   try {
     const { status } = req.query;
@@ -63,7 +61,6 @@ router.post('/', async (req, res) => {
 
     const { customer_id, invoice_date, due_date, items, notes, discount_amount = 0 } = req.body;
 
-    // Generate invoice number
     const countResult = await client.query(
       "SELECT COUNT(*) as count FROM invoices WHERE business_id = $1",
       [req.business_id]
@@ -77,7 +74,6 @@ router.post('/', async (req, res) => {
     }
     const total = subtotal - discount_amount;
 
-    // Create invoice
     const invoiceResult = await client.query(
       `INSERT INTO invoices (business_id, customer_id, invoice_number, invoice_date, due_date, subtotal, discount_amount, total, notes, created_by, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'draft') RETURNING *`,
@@ -85,7 +81,6 @@ router.post('/', async (req, res) => {
     );
     const invoice = invoiceResult.rows[0];
 
-    // Create invoice items
     for (const item of (items || [])) {
       const itemTotal = (item.qty * item.unit_price) - (item.discount || 0);
       await client.query(
@@ -98,7 +93,6 @@ router.post('/', async (req, res) => {
     await client.query('COMMIT');
     res.status(201).json(invoice);
 
-    // Send invoice email (async)
     if (customer_id) {
       const customerResult = await query('SELECT * FROM customers WHERE id = $1 AND business_id = $2', [customer_id, req.business_id]);
       if (customerResult.rows[0]?.email) {

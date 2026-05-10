@@ -3,9 +3,6 @@ import helmet from 'helmet';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// ========================
-// SECURITY HEADERS
-// ========================
 export const securityHeaders = helmet({
   contentSecurityPolicy: {
     directives: {
@@ -33,11 +30,6 @@ export const securityHeaders = helmet({
   }),
 });
 
-// ========================
-// RATE LIMITING
-// ========================
-
-// Global rate limiter - general API protection
 export const globalRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
@@ -46,7 +38,6 @@ export const globalRateLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Strict rate limiter for auth endpoints - prevents brute force
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // limit each IP to 5 login/register attempts per windowMs
@@ -56,7 +47,6 @@ export const authRateLimiter = rateLimit({
   skipSuccessfulRequests: true, // only count failed attempts
 });
 
-// Refresh token rate limiter - prevents token brute-forcing
 export const refreshTokenRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -65,7 +55,6 @@ export const refreshTokenRateLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Password reset rate limiter - prevents email enumeration abuse
 export const passwordResetRateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 3, // limit each IP to 3 password reset requests per hour
@@ -74,15 +63,9 @@ export const passwordResetRateLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// ========================
-// INPUT SANITIZATION
-// ========================
-
-// Light sanitization - only strips null bytes and control characters
 export const sanitizeInput = (req, res, next) => {
   const sanitizeValue = (value) => {
     if (typeof value === 'string') {
-      // Remove null bytes and control characters
       return value.replace(/[\x00-\x1F\x7F]/g, '').trim();
     }
     if (typeof value === 'object' && value !== null) {
@@ -104,14 +87,10 @@ export const sanitizeInput = (req, res, next) => {
   next();
 };
 
-// ========================
-// AUDIT LOGGING
-// ========================
 import { logAudit, getClientIp } from '../utils/audit.js';
 
 export const auditLogger = (action, options = {}) => {
   return (req, res, next) => {
-    // Collect audit data before response
     const auditData = {
       businessId: req.user?.business_id || null,
       userId: req.user?.id || null,
@@ -119,16 +98,14 @@ export const auditLogger = (action, options = {}) => {
       resourceType: options.resourceType || null,
       resourceId: options.resourceId || null,
       details: options.details || {},
-      ip: getClientIp(req) || (req.ip || req.connection?.remoteAddress),
+      ip: getClientIp(req),
       userAgent: req.get('User-Agent'),
     };
 
-    // Log to console in non-production
     if (process.env.NODE_ENV !== 'production') {
       console.log('AUDIT:', JSON.stringify(auditData));
     }
 
-    // Fire-and-forget DB insert (don't block response)
     logAudit(auditData).catch(console.error);
 
     next();

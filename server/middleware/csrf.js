@@ -3,12 +3,10 @@ import crypto from 'crypto';
 const CSRF_TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
 const CSRF_COOKIE_NAME = 'csrf_token';
 
-// Generate cryptographically secure CSRF token
 export const generateCsrfToken = () => {
   return crypto.randomBytes(32).toString('hex');
 };
 
-// Set CSRF token cookie (called on login/register)
 export const setCsrfCookie = (req, res) => {
   const token = generateCsrfToken();
   const isProduction = process.env.NODE_ENV === 'production';
@@ -24,7 +22,6 @@ export const setCsrfCookie = (req, res) => {
   return token;
 };
 
-// Clear CSRF token (on logout)
 export const clearCsrfCookie = (res) => {
   res.clearCookie(CSRF_COOKIE_NAME, {
     httpOnly: false,

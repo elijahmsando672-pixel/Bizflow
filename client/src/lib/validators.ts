@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-// Auth Validators
 export const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
@@ -18,7 +17,6 @@ export const registerSchema = z.object({
   path: ["confirmPassword"],
 });
 
-// Customer Validators
 export const customerSchema = z.object({
   name: z.string().min(2, 'Customer name is required'),
   email: z.string().email('Invalid email address').optional().or(z.literal('')),
@@ -29,7 +27,6 @@ export const customerSchema = z.object({
   credit_limit: z.coerce.number().min(0, 'Credit limit must be positive').optional().or(z.literal('')),
 });
 
-// Product Validators
 export const productSchema = z.object({
   name: z.string().min(2, 'Product name is required'),
   sku: z.string().optional(),
@@ -44,7 +41,6 @@ export const productSchema = z.object({
   image_url: z.string().url('Invalid image URL').optional().or(z.literal('')),
 });
 
-// Sale/Invoice Item Validators
 export const saleItemSchema = z.object({
   product_id: z.string().optional(),
   product_name: z.string().min(1, 'Product name is required'),
@@ -53,7 +49,6 @@ export const saleItemSchema = z.object({
   discount: z.coerce.number().min(0, 'Discount must be positive').optional().or(z.literal('')),
 });
 
-// Sale Validators
 export const saleSchema = z.object({
   customer_id: z.string().optional(),
   sale_date: z.string().or(z.date()).optional(),
@@ -63,7 +58,6 @@ export const saleSchema = z.object({
   discount_amount: z.coerce.number().min(0, 'Discount must be positive').optional().or(z.literal('')),
 });
 
-// Invoice Validators
 export const invoiceSchema = z.object({
   customer_id: z.string().optional(),
   invoice_date: z.string().or(z.date()).optional(),
@@ -73,7 +67,6 @@ export const invoiceSchema = z.object({
   discount_amount: z.coerce.number().min(0, 'Discount must be positive').optional().or(z.literal('')),
 });
 
-// Expense Validators
 export const expenseSchema = z.object({
   category_id: z.string().optional(),
   description: z.string().min(2, 'Description is required'),
@@ -85,7 +78,6 @@ export const expenseSchema = z.object({
   notes: z.string().optional(),
 });
 
-// Category Validators
 export const categorySchema = z.object({
   name: z.string().min(2, 'Category name is required'),
   description: z.string().optional(),

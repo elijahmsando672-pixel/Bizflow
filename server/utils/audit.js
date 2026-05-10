@@ -36,6 +36,5 @@ export const logAudit = async ({
 export const getClientIp = (req) => {
   return req.ip || 
          req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
-         req.connection.remoteAddress ||
          req.socket?.remoteAddress;
 };

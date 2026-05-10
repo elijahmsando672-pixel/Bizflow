@@ -3,11 +3,6 @@ import { query } from '../config/db.js';
 
 const router = express.Router();
 
-// ========== MODULE 1: CUSTOMERS ==========
-
-// All routes are automatically protected by the global `protect` middleware
-// and have CSRF validation applied for state-changing methods
-
 router.get('/', async (req, res) => {
   try {
     const result = await query(

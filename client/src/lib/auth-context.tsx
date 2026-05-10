@@ -87,14 +87,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(savedToken);
       setUser(JSON.parse(savedUser));
       setBusiness(JSON.parse(savedBusiness));
-      // Fetch fresh CSRF token for state-changing requests
       fetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/csrf-token`,
         { method: "GET", credentials: 'include' }
       ).catch(() => {});
       setIsLoading(false);
     } else {
-      // No token in storage, try to refresh using httpOnly cookie
       refreshAccessToken().then((success) => {
         if (success) {
           fetch(
@@ -187,7 +185,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      // Call server to invalidate refresh token and clear cookie
       await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/logout`,
         {
@@ -197,8 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       );
       } catch {
-        // Silently fail - server may be unreachable  
-      } finally {
+        } finally {
       setUser(null);
       setBusiness(null);
       setToken(null);

@@ -14,7 +14,6 @@ const ARGON2_OPTIONS = {
   saltLength: 16,
 };
 
-// Hash password using Argon2id (new passwords)
 export const hashPassword = async (password) => {
   try {
     return await argon2.hash(password, ARGON2_OPTIONS);
@@ -25,7 +24,6 @@ export const hashPassword = async (password) => {
   }
 };
 
-// Verify password (supports both Argon2id and bcrypt hashes)
 export const verifyPassword = async (password, hash) => {
   if (!hash) return false;
   
@@ -47,7 +45,6 @@ export const verifyPassword = async (password, hash) => {
   return false;
 };
 
-// Pre-hash check to determine if hash needs upgrade
 export const needsUpgrade = (hash) => {
   // All new hashes should be argon2; legacy are bcrypt
   return !hash.startsWith('$argon2');

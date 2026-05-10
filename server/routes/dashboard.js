@@ -3,8 +3,6 @@ import { query } from '../config/db.js';
 
 const router = express.Router();
 
-// All routes protected by global `protect` middleware with CSRF
-
 router.get('/', async (req, res) => {
   try {
     const businessId = req.business_id;
@@ -172,7 +170,6 @@ router.get('/profit-summary', async (req, res) => {
   }
 });
 
-// ========== NEW: Low Stock Alerts with full product details ==========
 router.get('/low-stock', async (req, res) => {
   try {
     const result = await query(
@@ -193,7 +190,6 @@ router.get('/low-stock', async (req, res) => {
   }
 });
 
-// ========== NEW: Top Products (best sellers by qty sold) ==========
 router.get('/top-products', async (req, res) => {
   try {
     const { period = '30' } = req.query;
@@ -222,7 +218,6 @@ router.get('/top-products', async (req, res) => {
   }
 });
 
-// ========== NEW: Frequent Customers ==========
 router.get('/frequent-customers', async (req, res) => {
   try {
     const { period = '30' } = req.query;
@@ -249,7 +244,6 @@ router.get('/frequent-customers', async (req, res) => {
   }
 });
 
-// ========== NEW: Restock Budget Calculator & Creator ==========
 router.get('/restock-budget', async (req, res) => {
   try {
     const { multiplier = 2 } = req.query;

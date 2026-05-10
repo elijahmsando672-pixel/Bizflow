@@ -12,12 +12,10 @@ import { hashPassword, verifyPassword } from '../utils/password.js';
 
 const router = express.Router();
 
-// Security: Failed login tracking constants
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 const ATTEMPT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
-// Helper: Check if IP/email is temporarily locked
 const isLocked = async (email, ip) => {
   const cutoff = new Date(Date.now() - ATTEMPT_WINDOW_MS);
   const result = await query(
@@ -29,7 +27,6 @@ const isLocked = async (email, ip) => {
   return result.rows[0].failed_count >= MAX_LOGIN_ATTEMPTS;
 };
 
-// Helper: Record login attempt
 const recordLoginAttempt = async (email, ip, success) => {
   await query(
     'INSERT INTO login_attempts (email, ip_address, success) VALUES ($1, $2, $3)',
@@ -37,7 +34,6 @@ const recordLoginAttempt = async (email, ip, success) => {
   );
 };
 
-// Validation schemas with tightened requirements
 const registerSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
   email: Joi.string().email().required(),
@@ -61,7 +57,6 @@ const loginSchema = Joi.object({
   password: Joi.string().min(1).required(),
 });
 
-// Generate JWT token
 const generateToken = (user) => {
   return jwt.sign(
     { id: user.id, email: user.email, business_id: user.business_id, role: user.role },
@@ -70,21 +65,14 @@ const generateToken = (user) => {
   );
 };
 
-// Generate secure refresh token
 const generateRefreshToken = () => {
   return crypto.randomBytes(64).toString('hex');
 };
 
-// Generate password reset token
 const generatePasswordResetToken = () => {
   return crypto.randomBytes(32).toString('hex');
 };
 
-// ========================
-// AUTH ROUTES
-// ========================
-
-// Register - creates both user AND business (multi-tenant)
 router.post('/register', auditLogger('auth.register'), async (req, res) => {
   try {
     const { error, value } = registerSchema.validate(req.body);
@@ -94,23 +82,19 @@ router.post('/register', auditLogger('auth.register'), async (req, res) => {
 
     const { name, email, password, business_name, phone } = value;
 
-    // Check if email exists (generic message to prevent email enumeration)
     const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
       return res.status(400).json({ error: 'Invalid registration details' });
     }
 
-    // Create business first
     const businessResult = await query(
       'INSERT INTO businesses (name, email, phone) VALUES ($1, $2, $3) RETURNING id',
       [business_name, email, phone]
     );
     const business_id = businessResult.rows[0].id;
 
-    // Hash password with Argon2id
     const hashedPassword = await hashPassword(password);
 
-    // Create user with owner role
     const userResult = await query(
       `INSERT INTO users (business_id, name, email, password, role) 
        VALUES ($1, $2, $3, $4, 'owner') RETURNING id, name, email, role, business_id`,
@@ -127,20 +111,16 @@ router.post('/register', auditLogger('auth.register'), async (req, res) => {
       [user.id, refreshToken, refreshExpiresAt]
     );
 
-    // Add default categories for the business
     await query(
       `INSERT INTO expense_categories (business_id, name) VALUES 
        ($1, 'Rent'), ($1, 'Utilities'), ($1, 'Salaries'), ($1, 'Supplies'), ($1, 'Marketing'), ($1, 'Transport'), ($1, 'Other')`,
       [business_id]
     );
 
-    // Log successful registration
     await recordLoginAttempt(email, req.ip, true);
 
-    // Send welcome email (async)
     sendWelcomeEmail(email, { name: user.name, business_name }).catch(console.error);
 
-    // Set HTTP-only refresh token cookie
     const isProduction = process.env.NODE_ENV === 'production';
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
@@ -150,7 +130,6 @@ router.post('/register', auditLogger('auth.register'), async (req, res) => {
       path: '/api/auth',
     });
 
-    // Set CSRF token for frontend
     setCsrfCookie(req, res);
 
     res.status(201).json({ 
@@ -164,7 +143,6 @@ router.post('/register', auditLogger('auth.register'), async (req, res) => {
   }
 });
 
-// Login with rate limiting and lockout protection
 router.post('/login', auditLogger('auth.login'), async (req, res) => {
   try {
     const { error, value } = loginSchema.validate(req.body);
@@ -175,7 +153,6 @@ router.post('/login', auditLogger('auth.login'), async (req, res) => {
     const { email, password } = value;
     const ip = req.ip || req.socket.remoteAddress;
 
-    // Check for account lockout
     if (await isLocked(email, ip)) {
       return res.status(429).json({ 
         error: 'Too many failed attempts. Please try again later.' 
@@ -206,10 +183,8 @@ router.post('/login', auditLogger('auth.login'), async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Invalidate all existing refresh tokens to prevent session fixation and concurrent logins
     await query('DELETE FROM refresh_tokens WHERE user_id = $1', [user.id]);
 
-    // Successful login - clear failed attempts
     await query(
       'DELETE FROM login_attempts WHERE email = $1 AND ip_address = $2 AND success = false',
       [email, ip]
@@ -230,7 +205,6 @@ router.post('/login', auditLogger('auth.login'), async (req, res) => {
 
     const { password: _, ...userData } = user;
 
-    // Set refresh token as HTTP-only cookie
     const isProduction = process.env.NODE_ENV === 'production';
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
@@ -240,7 +214,6 @@ router.post('/login', auditLogger('auth.login'), async (req, res) => {
       path: '/api/auth',
     });
 
-    // Set CSRF token
     setCsrfCookie(req, res);
 
     res.json({ 
@@ -254,7 +227,6 @@ router.post('/login', auditLogger('auth.login'), async (req, res) => {
   }
 });
 
-// Get current user info
 router.get('/me', authenticate, auditLogger('auth.me'), async (req, res) => {
   try {
     const result = await query(
@@ -276,7 +248,6 @@ router.get('/me', authenticate, auditLogger('auth.me'), async (req, res) => {
   }
 });
 
-// Logout - invalidate refresh token (no auth required, uses cookie)
 router.post('/logout', auditLogger('auth.logout'), async (req, res) => {
   try {
     const refreshToken = req.cookies?.refreshToken;
@@ -285,7 +256,6 @@ router.post('/logout', auditLogger('auth.logout'), async (req, res) => {
       await query('DELETE FROM refresh_tokens WHERE token = $1', [refreshToken]);
     }
 
-    // Clear cookies
     res.clearCookie('refreshToken', { 
       path: '/api/auth', 
       httpOnly: true, 
@@ -300,12 +270,10 @@ router.post('/logout', auditLogger('auth.logout'), async (req, res) => {
   }
 });
 
-// Forgot Password - request reset (rate limited)
 router.post('/forgot-password', auditLogger('auth.forgot-password'), async (req, res) => {
   try {
     const { email } = req.body;
     if (!email || !Joi.string().email().validate(email).error) {
-      // Always return same message regardless of email existence
       return res.json({ message: 'If the email exists in our system, a password reset link will be sent.' });
     }
 
@@ -314,7 +282,6 @@ router.post('/forgot-password', auditLogger('auth.forgot-password'), async (req,
       return res.json({ message: 'If the email exists in our system, a password reset link will be sent.' });
     }
 
-    // Hash the reset token before storing
     const resetToken = generatePasswordResetToken();
     const tokenHash = await hashPassword(resetToken);
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
@@ -324,7 +291,6 @@ router.post('/forgot-password', auditLogger('auth.forgot-password'), async (req,
       [email, tokenHash, expiresAt]
     );
 
-    // Send email with the UNHASHED token (only time it's visible)
     sendPasswordResetEmail(email, resetToken).catch(console.error);
 
     res.json({ message: 'If the email exists in our system, a password reset link will be sent.' });
@@ -334,7 +300,6 @@ router.post('/forgot-password', auditLogger('auth.forgot-password'), async (req,
   }
 });
 
-// Reset Password - with token
 router.post('/reset-password', auditLogger('auth.reset-password'), async (req, res) => {
   try {
     const { token, password } = req.body;
@@ -343,7 +308,6 @@ router.post('/reset-password', auditLogger('auth.reset-password'), async (req, r
       return res.status(400).json({ error: 'Token and new password are required' });
     }
 
-    // Get all unexpired, unused reset records for this token
     const result = await query(
       `SELECT * FROM password_resets 
        WHERE expires_at > NOW() AND used = false 
@@ -351,7 +315,6 @@ router.post('/reset-password', auditLogger('auth.reset-password'), async (req, r
       []
     );
 
-    // Find matching token by comparing hash
     let resetRecord = null;
     for (const record of result.rows) {
       const valid = await verifyPassword(token, record.token);
@@ -370,7 +333,6 @@ router.post('/reset-password', auditLogger('auth.reset-password'), async (req, r
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Validate password complexity
     const passwordValidation = Joi.string()
       .min(10)
       .pattern(/[a-z]/)
@@ -397,7 +359,6 @@ router.post('/reset-password', auditLogger('auth.reset-password'), async (req, r
   }
 });
 
-// Refresh Token - rotate and get new access token (reads from cookie)
 router.post('/refresh-token', auditLogger('auth.refresh-token'), async (req, res) => {
   try {
     const refreshToken = req.cookies?.refreshToken;
@@ -432,7 +393,6 @@ router.post('/refresh-token', auditLogger('auth.refresh-token'), async (req, res
       [oldTokenRecord.user_id, newRefreshToken, refreshExpiresAt]
     );
 
-    // Update cookie with new refresh token
     const isProduction = process.env.NODE_ENV === 'production';
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
@@ -441,9 +401,6 @@ router.post('/refresh-token', auditLogger('auth.refresh-token'), async (req, res
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/api/auth',
     });
-
-    // Do NOT rotate CSRF token on refresh (avoid breaking parallel requests)
-    // CSRF token remains valid until logout or expiration (24h)
 
     const userForToken = { id: oldTokenRecord.user_id, email: oldTokenRecord.email, business_id: oldTokenRecord.business_id, role: oldTokenRecord.role };
     const accessToken = generateToken(userForToken);
@@ -457,13 +414,11 @@ router.post('/refresh-token', auditLogger('auth.refresh-token'), async (req, res
   }
 });
 
-// Get fresh CSRF token (for SPA initialization)
 router.get('/csrf-token', (req, res) => {
   const token = setCsrfCookie(req, res);
   res.json({ csrfToken: token });
 });
 
-// Health check
 router.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });

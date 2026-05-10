@@ -3,10 +3,6 @@ import { query } from '../config/db.js';
 
 const router = express.Router();
 
-// ========== MODULE 2: PRODUCTS / INVENTORY ==========
-// All routes protected by global `protect` middleware with CSRF
-
-// Get categories (MUST be before /:id routes)
 router.get('/categories', async (req, res) => {
   try {
     const result = await query('SELECT * FROM categories WHERE business_id = $1 ORDER BY name', [req.business_id]);
@@ -17,7 +13,6 @@ router.get('/categories', async (req, res) => {
    }
 });
 
-// Create category
 router.post('/categories', async (req, res) => {
   try {
     const { name, description, parent_id } = req.body;
@@ -32,7 +27,6 @@ router.post('/categories', async (req, res) => {
    }
 });
 
-// Get all products
 router.get('/', async (req, res) => {
   try {
     const { low_stock, category } = req.query;
@@ -56,7 +50,6 @@ router.get('/', async (req, res) => {
    }
 });
 
-// Create product
 router.post('/', async (req, res) => {
   try {
     const { name, sku, barcode, description, category_id, unit, cost_price, selling_price, stock_qty, reorder_level, image_url } = req.body;
@@ -66,7 +59,6 @@ router.post('/', async (req, res) => {
       [req.business_id, name, sku, barcode, description, category_id, unit || 'piece', cost_price || 0, selling_price || 0, stock_qty || 0, reorder_level || 10, image_url]
     );
 
-    // Record initial stock movement if qty > 0
     if (stock_qty > 0) {
       await query(
         `INSERT INTO stock_movements (business_id, product_id, qty_before, qty_change, qty_after, reason)
@@ -82,7 +74,6 @@ router.post('/', async (req, res) => {
    }
 });
 
-// Get product by ID (MUST be after /categories)
 router.get('/:id', async (req, res) => {
   try {
     const result = await query(
@@ -97,12 +88,10 @@ router.get('/:id', async (req, res) => {
    }
 });
 
-// Update product
 router.put('/:id', async (req, res) => {
   try {
     const { name, sku, barcode, description, category_id, unit, cost_price, selling_price, stock_qty, reorder_level, is_active, image_url } = req.body;
     
-    // Get current qty
     const current = await query('SELECT stock_qty FROM products WHERE id=$1 AND business_id=$2', [req.params.id, req.business_id]);
     if (current.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
 
@@ -117,7 +106,6 @@ router.put('/:id', async (req, res) => {
       [name, sku, barcode, description, category_id, unit, cost_price, selling_price, newQty, reorder_level, is_active, image_url, req.params.id, req.business_id]
     );
 
-    // Record stock movement if qty changed
     if (qtyDiff !== 0) {
       await query(
         `INSERT INTO stock_movements (business_id, product_id, qty_before, qty_change, qty_after, reason)
@@ -133,7 +121,6 @@ router.put('/:id', async (req, res) => {
    }
 });
 
-// Delete product
 router.delete('/:id', async (req, res) => {
   try {
     const result = await query('DELETE FROM products WHERE id=$1 AND business_id=$2 RETURNING id', [req.params.id, req.business_id]);
@@ -145,7 +132,6 @@ router.delete('/:id', async (req, res) => {
    }
 });
 
-// Get stock movements for a product
 router.get('/:id/stock-history', async (req, res) => {
   try {
     const result = await query(

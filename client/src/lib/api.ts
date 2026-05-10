@@ -73,27 +73,35 @@ async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<u
         }
       );
       
-      if (refreshResponse.ok) {
-        const { token: newToken } = await refreshResponse.json();
-        localStorage.setItem('token', newToken);
-        
-        const newHeaders = {
-          ...headers,
-          Authorization: `Bearer ${newToken}`,
-        };
-        const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
-          ...options,
-          headers: newHeaders,
-          credentials: 'include',
-        });
-        
-        if (!retryResponse.ok) {
-          const error = await retryResponse.json().catch(() => ({ error: 'Request failed' }));
-          throw new ApiError(error.error || 'Request failed', retryResponse.status);
+      if (!refreshResponse.ok) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('business');
+          window.location.href = '/login';
         }
-        
-        return retryResponse.json();
+        throw new ApiError('Session expired', 401);
       }
+      
+      const { token: newToken } = await refreshResponse.json();
+      localStorage.setItem('token', newToken);
+      
+      const newHeaders = {
+        ...headers,
+        Authorization: `Bearer ${newToken}`,
+      };
+      const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers: newHeaders,
+        credentials: 'include',
+      });
+      
+      if (!retryResponse.ok) {
+        const error = await retryResponse.json().catch(() => ({ error: 'Request failed' }));
+        throw new ApiError(error.error || 'Request failed', retryResponse.status);
+      }
+      
+      return retryResponse.json();
     } catch {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token');

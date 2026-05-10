@@ -147,11 +147,11 @@ export default function TimeTrackingPage() {
     }
   }
 
-  const totalHoursNum = summary.total_hours;
+  const totalHoursNum = Number(summary.total_hours) || 0;
   const totalHours = totalHoursNum.toFixed(1);
-  const billableHours = summary.billable_hours.toFixed(1);
-  const totalEntries = (summary.summary?.total_entries ?? 0);
-  const nonBillableHours = (summary.summary?.non_billable_hours ?? 0).toFixed(1);
+  const billableHours = (Number(summary.billable_hours) || 0).toFixed(1);
+  const totalEntries = (Number(summary.summary?.total_entries) || 0);
+  const nonBillableHours = (Number(summary.summary?.non_billable_hours) || 0).toFixed(1);
 
   return (
     <div className="space-y-6">
