@@ -173,7 +173,7 @@ router.post('/login', auditLogger('auth.login'), async (req, res) => {
     }
 
     const { email, password } = value;
-    const ip = req.ip || req.connection.remoteAddress;
+    const ip = req.ip || req.socket.remoteAddress;
 
     // Check for account lockout
     if (await isLocked(email, ip)) {
@@ -276,8 +276,8 @@ router.get('/me', authenticate, auditLogger('auth.me'), async (req, res) => {
   }
 });
 
-// Logout - invalidate refresh token
-router.post('/logout', authenticate, auditLogger('auth.logout'), async (req, res) => {
+// Logout - invalidate refresh token (no auth required, uses cookie)
+router.post('/logout', auditLogger('auth.logout'), async (req, res) => {
   try {
     const refreshToken = req.cookies?.refreshToken;
     
@@ -400,7 +400,7 @@ router.post('/reset-password', auditLogger('auth.reset-password'), async (req, r
 // Refresh Token - rotate and get new access token (reads from cookie)
 router.post('/refresh-token', auditLogger('auth.refresh-token'), async (req, res) => {
   try {
-    const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+    const refreshToken = req.cookies?.refreshToken;
     
     if (!refreshToken) {
       return res.status(401).json({ error: 'No refresh token provided' });

@@ -63,7 +63,9 @@ export default function TimeTrackingPage() {
     try {
       const data = await api.projects.getProjects();
       setProjects(data as Array<{ id: string; name: string }>);
-    } catch {}
+    } catch (err) {
+      console.error("Failed to load projects:", err);
+    }
   }, []);
 
   const loadData = useCallback(async () => {
@@ -91,8 +93,8 @@ export default function TimeTrackingPage() {
         summary: summaryTyped.summary,
         by_project: summaryTyped.by_project
       });
-    } catch {
-      setError("Failed to load time entries");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load time entries");
     } finally {
       setLoading(false);
     }
@@ -131,8 +133,8 @@ export default function TimeTrackingPage() {
       setDialogOpen(false);
       setForm({ project_id: "", task_id: "", description: "", date: new Date().toISOString().split("T")[0], duration_minutes: 0, is_billable: true });
       loadData();
-    } catch {
-      setError("Failed to save time entry");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save time entry");
     }
   }
 
@@ -140,8 +142,8 @@ export default function TimeTrackingPage() {
     try {
       await api.timetracking.deleteEntry(id);
       loadData();
-    } catch {
-      setError("Failed to delete entry");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete entry");
     }
   }
 

@@ -16,6 +16,7 @@ router.get('/roles', async (req, res) => {
     const defaultRoles = DEFAULT_ROLES.filter(r => !roles.includes(r));
     res.json([...defaultRoles, ...roles]);
   } catch (error) {
+    console.error('Fetch roles error:', error);
     res.status(500).json({ error: 'Failed to fetch roles' });
   }
 });
@@ -51,6 +52,7 @@ router.get('/permissions', async (req, res) => {
     }
     res.json(result.rows);
   } catch (error) {
+    console.error('Fetch permissions error:', error);
     res.status(500).json({ error: 'Failed to fetch permissions' });
   }
 });
@@ -65,6 +67,7 @@ router.put('/permissions/:id', async (req, res) => {
     if (!result.rows.length) return res.status(404).json({ error: 'Permission not found' });
     res.json(result.rows[0]);
   } catch (error) {
+    console.error('Update permission error:', error);
     res.status(500).json({ error: 'Failed to update permission' });
   }
 });
@@ -82,6 +85,7 @@ router.post('/permissions/bulk', async (req, res) => {
     await Promise.all(updates);
     res.json({ message: 'Permissions updated' });
   } catch (error) {
+    console.error('Bulk update permissions error:', error);
     res.status(500).json({ error: 'Failed to update permissions' });
   }
 });
@@ -97,6 +101,7 @@ router.get('/check', async (req, res) => {
     if (!result.rows.length) return res.json({ can_create: false, can_read: false, can_update: false, can_delete: false });
     res.json(result.rows[0]);
   } catch (error) {
+    console.error('Check permissions error:', error);
     res.status(500).json({ error: 'Failed to check permissions' });
   }
 });

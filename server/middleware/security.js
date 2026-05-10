@@ -1,6 +1,5 @@
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
-import compression from 'compression';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -55,6 +54,15 @@ export const authRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true, // only count failed attempts
+});
+
+// Refresh token rate limiter - prevents token brute-forcing
+export const refreshTokenRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many refresh attempts, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 // Password reset rate limiter - prevents email enumeration abuse

@@ -90,8 +90,8 @@ export default function ProjectsPage() {
       const params = filterStatus !== "all" ? `?status=${filterStatus}` : "";
       const data = await api.projects.getProjects(params);
       setProjects(data as Project[]);
-    } catch {
-      setError("Failed to load projects");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load projects");
     } finally {
       setLoading(false);
     }
@@ -101,13 +101,17 @@ export default function ProjectsPage() {
     try {
       const data = await api.customers.getAll();
       setCustomers(data as { id: string; name: string; first_name: string; last_name: string }[]);
-    } catch {}
+    } catch (err) {
+      console.error("Failed to load customers:", err);
+    }
   }, []);
 
   const loadTeam = useCallback(async () => {
     try {
       await api.team.getMembers();
-    } catch {}
+    } catch (err) {
+      console.error("Failed to load team:", err);
+    }
   }, []);
 
   useEffect(() => { loadProjects(); loadCustomers(); loadTeam(); }, [loadProjects, loadCustomers, loadTeam]);
@@ -118,8 +122,8 @@ export default function ProjectsPage() {
     try {
       const data = await api.projects.getTasks(project.id);
       setTasks(data as Task[]);
-    } catch {
-      setError("Failed to load tasks");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load tasks");
     }
   }
 
@@ -131,8 +135,8 @@ export default function ProjectsPage() {
       setProjectDialog(false);
       setProjectForm({ name: "", description: "", start_date: "", end_date: "", budget: 0, customer_id: "" });
       loadProjects();
-    } catch {
-      setError("Failed to create project");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create project");
     }
   }
 
@@ -144,8 +148,8 @@ export default function ProjectsPage() {
       setSuccess("Task created");
       setTaskForm({ title: "", description: "", priority: "medium", assignee_id: "", due_date: "", estimated_hours: 0 });
       loadTasks(selectedProject);
-    } catch {
-      setError("Failed to create task");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create task");
     }
   }
 
@@ -153,8 +157,8 @@ export default function ProjectsPage() {
     try {
       await api.projects.updateTask(task.id, { status });
       if (selectedProject) loadTasks(selectedProject);
-    } catch {
-      setError("Failed to update task");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update task");
     }
   }
 

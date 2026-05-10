@@ -106,8 +106,8 @@ export default function ProcurementPage() {
       ]);
       setVendors(vendorsData as Vendor[]);
       setPurchaseOrders(poData as PurchaseOrder[]);
-    } catch {
-      setError("Failed to load data");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setLoading(false);
     }
@@ -123,8 +123,8 @@ export default function ProcurementPage() {
       setVendorDialog(false);
       setVendorForm({ name: "", email: "", phone: "", address: "", contact_person: "", payment_terms: "", notes: "" });
       loadData();
-    } catch {
-      setError("Failed to create vendor");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create vendor");
     }
   }
 
@@ -147,8 +147,8 @@ export default function ProcurementPage() {
       setPoDialog(false);
       setPoForm({ vendor_id: "", expected_delivery: "", notes: "", items: [] });
       loadData();
-    } catch {
-      setError("Failed to create purchase order");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create purchase order");
     }
   }
 
@@ -156,8 +156,8 @@ export default function ProcurementPage() {
     try {
       await api.procurement.updatePurchaseOrder(po.id, { status });
       loadData();
-    } catch {
-      setError("Failed to update purchase order");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update purchase order");
     }
   }
 
@@ -167,7 +167,9 @@ export default function ProcurementPage() {
     try {
       const data = await api.procurement.getPurchaseOrder(po.id);
       setSelectedPO(data as PurchaseOrder);
-    } catch {}
+    } catch (err) {
+      console.error("Failed to load purchase order:", err);
+    }
   }
 
   function getStatusBadge(status: string) {

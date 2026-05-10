@@ -76,7 +76,6 @@ const allowedOrigins = [
     'http://127.0.0.1:5173',
   ]),
   ...(process.env.APP_URL ? [process.env.APP_URL.replace(/\/+$/, '')] : []),
-  ...(process.env.NEXT_PUBLIC_API_URL ? [process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '')] : []),
 ];
 
 app.use(cors({
@@ -116,9 +115,9 @@ app.use(express.urlencoded({
 }));
 
 // Global rate limiter (skip health and auth)
-import { globalRateLimiter, authRateLimiter, passwordResetRateLimiter } from './middleware/security.js';
+import { globalRateLimiter, authRateLimiter, passwordResetRateLimiter, refreshTokenRateLimiter } from './middleware/security.js';
 app.use('/api/health', (req, res, next) => next());
-app.use('/api/auth/refresh-token', (req, res, next) => next()); // Refresh uses cookie auth
+app.use('/api/auth/refresh-token', refreshTokenRateLimiter);
 app.use(globalRateLimiter);
 
 // Apply stricter rate limiting to auth endpoints

@@ -3,15 +3,9 @@ import { query } from '../config/db.js';
 
 const router = express.Router();
 
-let poCounter = null;
-
-async function getNextPONumber(businessId) {
-  if (!poCounter) {
-    const result = await query(`SELECT COALESCE(MAX(CAST(SUBSTRING(po_number FROM 3) AS INTEGER)), 0) as max_num FROM purchase_orders WHERE business_id = $1`, [businessId]);
-    poCounter = result.rows[0].max_num;
-  }
-  poCounter++;
-  return `PO-${String(poCounter).padStart(5, '0')}`;
+async function getNextPONumber() {
+  const result = await query(`SELECT COALESCE(MAX(CAST(SUBSTRING(po_number FROM 3) AS INTEGER)), 0) + 1 as next_num FROM purchase_orders`);
+  return `PO-${String(result.rows[0].next_num).padStart(5, '0')}`;
 }
 
 // Vendors
@@ -88,7 +82,7 @@ router.delete('/vendors/:id', async (req, res) => {
 router.post('/purchase-orders', async (req, res) => {
   try {
     const { vendor_id, expected_delivery, notes, items } = req.body;
-    const poNumber = await getNextPONumber(req.business_id);
+    const poNumber = await getNextPONumber();
 
     const subtotal = items.reduce((sum, item) => sum + (item.qty * item.unit_price), 0);
     const taxAmount = subtotal * 0.16;
@@ -97,7 +91,7 @@ router.post('/purchase-orders', async (req, res) => {
     const poResult = await query(
       `INSERT INTO purchase_orders (business_id, po_number, vendor_id, expected_delivery, subtotal, tax_amount, total, notes, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [req.business_id, poNumber, vendor_id, expected_delivery, subtotal, taxAmount, total, notes, req.user_id]
+      [req.business_id, poNumber, vendor_id, expected_delivery, subtotal, taxAmount, total, notes, req.user.id]
     );
 
     const poId = poResult.rows[0].id;

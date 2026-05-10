@@ -302,7 +302,7 @@ router.post('/restock-budget', async (req, res) => {
     const po = await query(
       `INSERT INTO purchase_orders (business_id, po_number, vendor_id, status, order_date, subtotal, tax_amount, total, notes, created_by)
        VALUES ($1, $2, $3, 'draft', CURRENT_DATE, $4, $5, $6, $7, $8) RETURNING *`,
-      [req.business_id, poNumber, vendor_id || null, subtotal, tax, total, notes || 'Auto-generated restock budget', req.user_id]
+      [req.business_id, poNumber, vendor_id || null, subtotal, tax, total, notes || 'Auto-generated restock budget', req.user.id]
     );
 
     for (const item of budgetItems) {

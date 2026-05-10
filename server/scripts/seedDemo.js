@@ -15,8 +15,7 @@ const pool = new Pool({
 
 const query = async (text, params) => pool.query(text, params);
 
-const BUSINESS_ID = '2c9466c1-dd48-442e-b1a0-fe0d58640a2e';
-const USER_ID = 'f58b7bb4-fbbb-4e5f-ab15-6d8171f0fc00';
+let BUSINESS_ID, USER_ID;
 const USER_NAME = 'Elijah';
 
 const now = new Date();
@@ -29,6 +28,29 @@ const d = (daysAgo) => {
 async function seedDemo() {
   try {
     console.log('🌱 Seeding demo data...');
+
+    // Bootstrap: create business and admin user if they don't exist
+    const existingUser = await query(`SELECT id FROM users WHERE email = 'elijah@bizflow.com'`);
+    if (existingUser.rows.length === 0) {
+      const bizResult = await query(
+        `INSERT INTO businesses (name, email, status) VALUES ('BizFlow Demo', 'admin@bizflow.com', 'active') RETURNING id`
+      );
+      BUSINESS_ID = bizResult.rows[0].id;
+      const { hashPassword } = await import('../utils/password.js');
+      const hashedPassword = await hashPassword('test123');
+      const userResult = await query(
+        `INSERT INTO users (business_id, name, email, password, role) VALUES ($1, 'Elijah', 'elijah@bizflow.com', $2, 'owner') RETURNING id`,
+        [BUSINESS_ID, hashedPassword]
+      );
+      USER_ID = userResult.rows[0].id;
+      console.log('✅ Created demo business and admin user');
+    } else {
+      const user = existingUser.rows[0];
+      const bizResult = await query(`SELECT id FROM users WHERE id = $1`, [user.id]);
+      USER_ID = user.id;
+      const bizIdResult = await query(`SELECT business_id FROM users WHERE id = $1`, [user.id]);
+      BUSINESS_ID = bizIdResult.rows[0].business_id;
+    }
 
     // 1. Customers
     const customers = [

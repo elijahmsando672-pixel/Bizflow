@@ -7,7 +7,7 @@ router.post('/', async (req, res) => {
   try {
     const { first_name, last_name, email, phone, company, job_title, source, estimated_value, notes } = req.body;
     const businessId = req.business_id;
-    const createdById = req.user_id;
+    const createdById = req.user.id;
 
     const result = await query(
       `INSERT INTO leads (business_id, first_name, last_name, email, phone, company, job_title, source, estimated_value, notes, created_by, lead_score)
@@ -62,6 +62,7 @@ router.get('/:id', async (req, res) => {
     if (!result.rows.length) return res.status(404).json({ error: 'Lead not found' });
     res.json(result.rows[0]);
   } catch (error) {
+    console.error('Get lead error:', error);
     res.status(500).json({ error: 'Failed to fetch lead' });
   }
 });
@@ -80,6 +81,7 @@ router.put('/:id', async (req, res) => {
     if (!result.rows.length) return res.status(404).json({ error: 'Lead not found' });
     res.json(result.rows[0]);
   } catch (error) {
+    console.error('Update lead error:', error);
     res.status(500).json({ error: 'Failed to update lead' });
   }
 });
@@ -94,9 +96,9 @@ router.post('/:id/convert', async (req, res) => {
 
     const l = lead.rows[0];
     const customerResult = await query(
-      `INSERT INTO customers (business_id, first_name, last_name, email, phone, company)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-      [businessId, l.first_name, l.last_name, customer_email || l.email, customer_phone || l.phone, company || l.company]
+      `INSERT INTO customers (business_id, name, email, phone, company)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [businessId, customer_name || `${l.first_name} ${l.last_name}`, customer_email || l.email, customer_phone || l.phone, company || l.company]
     );
 
     const customerId = customerResult.rows[0].id;
@@ -105,8 +107,8 @@ router.post('/:id/convert', async (req, res) => {
 
     await query(
       `INSERT INTO customer_activities (business_id, customer_id, activity_type, subject, created_by)
-       VALUES ($1, $2, 'conversion', 'Converted from lead: $3', $4)`,
-      [businessId, customerId, l.first_name + ' ' + l.last_name, req.user_id]
+       VALUES ($1, $2, 'conversion', $3, $4)`,
+      [businessId, customerId, `Converted from lead: ${l.first_name} ${l.last_name}`, req.user.id]
     );
 
     res.json({ message: 'Lead converted to customer', customer_id: customerId });
@@ -122,10 +124,11 @@ router.post('/:id/activities', async (req, res) => {
     const result = await query(
       `INSERT INTO customer_activities (business_id, customer_id, activity_type, subject, description, scheduled_at, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [req.business_id, req.params.id, activity_type, subject, description, scheduled_at, req.user_id]
+      [req.business_id, req.params.id, activity_type, subject, description, scheduled_at, req.user.id]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
+    console.error('Create activity error:', error);
     res.status(500).json({ error: 'Failed to create activity' });
   }
 });
@@ -136,6 +139,7 @@ router.delete('/:id', async (req, res) => {
     if (!result.rowCount) return res.status(404).json({ error: 'Lead not found' });
     res.json({ message: 'Lead deleted' });
   } catch (error) {
+    console.error('Delete lead error:', error);
     res.status(500).json({ error: 'Failed to delete lead' });
   }
 });

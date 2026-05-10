@@ -9,7 +9,7 @@ router.post('/', async (req, res) => {
     const result = await query(
       `INSERT INTO projects (business_id, name, description, start_date, end_date, budget, customer_id, assigned_to, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [req.business_id, name, description, start_date, end_date, budget, customer_id, assigned_to, req.user_id]
+      [req.business_id, name, description, start_date, end_date, budget, customer_id, assigned_to, req.user.id]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {

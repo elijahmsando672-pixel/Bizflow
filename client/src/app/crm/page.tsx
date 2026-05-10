@@ -55,8 +55,8 @@ export default function CRMPage() {
       const params = filterStatus !== "all" ? `?status=${filterStatus}` : "";
       const data = await api.crm.getLeads(params);
       setLeads(data as Lead[]);
-    } catch {
-      setError("Failed to load leads");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load leads");
     } finally {
       setLoading(false);
     }
@@ -72,8 +72,8 @@ export default function CRMPage() {
       setDialogOpen(false);
       setForm({ first_name: "", last_name: "", email: "", phone: "", company: "", job_title: "", source: "inbound", estimated_value: 0, notes: "" });
       loadLeads();
-    } catch {
-      setError("Failed to create lead");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create lead");
     }
   }
 
@@ -88,8 +88,8 @@ export default function CRMPage() {
       setSuccess("Lead converted to customer");
       setConvertDialog(false);
       loadLeads();
-    } catch {
-      setError("Failed to convert lead");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to convert lead");
     }
   }
 
@@ -97,8 +97,8 @@ export default function CRMPage() {
     try {
       await api.crm.updateLead(lead.id, { status });
       loadLeads();
-    } catch {
-      setError("Failed to update lead");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update lead");
     }
   }
 

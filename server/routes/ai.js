@@ -4,7 +4,10 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const router = express.Router();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'AIzaSyB5yGl3K9dMv8fFzYJq0kYKz7x9qY3z4pI');
+if (!process.env.GEMINI_API_KEY) {
+  console.warn('GEMINI_API_KEY not set - AI features will use fallback insights');
+}
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 router.get('/insights', async (req, res) => {
   try {

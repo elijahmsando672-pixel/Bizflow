@@ -598,7 +598,7 @@ export default function Home() {
   function handleBudgetCreated() {
     api.dashboard.getRestockBudget(2)
       .then((b) => setRestockBudget(b as { items: Array<{ id: string; name: string; cost_price: number; stock_qty: number; reorder_level: number }>; totalBudget: number; itemCount: number }))
-      .catch(() => {});
+      .catch((err) => console.error("Failed to refresh restock budget:", err));
   }
 
   if (isLoading) {

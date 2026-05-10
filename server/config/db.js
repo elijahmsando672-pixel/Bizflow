@@ -22,14 +22,7 @@ export const pool = new Pool({
     : undefined,
 });
 
-export const query = async (text, params) => {
-  try {
-    const result = await pool.query(text, params);
-    return result;
-  } catch (error) {
-    throw error;
-  }
-};
+export const query = (text, params) => pool.query(text, params);
 
 export const initDatabase = async () => {
   const schema = `

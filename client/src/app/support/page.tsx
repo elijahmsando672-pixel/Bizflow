@@ -97,8 +97,8 @@ export default function SupportPage() {
       ]);
       setTickets(ticketsData as Ticket[]);
       setStats(statsData ? (statsData as { stats: Stats }).stats : { total: 0, open: 0, in_progress: 0, resolved: 0 });
-    } catch {
-      setError("Failed to load tickets");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load tickets");
     } finally {
       setLoading(false);
     }
@@ -108,7 +108,9 @@ export default function SupportPage() {
     try {
       const data = await api.customers.getAll();
       setCustomers(data as { id: string; name: string }[]);
-    } catch {}
+    } catch (err) {
+      console.error("Failed to load customers:", err);
+    }
   }, []);
 
   useEffect(() => { loadTickets(); loadCustomers(); }, [loadTickets, loadCustomers]);
@@ -121,8 +123,8 @@ export default function SupportPage() {
       setDialogOpen(false);
       setForm({ customer_id: "", subject: "", description: "", priority: "medium", category: "general", assigned_to: "" });
       loadTickets();
-    } catch {
-      setError("Failed to create ticket");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create ticket");
     }
   }
 
@@ -130,8 +132,8 @@ export default function SupportPage() {
     try {
       await api.support.updateTicket(ticket.id, { status });
       loadTickets();
-    } catch {
-      setError("Failed to update ticket");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update ticket");
     }
   }
 
@@ -154,8 +156,8 @@ export default function SupportPage() {
       const data = await api.support.getReplies(selectedTicket.id);
       setReplies(data as Array<{ id: string; message: string; created_at: string; is_internal?: boolean; author_name?: string }>);
       loadTickets();
-    } catch {
-      setError("Failed to send reply");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send reply");
     }
   }
 

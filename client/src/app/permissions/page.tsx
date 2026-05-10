@@ -47,8 +47,8 @@ export default function PermissionsPage() {
       if (rolesData && (rolesData as string[]).length > 0) {
         setSelectedRole((rolesData as string[])[0]);
       }
-    } catch {
-      setError("Failed to load permissions");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load permissions");
     } finally {
       setLoading(false);
     }
@@ -84,8 +84,8 @@ export default function PermissionsPage() {
       setSuccess(`Permissions saved for ${selectedRole}`);
       setEditing({});
       loadData();
-    } catch {
-      setError("Failed to save permissions");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save permissions");
     }
   }
 

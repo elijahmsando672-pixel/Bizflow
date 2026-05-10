@@ -4,15 +4,9 @@ import { sendTicketCreatedEmail, sendTicketReplyEmail } from '../utils/email.js'
 
 const router = express.Router();
 
-let ticketCounter = null;
-
-async function getNextTicketNumber(businessId) {
-  if (!ticketCounter) {
-    const result = await query(`SELECT COALESCE(MAX(CAST(SUBSTRING(ticket_number FROM 4) AS INTEGER)), 0) as max_num FROM support_tickets WHERE business_id = $1`, [businessId]);
-    ticketCounter = result.rows[0].max_num;
-  }
-  ticketCounter++;
-  return `TKT-${String(ticketCounter).padStart(5, '0')}`;
+async function getNextTicketNumber() {
+  const result = await query(`SELECT COALESCE(MAX(CAST(SUBSTRING(ticket_number FROM 4) AS INTEGER)), 0) + 1 as next_num FROM support_tickets`);
+  return `TKT-${String(result.rows[0].next_num).padStart(5, '0')}`;
 }
 
 // SLA Configs (before /:id)
@@ -101,7 +95,7 @@ router.get('/dashboard-stats', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { customer_id, subject, description, priority, category, assigned_to } = req.body;
-    const ticketNumber = await getNextTicketNumber(req.business_id);
+    const ticketNumber = await getNextTicketNumber();
 
     const slaResult = await query(
       `SELECT resolution_hours FROM sla_configs WHERE business_id = $1 AND category = $2 AND priority = $3 AND is_active = true LIMIT 1`,
@@ -115,7 +109,7 @@ router.post('/', async (req, res) => {
     const result = await query(
       `INSERT INTO support_tickets (business_id, customer_id, ticket_number, subject, description, priority, category, assigned_to, sla_deadline, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-      [req.business_id, customer_id, ticketNumber, subject, description, priority, category, assigned_to, slaDeadline.toISOString(), req.user_id]
+      [req.business_id, customer_id, ticketNumber, subject, description, priority, category, assigned_to, slaDeadline.toISOString(), req.user.id]
     );
     const ticket = result.rows[0];
 
@@ -227,7 +221,7 @@ router.post('/:id/replies', async (req, res) => {
     const result = await query(
       `INSERT INTO ticket_replies (business_id, ticket_id, message, is_internal, created_by)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [req.business_id, req.params.id, message, is_internal || false, req.user_id]
+      [req.business_id, req.params.id, message, is_internal || false, req.user.id]
     );
     const reply = result.rows[0];
 
@@ -240,7 +234,7 @@ router.post('/:id/replies', async (req, res) => {
       );
       if (ticketResult.rows.length) {
         const ticket = ticketResult.rows[0];
-        if (ticket.customer_email && ticket.assigned_to !== req.user_id) {
+        if (ticket.customer_email && ticket.assigned_to !== req.user.id) {
           sendTicketReplyEmail(ticket.customer_email, ticket, reply, req.user.name).catch(() => {});
         }
       }

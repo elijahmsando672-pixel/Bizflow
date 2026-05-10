@@ -29,6 +29,7 @@ router.get('/stages', async (req, res) => {
     }
     res.json(result.rows);
   } catch (error) {
+    console.error('Fetch stages error:', error);
     res.status(500).json({ error: 'Failed to fetch deal stages' });
   }
 });
@@ -43,6 +44,7 @@ router.post('/stages', async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
+    console.error('Create stage error:', error);
     res.status(500).json({ error: 'Failed to create stage' });
   }
 });
@@ -59,6 +61,7 @@ router.put('/stages/:id', async (req, res) => {
     if (!result.rows.length) return res.status(404).json({ error: 'Stage not found' });
     res.json(result.rows[0]);
   } catch (error) {
+    console.error('Update stage error:', error);
     res.status(500).json({ error: 'Failed to update stage' });
   }
 });
@@ -70,6 +73,7 @@ router.delete('/stages/:id', async (req, res) => {
     if (!result.rowCount) return res.status(404).json({ error: 'Stage not found' });
     res.json({ message: 'Stage deleted' });
   } catch (error) {
+    console.error('Delete stage error:', error);
     res.status(500).json({ error: 'Failed to delete stage' });
   }
 });
@@ -81,7 +85,7 @@ router.post('/', async (req, res) => {
     const result = await query(
       `INSERT INTO deals (business_id, customer_id, lead_id, name, stage_id, value, priority, expected_close_date, assigned_to, notes, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-      [req.business_id, customer_id, lead_id, name, stage_id, value, priority, expected_close_date, assigned_to, notes, req.user_id]
+      [req.business_id, customer_id, lead_id, name, stage_id, value, priority, expected_close_date, assigned_to, notes, req.user.id]
     );
     const deal = result.rows[0];
 
@@ -155,6 +159,7 @@ router.get('/pipeline-summary', async (req, res) => {
 
     res.json({ stages: stages.rows, summary: summary.rows[0] });
   } catch (error) {
+    console.error('Pipeline summary error:', error);
     res.status(500).json({ error: 'Failed to fetch pipeline summary' });
   }
 });
@@ -175,6 +180,7 @@ router.get('/:id', async (req, res) => {
     if (!result.rows.length) return res.status(404).json({ error: 'Deal not found' });
     res.json(result.rows[0]);
   } catch (error) {
+    console.error('Fetch deal error:', error);
     res.status(500).json({ error: 'Failed to fetch deal' });
   }
 });
@@ -215,6 +221,7 @@ router.put('/:id', async (req, res) => {
 
     res.json(deal);
   } catch (error) {
+    console.error('Update deal error:', error);
     res.status(500).json({ error: 'Failed to update deal' });
   }
 });
@@ -225,10 +232,11 @@ router.post('/:id/activities', async (req, res) => {
     const result = await query(
       `INSERT INTO deal_activities (business_id, deal_id, activity_type, description, created_by)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [req.business_id, req.params.id, activity_type, description, req.user_id]
+      [req.business_id, req.params.id, activity_type, description, req.user.id]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
+    console.error('Create activity error:', error);
     res.status(500).json({ error: 'Failed to create activity' });
   }
 });
@@ -240,6 +248,7 @@ router.delete('/:id', async (req, res) => {
     if (!result.rowCount) return res.status(404).json({ error: 'Deal not found' });
     res.json({ message: 'Deal deleted' });
   } catch (error) {
+    console.error('Delete deal error:', error);
     res.status(500).json({ error: 'Failed to delete deal' });
   }
 });
