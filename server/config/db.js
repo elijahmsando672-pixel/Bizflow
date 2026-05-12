@@ -1,6 +1,6 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
-import { promises as dnsPromises } from 'node:dns';
+import dns from 'node:dns';
 
 dotenv.config();
 
@@ -8,13 +8,15 @@ const { Pool } = pg;
 
 const RENDER_DB_REGIONS = ['oregon', 'ohio', 'frankfurt', 'singapore', 'virginia', 'us-east'];
 
+dns.setServers(['8.8.8.8', '1.1.1.1']);
+
 const resolveRenderHost = async (host) => {
   for (const region of RENDER_DB_REGIONS) {
     const ext = `${host}.${region}-postgres.render.com`;
     try {
-      await dnsPromises.lookup(ext);
-      console.log(`DB host resolved via external: ${ext}`);
-      return ext;
+      const [address] = await dns.promises.resolve4(ext);
+      console.log(`DB host resolved: ${ext} -> ${address}`);
+      return address;
     } catch {}
   }
   return null;
