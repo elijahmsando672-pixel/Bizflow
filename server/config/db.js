@@ -45,23 +45,26 @@ const resolveDbHost = async () => {
   } catch (err) {
     if (err.code === 'ENOTFOUND' && host.startsWith('dpg-')) {
       const regions = ['oregon', 'ohio', 'frankfurt', 'singapore', 'virginia'];
+      const suffixes = ['-postgres.render.com', '.render.com'];
       for (const region of regions) {
-        const externalHost = `${host}.${region}-postgres.render.com`;
-        try {
-          await dns.resolve(externalHost);
-          console.log(`DB host resolved: ${host} -> ${externalHost}`);
-          const user = process.env.DB_USER || 'postgres';
-          const password = process.env.DB_PASSWORD || 'postgres';
-          const database = process.env.DB_NAME || 'bizflow';
-          const connStr = `postgres://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${externalHost}:${process.env.DB_PORT || 5432}/${database}`;
-          pool.options.connectionString = connStr;
-          pool.options.host = undefined;
-          pool.options.port = undefined;
-          pool.options.database = undefined;
-          pool.options.user = undefined;
-          pool.options.password = undefined;
-          return;
-        } catch {}
+        for (const suffix of suffixes) {
+          const externalHost = `${host}.${region}${suffix}`;
+          try {
+            await dns.resolve(externalHost);
+            console.log(`DB host resolved: ${host} -> ${externalHost}`);
+            const user = process.env.DB_USER || 'postgres';
+            const password = process.env.DB_PASSWORD || 'postgres';
+            const database = process.env.DB_NAME || 'bizflow';
+            const connStr = `postgres://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${externalHost}:${process.env.DB_PORT || 5432}/${database}`;
+            pool.options.connectionString = connStr;
+            pool.options.host = undefined;
+            pool.options.port = undefined;
+            pool.options.database = undefined;
+            pool.options.user = undefined;
+            pool.options.password = undefined;
+            return;
+          } catch {}
+        }
       }
       console.warn(`Could not resolve Render DB host: ${host}. Try setting DATABASE_URL env var manually.`);
     }
