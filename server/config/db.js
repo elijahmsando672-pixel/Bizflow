@@ -1,30 +1,78 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
+import dns from 'node:dns/promises';
 
 dotenv.config();
 
 const { Pool } = pg;
 
-export const pool = new Pool({
-  // Support DATABASE_URL (Railway, Heroku, etc.)
-  connectionString: process.env.DATABASE_URL || undefined,
-  // Fallback to individual env vars when no DATABASE_URL
-  host: process.env.DATABASE_URL ? undefined : (process.env.DB_HOST || 'localhost'),
-  port: process.env.DATABASE_URL ? undefined : parseInt(process.env.DB_PORT || '5432', 10),
-  database: process.env.DATABASE_URL ? undefined : (process.env.DB_NAME || 'bizflow'),
-  user: process.env.DATABASE_URL ? undefined : (process.env.DB_USER || 'postgres'),
-  password: process.env.DATABASE_URL ? undefined : (process.env.DB_PASSWORD || 'postgres'),
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-  ssl: process.env.NODE_ENV === 'production'
-    ? { rejectUnauthorized: false }
-    : undefined,
-});
+const getDbConfig = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const connectionString = process.env.DATABASE_URL || undefined;
+
+  if (connectionString) {
+    return {
+      connectionString,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+      ssl: isProduction ? { rejectUnauthorized: false } : undefined,
+    };
+  }
+
+  return {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432', 10),
+    database: process.env.DB_NAME || 'bizflow',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+    ssl: isProduction ? { rejectUnauthorized: false } : undefined,
+  };
+};
+
+let dbConfig = getDbConfig();
+export const pool = new Pool(dbConfig);
+
+const resolveDbHost = async () => {
+  if (process.env.DATABASE_URL || !process.env.DB_HOST) return;
+
+  const host = process.env.DB_HOST;
+  try {
+    await dns.resolve(host);
+  } catch (err) {
+    if (err.code === 'ENOTFOUND' && host.startsWith('dpg-')) {
+      const regions = ['oregon', 'ohio', 'frankfurt', 'singapore', 'virginia'];
+      for (const region of regions) {
+        const externalHost = `${host}.${region}-postgres.render.com`;
+        try {
+          await dns.resolve(externalHost);
+          console.log(`DB host resolved: ${host} -> ${externalHost}`);
+          const user = process.env.DB_USER || 'postgres';
+          const password = process.env.DB_PASSWORD || 'postgres';
+          const database = process.env.DB_NAME || 'bizflow';
+          const connStr = `postgres://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${externalHost}:${process.env.DB_PORT || 5432}/${database}`;
+          pool.options.connectionString = connStr;
+          pool.options.host = undefined;
+          pool.options.port = undefined;
+          pool.options.database = undefined;
+          pool.options.user = undefined;
+          pool.options.password = undefined;
+          return;
+        } catch {}
+      }
+      console.warn(`Could not resolve Render DB host: ${host}. Try setting DATABASE_URL env var manually.`);
+    }
+  }
+};
 
 export const query = (text, params) => pool.query(text, params);
 
 export const initDatabase = async () => {
+  await resolveDbHost();
+
   const schema = `
     -- Enable UUID extension
     CREATE EXTENSION IF NOT EXISTS "pgcrypto";
