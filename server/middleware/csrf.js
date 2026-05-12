@@ -12,9 +12,9 @@ export const setCsrfCookie = (req, res) => {
   const isProduction = process.env.NODE_ENV === 'production';
   
   res.cookie(CSRF_COOKIE_NAME, token, {
-    httpOnly: false, // Must be readable by JavaScript
+    httpOnly: false,
     secure: isProduction,
-    sameSite: 'strict',
+    sameSite: isProduction ? 'none' : 'strict',
     maxAge: CSRF_TOKEN_EXPIRY,
     path: '/',
   });
@@ -26,7 +26,7 @@ export const clearCsrfCookie = (res) => {
   res.clearCookie(CSRF_COOKIE_NAME, {
     httpOnly: false,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
     path: '/',
   });
 };

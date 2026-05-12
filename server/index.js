@@ -32,11 +32,13 @@ import { requirePermission } from './middleware/rbac.js';
 
 dotenv.config();
 
-const requiredEnvVars = ['JWT_SECRET', 'DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
-const missing = requiredEnvVars.filter(key => !process.env[key]);
-if (missing.length > 0) {
-  console.error(`FATAL ERROR: Missing required environment variables: ${missing.join(', ')}`);
-  process.exit(1);
+if (!process.env.DATABASE_URL) {
+  const requiredEnvVars = ['JWT_SECRET', 'DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
+  const missing = requiredEnvVars.filter(key => !process.env[key]);
+  if (missing.length > 0) {
+    console.error(`FATAL ERROR: Missing required environment variables: ${missing.join(', ')}`);
+    process.exit(1);
+  }
 }
 
 const app = express();

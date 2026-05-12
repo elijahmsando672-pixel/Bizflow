@@ -209,7 +209,7 @@ router.post('/login', auditLogger('auth.login'), async (req, res) => {
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'strict',
+      sameSite: isProduction ? 'none' : 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/api/auth',
     });
@@ -256,10 +256,12 @@ router.post('/logout', auditLogger('auth.logout'), async (req, res) => {
       await query('DELETE FROM refresh_tokens WHERE token = $1', [refreshToken]);
     }
 
+    const isProduction = process.env.NODE_ENV === 'production';
     res.clearCookie('refreshToken', { 
       path: '/api/auth', 
       httpOnly: true, 
-      sameSite: 'strict' 
+      sameSite: isProduction ? 'none' : 'strict',
+      secure: isProduction,
     });
     clearCsrfCookie(res);
 
@@ -394,10 +396,10 @@ router.post('/refresh-token', auditLogger('auth.refresh-token'), async (req, res
     );
 
     const isProduction = process.env.NODE_ENV === 'production';
-    res.cookie('refreshToken', newRefreshToken, {
+    res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'strict',
+      sameSite: isProduction ? 'none' : 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/api/auth',
     });
