@@ -1,51 +1,23 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
-import { lookup as dnsLookup } from 'node:dns';
+import { promises as dnsPromises } from 'node:dns';
 
 dotenv.config();
 
 const { Pool } = pg;
 
-const RENDER_CANDIDATES = [];
-for (const region of ['oregon', 'ohio', 'frankfurt', 'singapore', 'virginia', 'us-east']) {
-  RENDER_CANDIDATES.push(`${region}-postgres.render.com`);
-}
+const RENDER_DB_REGIONS = ['oregon', 'ohio', 'frankfurt', 'singapore', 'virginia', 'us-east'];
 
-let lookupCache = {};
-
-const renderLookup = (hostname, options, callback) => {
-  if (!hostname.startsWith('dpg-') || hostname.includes('.')) {
-    dnsLookup(hostname, options, callback);
-    return;
+const resolveRenderHost = async (host) => {
+  for (const region of RENDER_DB_REGIONS) {
+    const ext = `${host}.${region}-postgres.render.com`;
+    try {
+      await dnsPromises.lookup(ext);
+      console.log(`DB host resolved via external: ${ext}`);
+      return ext;
+    } catch {}
   }
-
-  if (lookupCache[hostname]) {
-    dnsLookup(lookupCache[hostname], options, callback);
-    return;
-  }
-
-  dnsLookup(hostname, options, (err, address, family) => {
-    if (!err || err.code !== 'ENOTFOUND') {
-      return err ? callback(err) : callback(null, address, family);
-    }
-
-    let i = 0;
-    const tryNext = () => {
-      if (i >= RENDER_CANDIDATES.length) {
-        return callback(err);
-      }
-      const ext = `${hostname}.${RENDER_CANDIDATES[i++]}`;
-      dnsLookup(ext, options, (err2, address, family) => {
-        if (!err2) {
-          lookupCache[hostname] = ext;
-          callback(null, address, family);
-        } else {
-          tryNext();
-        }
-      });
-    };
-    tryNext();
-  });
+  return null;
 };
 
 export const pool = new Pool({
@@ -61,12 +33,29 @@ export const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production'
     ? { rejectUnauthorized: false }
     : undefined,
-  lookup: renderLookup,
 });
 
 export const query = (text, params) => pool.query(text, params);
 
 export const initDatabase = async () => {
+  if (!process.env.DATABASE_URL && process.env.DB_HOST?.startsWith('dpg-')) {
+    const external = await resolveRenderHost(process.env.DB_HOST);
+    if (external) {
+      const user = process.env.DB_USER || 'postgres';
+      const password = process.env.DB_PASSWORD || 'postgres';
+      const database = process.env.DB_NAME || 'bizflow';
+      const port = process.env.DB_PORT || 5432;
+      pool.options.connectionString = `postgres://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${external}:${port}/${database}`;
+      pool.options.host = undefined;
+      pool.options.port = undefined;
+      pool.options.database = undefined;
+      pool.options.user = undefined;
+      pool.options.password = undefined;
+    } else {
+      console.error('Could not resolve Render DB host. Set DATABASE_URL manually in Render dashboard.');
+    }
+  }
+
   const schema = `
     -- Enable UUID extension
     CREATE EXTENSION IF NOT EXISTS "pgcrypto";
