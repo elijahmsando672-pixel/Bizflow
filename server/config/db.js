@@ -1,23 +1,36 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
-import dns from 'node:dns';
+import net from 'node:net';
 
 dotenv.config();
 
 const { Pool } = pg;
 
-const RENDER_DB_REGIONS = ['oregon', 'ohio', 'frankfurt', 'singapore', 'virginia', 'us-east'];
+const RENDER_DB_IPS = [
+  { region: 'oregon', host: '35.227.164.209' },
+  { region: 'ohio', host: '3.129.155.172' },
+  { region: 'frankfurt', host: '3.65.142.85' },
+  { region: 'singapore', host: '13.214.97.86' },
+  { region: 'virginia', host: '54.87.193.254' },
+];
 
-dns.setServers(['8.8.8.8', '1.1.1.1']);
+const tcpConnect = (host, port = 5432, timeout = 3000) => {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(timeout);
+    socket.on('connect', () => { socket.destroy(); resolve(true); });
+    socket.on('error', () => { socket.destroy(); resolve(false); });
+    socket.on('timeout', () => { socket.destroy(); resolve(false); });
+    socket.connect(port, host);
+  });
+};
 
-const resolveRenderHost = async (host) => {
-  for (const region of RENDER_DB_REGIONS) {
-    const ext = `${host}.${region}-postgres.render.com`;
-    try {
-      const [address] = await dns.promises.resolve4(ext);
-      console.log(`DB host resolved: ${ext} -> ${address}`);
-      return address;
-    } catch {}
+const resolveRenderHost = async () => {
+  for (const { region, host } of RENDER_DB_IPS) {
+    if (await tcpConnect(host)) {
+      console.log(`DB host reachable: ${region} (${host})`);
+      return host;
+    }
   }
   return null;
 };
@@ -40,13 +53,13 @@ export const pool = new Pool({
 export const query = (text, params) => pool.query(text, params);
 
 export const initDatabase = async () => {
-  if (!process.env.DATABASE_URL && process.env.DB_HOST?.startsWith('dpg-')) {
-    const external = await resolveRenderHost(process.env.DB_HOST);
-    if (external) {
-      console.log(`Using resolved DB IP: ${external}`);
-      pool.options.host = external;
-    } else {
-      console.error('Could not resolve Render DB host. Set DATABASE_URL manually in Render dashboard.');
+  if (!process.env.DATABASE_URL) {
+    const ip = await resolveRenderHost();
+    if (ip) {
+      console.log(`Using reachable DB IP: ${ip}`);
+      pool.options.host = ip;
+    } else if (process.env.DB_HOST?.startsWith('dpg-')) {
+      console.error('Could not reach Render DB. Set DATABASE_URL env var manually in Render dashboard.');
     }
   }
 
