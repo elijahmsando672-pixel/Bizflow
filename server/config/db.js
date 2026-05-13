@@ -43,16 +43,8 @@ export const initDatabase = async () => {
   if (!process.env.DATABASE_URL && process.env.DB_HOST?.startsWith('dpg-')) {
     const external = await resolveRenderHost(process.env.DB_HOST);
     if (external) {
-      const user = process.env.DB_USER || 'postgres';
-      const password = process.env.DB_PASSWORD || 'postgres';
-      const database = process.env.DB_NAME || 'bizflow';
-      const port = process.env.DB_PORT || 5432;
-      pool.options.connectionString = `postgres://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${external}:${port}/${database}`;
-      pool.options.host = undefined;
-      pool.options.port = undefined;
-      pool.options.database = undefined;
-      pool.options.user = undefined;
-      pool.options.password = undefined;
+      console.log(`Using resolved DB IP: ${external}`);
+      pool.options.host = external;
     } else {
       console.error('Could not resolve Render DB host. Set DATABASE_URL manually in Render dashboard.');
     }
