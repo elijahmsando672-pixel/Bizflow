@@ -214,31 +214,36 @@ app.use('/api', requireSubscription);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-const startServer = async (retries = 3) => {
-  for (let attempt = 1; attempt <= retries; attempt++) {
+const startServer = async () => {
+  // Start listening immediately so Render/Vercel health checks pass right away
+  const server = app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`CORS: ${allowedOrigins.join(', ')}`);
+    console.log('Security: CSRF, rate limiting, HSTS (prod)');
+  });
+
+  // Server timeouts to prevent slowloris attacks
+  server.timeout = 30000;
+  server.keepAliveTimeout = 65000;
+  server.headersTimeout = 35000;
+
+  // Initialize DB asynchronously after listening (with retries)
+  const maxRetries = 10;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       await initDatabase();
       await seedDefaultPlans();
-      const server = app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
-        console.log(`CORS: ${allowedOrigins.join(', ')}`);
-        console.log('Security: CSRF, rate limiting, HSTS (prod)');
-      });
-
-      // Server timeouts to prevent slowloris attacks
-      server.timeout = 30000;
-      server.keepAliveTimeout = 65000;
-      server.headersTimeout = 35000;
+      console.log('Database ready');
       return;
     } catch (error) {
-      const isLast = attempt === retries;
+      const isLast = attempt === maxRetries;
       if (!isLast) {
-        const delay = Math.min(5000 * Math.pow(2, attempt - 1), 20000);
-        console.warn(`Server start attempt ${attempt}/${retries} failed: ${error.message}. Retrying in ${delay}ms...`);
+        const delay = Math.min(5000 * Math.pow(2, attempt - 1), 30000);
+        console.warn(`DB init attempt ${attempt}/${maxRetries} failed: ${error.message}. Retrying in ${delay}ms...`);
         await new Promise((r) => setTimeout(r, delay));
       } else {
-        console.error('Failed to start server after all retries:', error.message);
-        process.exit(1);
+        console.error('DB init failed after all retries:', error.message);
+        // Don't exit — server stays up for health checks
       }
     }
   }
