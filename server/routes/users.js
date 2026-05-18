@@ -2,6 +2,7 @@ import express from 'express';
 import Joi from 'joi';
 import { query } from '../config/db.js';
 import { hashPassword } from '../utils/password.js';
+import { auditLogger } from '../middleware/security.js';
 
 const router = express.Router();
 
@@ -29,7 +30,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', auditLogger('users.create'), async (req, res) => {
   try {
     const { error, value } = createUserSchema.validate(req.body);
     if (error) return res.status(400).json({ error: error.details[0].message });
@@ -60,7 +61,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', auditLogger('users.delete'), async (req, res) => {
   try {
     const check = await query(
       'SELECT role FROM users WHERE id = $1 AND business_id = $2',

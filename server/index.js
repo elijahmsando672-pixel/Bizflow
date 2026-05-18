@@ -114,8 +114,12 @@ app.use(express.urlencoded({
   parameterLimit: 500,
 }));
 
+// Input sanitization (applied before any route handler)
+import { sanitizeInput } from './middleware/security.js';
+app.use('/api', sanitizeInput);
+
 // Global rate limiter (skip health and auth)
-import { globalRateLimiter, authRateLimiter, passwordResetRateLimiter, refreshTokenRateLimiter } from './middleware/security.js';
+import { globalRateLimiter, userRateLimiter, authRateLimiter, passwordResetRateLimiter, refreshTokenRateLimiter } from './middleware/security.js';
 app.use('/api/health', (req, res, next) => next());
 app.use('/api/auth/refresh-token', refreshTokenRateLimiter);
 app.use(globalRateLimiter);
@@ -123,6 +127,9 @@ app.use(globalRateLimiter);
 // Apply stricter rate limiting to auth endpoints
 app.use(['/api/auth/login', '/api/auth/register'], authRateLimiter);
 app.use(['/api/auth/forgot-password', '/api/auth/reset-password'], passwordResetRateLimiter);
+
+// Per-user rate limiting for authenticated API routes
+app.use('/api', userRateLimiter(120, 15 * 60 * 1000));
 
 // Protected resource routes - authenticate + CSRF + RBAC validation
 app.use('/api/customers', protect, requirePermission, customerRoutes);

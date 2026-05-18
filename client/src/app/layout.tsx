@@ -16,8 +16,25 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BizFlow - Business Management",
-  description: "Modern business management dashboard",
+  title: {
+    default: "BizFlow - Business Management Software",
+    template: "%s | BizFlow",
+  },
+  description: "Modern business management dashboard. Manage sales, inventory, customers, team, and finances in one place.",
+  keywords: ["business management", "dashboard", "inventory", "sales", "CRM", "small business software"],
+  authors: [{ name: "BizFlow" }],
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    siteName: "BizFlow",
+    title: "BizFlow - Business Management Software",
+    description: "Modern business management dashboard. Manage sales, inventory, customers, team, and finances in one place.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "BizFlow - Business Management Software",
+    description: "Modern business management dashboard.",
+  },
   icons: {
     icon: "/favicon.svg",
   },

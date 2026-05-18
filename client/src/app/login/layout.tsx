@@ -1,0 +1,12 @@
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+
+export const metadata: Metadata = {
+  title: "Sign In - BizFlow",
+  description: "Sign in to your BizFlow business management dashboard. Manage sales, inventory, customers, and more.",
+  robots: { index: false, follow: false },
+};
+
+export default function LoginLayout({ children }: { children: ReactNode }) {
+  return <>{children}</>;
+}
