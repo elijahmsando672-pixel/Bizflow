@@ -52,18 +52,27 @@ export const pool = new Pool({
 
 export const query = (text, params) => pool.query(text, params);
 
-export const initDatabase = async () => {
-  if (!process.env.DATABASE_URL) {
-    const ip = await resolveRenderHost();
-    if (ip) {
-      console.log(`Using reachable DB IP: ${ip}`);
-      pool.options.host = ip;
-    } else if (process.env.DB_HOST?.startsWith('dpg-')) {
-      console.error('Could not reach Render DB. Set DATABASE_URL env var manually in Render dashboard.');
-    }
-  }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  const schema = `
+export const initDatabase = async (retries = 10, baseDelay = 3000) => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      if (!process.env.DATABASE_URL) {
+        const ip = await resolveRenderHost();
+        if (ip) {
+          console.log(`Using reachable DB IP: ${ip}`);
+          pool.options.host = ip;
+        } else if (process.env.DB_HOST?.startsWith('dpg-')) {
+          console.error('Could not reach Render DB. Set DATABASE_URL env var manually in Render dashboard.');
+        }
+      }
+
+      // Test the connection before running schema
+      const client = await pool.connect();
+      client.release();
+      console.log(`DB connection established (attempt ${attempt})`);
+
+      const schema = `
     -- Enable UUID extension
     CREATE EXTENSION IF NOT EXISTS "pgcrypto";
     
@@ -954,8 +963,20 @@ export const initDatabase = async () => {
     CREATE INDEX IF NOT EXISTS idx_permissions ON permissions(business_id, role_name);
   `;
 
-  await pool.query(schema);
-  console.log('Database schema initialized successfully');
+      await pool.query(schema);
+      console.log('Database schema initialized successfully');
+      return;
+    } catch (err) {
+      const isLast = attempt === retries;
+      if (isLast) {
+        console.error(`DB init failed after ${retries} attempts:`, err.message);
+        throw err;
+      }
+      const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 30000);
+      console.warn(`DB init attempt ${attempt}/${retries} failed: ${err.message}. Retrying in ${delay}ms...`);
+      await sleep(delay);
+    }
+  }
 };
 
 export default { pool, query, initDatabase };

@@ -214,24 +214,33 @@ app.use('/api', requireSubscription);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-const startServer = async () => {
-  try {
-    await initDatabase();
-    await seedDefaultPlans();
-    const server = app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-      console.log(`CORS: ${allowedOrigins.join(', ')}`);
-      console.log('Security: CSRF, rate limiting, HSTS (prod)');
-    });
+const startServer = async (retries = 3) => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await initDatabase();
+      await seedDefaultPlans();
+      const server = app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+        console.log(`CORS: ${allowedOrigins.join(', ')}`);
+        console.log('Security: CSRF, rate limiting, HSTS (prod)');
+      });
 
-    // Server timeouts to prevent slowloris attacks
-    server.timeout = 30000; // 30 seconds
-    server.keepAliveTimeout = 65000; // 65 seconds
-    server.headersTimeout = 35000; // 35 seconds
-
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
+      // Server timeouts to prevent slowloris attacks
+      server.timeout = 30000;
+      server.keepAliveTimeout = 65000;
+      server.headersTimeout = 35000;
+      return;
+    } catch (error) {
+      const isLast = attempt === retries;
+      if (!isLast) {
+        const delay = Math.min(5000 * Math.pow(2, attempt - 1), 20000);
+        console.warn(`Server start attempt ${attempt}/${retries} failed: ${error.message}. Retrying in ${delay}ms...`);
+        await new Promise((r) => setTimeout(r, delay));
+      } else {
+        console.error('Failed to start server after all retries:', error.message);
+        process.exit(1);
+      }
+    }
   }
 };
 
