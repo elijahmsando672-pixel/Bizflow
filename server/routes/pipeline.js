@@ -90,7 +90,7 @@ router.post('/', async (req, res) => {
     const deal = result.rows[0];
 
     if (assigned_to) {
-      const assigneeResult = await query(`SELECT email, name FROM users WHERE id = $1`, [assigned_to]);
+      const assigneeResult = await query(`SELECT email, name FROM users WHERE id = $1 AND business_id = $2`, [assigned_to, req.business_id]);
       if (assigneeResult.rows.length && assigneeResult.rows[0].email) {
         sendDealCreatedEmail(assigneeResult.rows[0].email, deal, req.user.name).catch(() => {});
       }
@@ -213,7 +213,7 @@ router.put('/:id', async (req, res) => {
     const deal = result.rows[0];
 
     if (outcome === 'won') {
-      const ownerResult = await query(`SELECT email FROM users WHERE id = $1`, [deal.assigned_to || deal.created_by]);
+      const ownerResult = await query(`SELECT email FROM users WHERE id = $1 AND business_id = $2`, [deal.assigned_to || deal.created_by, req.business_id]);
       if (ownerResult.rows.length && ownerResult.rows[0].email) {
         sendDealWonEmail(ownerResult.rows[0].email, deal).catch(() => {});
       }

@@ -4,8 +4,11 @@ import { sendTicketCreatedEmail, sendTicketReplyEmail } from '../utils/email.js'
 
 const router = express.Router();
 
-async function getNextTicketNumber() {
-  const result = await query(`SELECT COALESCE(MAX(CAST(SUBSTRING(ticket_number FROM 4) AS INTEGER)), 0) + 1 as next_num FROM support_tickets`);
+async function getNextTicketNumber(business_id) {
+  const result = await query(
+    `SELECT COALESCE(MAX(CAST(SUBSTRING(ticket_number FROM 5) AS INTEGER)), 0) + 1 as next_num FROM support_tickets WHERE business_id = $1`,
+    [business_id]
+  );
   return `TKT-${String(result.rows[0].next_num).padStart(5, '0')}`;
 }
 
@@ -95,7 +98,7 @@ router.get('/dashboard-stats', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { customer_id, subject, description, priority, category, assigned_to } = req.body;
-    const ticketNumber = await getNextTicketNumber();
+    const ticketNumber = await getNextTicketNumber(req.business_id);
 
     const slaResult = await query(
       `SELECT resolution_hours FROM sla_configs WHERE business_id = $1 AND category = $2 AND priority = $3 AND is_active = true LIMIT 1`,
@@ -114,14 +117,14 @@ router.post('/', async (req, res) => {
     const ticket = result.rows[0];
 
     if (assigned_to) {
-      const assigneeResult = await query(`SELECT email, name FROM users WHERE id = $1`, [assigned_to]);
+      const assigneeResult = await query(`SELECT email, name FROM users WHERE id = $1 AND business_id = $2`, [assigned_to, req.business_id]);
       if (assigneeResult.rows.length) {
         sendTicketCreatedEmail(assigneeResult.rows[0].email, ticket, { name: req.user.name }).catch(() => {});
       }
     }
 
     if (customer_id) {
-      const custResult = await query(`SELECT email FROM customers WHERE id = $1`, [customer_id]);
+      const custResult = await query(`SELECT email FROM customers WHERE id = $1 AND business_id = $2`, [customer_id, req.business_id]);
       if (custResult.rows.length && custResult.rows[0].email) {
         sendTicketCreatedEmail(custResult.rows[0].email, ticket, null).catch(() => {});
       }
@@ -229,12 +232,12 @@ router.post('/:id/replies', async (req, res) => {
 
     if (!is_internal) {
       const ticketResult = await query(
-        `SELECT t.*, c.email as customer_email FROM support_tickets t LEFT JOIN customers c ON t.customer_id = c.id WHERE t.id = $1`,
-        [req.params.id]
+        `SELECT t.*, c.email as customer_email FROM support_tickets t LEFT JOIN customers c ON t.customer_id = c.id WHERE t.id = $1 AND t.business_id = $2`,
+        [req.params.id, req.business_id]
       );
       if (ticketResult.rows.length) {
         const ticket = ticketResult.rows[0];
-        if (ticket.customer_email && ticket.assigned_to !== req.user.id) {
+        if (ticket.customer_email) {
           sendTicketReplyEmail(ticket.customer_email, ticket, reply, req.user.name).catch(() => {});
         }
       }
@@ -252,9 +255,9 @@ router.get('/:id/replies', async (req, res) => {
       `SELECT r.*, u.name as author_name
        FROM ticket_replies r
        LEFT JOIN users u ON r.created_by = u.id
-       WHERE r.ticket_id = $1
+       WHERE r.ticket_id = $1 AND r.business_id = $2
        ORDER BY r.created_at ASC`,
-      [req.params.id]
+      [req.params.id, req.business_id]
     );
     res.json(result.rows);
   } catch (error) {

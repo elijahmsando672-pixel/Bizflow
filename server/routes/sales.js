@@ -166,7 +166,7 @@ router.get('/', async (req, res) => {
     res.json(result.rows);
    } catch (err) {
      console.error('Sales route error:', err);
-     res.status(500).json({ error: 'Internal server error' });
+     res.status(500).json({ error: 'Server error' });
    }
 });
 
@@ -269,7 +269,7 @@ router.get('/:id', async (req, res) => {
     res.json({ ...saleResult.rows[0], items: itemsResult.rows, receipt: receiptResult.rows[0] || null });
    } catch (err) {
      console.error('Sales route error:', err);
-     res.status(500).json({ error: 'Internal server error' });
+     res.status(500).json({ error: 'Server error' });
    }
 });
 
@@ -290,12 +290,13 @@ router.post('/', async (req, res) => {
     for (const item of (items || [])) {
       subtotal += (item.qty * item.unit_price) - (item.discount || 0);
     }
-    const total = subtotal - discount_amount;
+    const taxAmount = subtotal * 0.16;
+    const total = Math.max(0, subtotal - discount_amount);
 
     const saleResult = await client.query(
-      `INSERT INTO sales (business_id, customer_id, invoice_number, sale_date, due_date, subtotal, discount_amount, total, notes, status, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-      [req.business_id, customer_id, saleNumber, sale_date || new Date(), due_date, subtotal, discount_amount, total, notes, status, req.user.id]
+      `INSERT INTO sales (business_id, customer_id, invoice_number, sale_date, due_date, subtotal, tax_amount, discount_amount, total, notes, status, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+      [req.business_id, customer_id, saleNumber, sale_date || new Date(), due_date, subtotal, taxAmount, discount_amount, total, notes, status, req.user.id]
     );
     const sale = saleResult.rows[0];
 
@@ -344,7 +345,7 @@ router.post('/', async (req, res) => {
    } catch (err) {
      await client.query('ROLLBACK');
      console.error('Sales route error:', err);
-     res.status(500).json({ error: 'Internal server error' });
+     res.status(500).json({ error: 'Server error' });
    }
 });
 
@@ -373,7 +374,7 @@ router.put('/:id', async (req, res) => {
     res.json(result.rows[0]);
    } catch (err) {
      console.error('Sales route error:', err);
-     res.status(500).json({ error: 'Internal server error' });
+     res.status(500).json({ error: 'Server error' });
    }
 });
 
@@ -396,7 +397,7 @@ router.delete('/:id', async (req, res) => {
       }
     }
 
-    await client.query('DELETE FROM cashflow_entries WHERE source_id = $1 AND source_type = $2', [req.params.id, 'sale']);
+    await client.query('DELETE FROM cashflow_entries WHERE source_id = $1 AND source_type = $2 AND business_id = $3', [req.params.id, 'sale', req.business_id]);
     await client.query('DELETE FROM receipts WHERE sale_id = $1 AND business_id = $2', [req.params.id, req.business_id]);
     await client.query('DELETE FROM sale_items WHERE sale_id = $1 AND business_id = $2', [req.params.id, req.business_id]);
     await client.query('DELETE FROM sales WHERE id = $1 AND business_id = $2', [req.params.id, req.business_id]);
@@ -406,7 +407,7 @@ router.delete('/:id', async (req, res) => {
    } catch (err) {
      await client.query('ROLLBACK');
      console.error('Sales route error:', err);
-     res.status(500).json({ error: 'Internal server error' });
+     res.status(500).json({ error: 'Server error' });
    }
 });
 

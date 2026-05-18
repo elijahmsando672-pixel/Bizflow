@@ -1,6 +1,6 @@
 import express from 'express';
 import { query, pool } from '../config/db.js';
-import { sendInvoiceEmail, sendPaymentReminderEmail } from '../utils/email.js';
+import { sendInvoiceEmail } from '../utils/email.js';
 
 const router = express.Router();
 
@@ -91,14 +91,19 @@ router.post('/', async (req, res) => {
     }
 
     await client.query('COMMIT');
-    res.status(201).json(invoice);
 
     if (customer_id) {
-      const customerResult = await query('SELECT * FROM customers WHERE id = $1 AND business_id = $2', [customer_id, req.business_id]);
-      if (customerResult.rows[0]?.email) {
-        sendInvoiceEmail(customerResult.rows[0].email, invoice, customerResult.rows[0]).catch(console.error);
+      try {
+        const customerResult = await query('SELECT * FROM customers WHERE id = $1 AND business_id = $2', [customer_id, req.business_id]);
+        if (customerResult.rows[0]?.email) {
+          sendInvoiceEmail(customerResult.rows[0].email, invoice, customerResult.rows[0]).catch(() => {});
+        }
+      } catch (emailErr) {
+        console.error('Send invoice email error:', emailErr);
       }
     }
+
+    res.status(201).json(invoice);
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Create invoice error:', error);

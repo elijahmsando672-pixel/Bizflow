@@ -1,6 +1,5 @@
 import express from 'express';
 import { query, pool } from '../config/db.js';
-import Joi from 'joi';
 
 const router = express.Router();
 
@@ -180,12 +179,18 @@ router.post('/check-usage', async (req, res) => {
     const userCount = await query('SELECT COUNT(*) FROM users WHERE business_id = $1', [req.business_id]);
     const productCount = await query('SELECT COUNT(*) FROM products WHERE business_id = $1', [req.business_id]);
 
+    const currentUsers = parseInt(userCount.rows[0].count);
+    const currentProducts = parseInt(productCount.rows[0].count);
+    const withinLimits =
+      (!sub.max_users || currentUsers <= sub.max_users) &&
+      (!sub.max_products || currentProducts <= sub.max_products);
+
     res.json({
-      within_limits: true,
+      within_limits: withinLimits,
       max_users: sub.max_users,
-      current_users: parseInt(userCount.rows[0].count),
+      current_users: currentUsers,
       max_products: sub.max_products,
-      current_products: parseInt(productCount.rows[0].count),
+      current_products: currentProducts,
     });
   } catch (err) {
     console.error('Check usage error:', err);

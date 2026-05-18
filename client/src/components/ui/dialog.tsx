@@ -10,19 +10,22 @@ function Dialog({
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }) {
+  if (!open) return null;
+
   return (
     <>
-      {open && (
+      <div
+        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm animate-in fade-in"
+        onClick={() => onOpenChange?.(false)}
+      />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
-          className="fixed inset-0 z-50 bg-black/50"
-          onClick={() => onOpenChange?.(false)}
-        />
-      )}
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="relative z-50 w-full max-w-lg">{children}</div>
+          className="relative z-50 w-full max-w-lg animate-in zoom-in-95 slide-in-from-bottom-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {children}
         </div>
-      )}
+      </div>
     </>
   )
 }
@@ -35,7 +38,7 @@ function DialogContent({
   children: React.ReactNode
 }) {
   return (
-    <div className={cn("rounded-lg border bg-white p-6 shadow-lg", className)}>
+    <div className={cn("rounded-xl border bg-card p-6 shadow-modal", className)}>
       {children}
     </div>
   )
@@ -77,7 +80,7 @@ function DialogDescription({
   children: React.ReactNode
 }) {
   return (
-    <p className={cn("text-sm text-gray-500", className)}>{children}</p>
+    <p className={cn("text-sm text-muted-foreground", className)}>{children}</p>
   )
 }
 

@@ -193,6 +193,7 @@ router.get('/low-stock', async (req, res) => {
 router.get('/top-products', async (req, res) => {
   try {
     const { period = '30' } = req.query;
+    const days = parseInt(period) || 30;
     const result = await query(
       `SELECT p.id, p.name, p.sku, p.stock_qty, p.selling_price,
               c.name as category_name,
@@ -205,11 +206,11 @@ router.get('/top-products', async (req, res) => {
        LEFT JOIN categories c ON p.category_id = c.id
        JOIN sales s ON si.sale_id = s.id
        WHERE si.business_id = $1 AND s.status != 'draft'
-         AND s.sale_date >= NOW() - INTERVAL '${parseInt(period)} days'
+         AND s.sale_date >= CURRENT_DATE - $2::integer
        GROUP BY p.id, p.name, p.sku, p.stock_qty, p.selling_price, c.name
        ORDER BY total_sold DESC
        LIMIT 10`,
-      [req.business_id]
+      [req.business_id, days]
     );
     res.json(result.rows);
   } catch (error) {
@@ -221,6 +222,7 @@ router.get('/top-products', async (req, res) => {
 router.get('/frequent-customers', async (req, res) => {
   try {
     const { period = '30' } = req.query;
+    const days = parseInt(period) || 30;
     const result = await query(
       `SELECT c.id, c.name, c.email, c.phone, c.company,
               COUNT(DISTINCT s.id) as total_orders,
@@ -231,11 +233,11 @@ router.get('/frequent-customers', async (req, res) => {
        FROM customers c
        JOIN sales s ON c.id = s.customer_id
        WHERE c.business_id = $1 AND s.status != 'draft'
-         AND s.sale_date >= NOW() - INTERVAL '${parseInt(period)} days'
+         AND s.sale_date >= CURRENT_DATE - $2::integer
        GROUP BY c.id, c.name, c.email, c.phone, c.company
        ORDER BY total_spent DESC, total_orders DESC
        LIMIT 10`,
-      [req.business_id]
+      [req.business_id, days]
     );
     res.json(result.rows);
   } catch (error) {
@@ -246,18 +248,18 @@ router.get('/frequent-customers', async (req, res) => {
 
 router.get('/restock-budget', async (req, res) => {
   try {
-    const { multiplier = 2 } = req.query;
+    const mult = parseFloat(req.query.multiplier) || 2;
     const lowStock = await query(
       `SELECT p.id, p.name, p.sku, p.stock_qty, p.reorder_level, p.cost_price, p.selling_price,
               c.name as category_name,
-              ((p.reorder_level * ${parseFloat(multiplier)} - p.stock_qty)) as suggested_qty,
-              ((p.reorder_level * ${parseFloat(multiplier)} - p.stock_qty) * p.cost_price) as estimated_cost
+              ((p.reorder_level * $2 - p.stock_qty)) as suggested_qty,
+              ((p.reorder_level * $2 - p.stock_qty) * p.cost_price) as estimated_cost
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
        WHERE p.business_id = $1 AND p.stock_qty <= p.reorder_level AND p.is_active = true
-         AND (p.reorder_level * ${parseFloat(multiplier)} - p.stock_qty) > 0
+         AND (p.reorder_level * $2 - p.stock_qty) > 0
        ORDER BY estimated_cost DESC`,
-      [req.business_id]
+      [req.business_id, mult]
     );
 
     const totalBudget = lowStock.rows.reduce((sum, item) => sum + parseFloat(item.estimated_cost || 0), 0);

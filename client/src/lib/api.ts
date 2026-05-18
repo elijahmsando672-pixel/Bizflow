@@ -262,6 +262,11 @@ const api = {
     updateRole: (id: string, role: string) => fetchApi(`/team/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
     updateMember: (id: string, data: { is_active: boolean }) => fetchApi(`/team/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   },
+  users: {
+    getAll: () => fetchApi('/users'),
+    create: (data: { name: string; email: string; password: string; role: string; is_active?: boolean }) => fetchApi('/users', { method: 'POST', body: JSON.stringify(data) }),
+    remove: (id: string) => fetchApi(`/users/${id}`, { method: 'DELETE' }),
+  },
   employees: {
     getAll: (params?: string) => fetchApi(`/employees${params ? `?${params}` : ''}`),
     getById: (id: string) => fetchApi(`/employees/${id}`),

@@ -12,7 +12,7 @@ router.get('/', async (req, res) => {
     res.json(result.rows);
    } catch (err) {
      console.error('Customers route error:', err);
-     res.status(500).json({ error: 'Internal server error' });
+     res.status(500).json({ error: 'Server error' });
    }
 });
 
@@ -27,7 +27,7 @@ router.post('/', async (req, res) => {
     res.status(201).json(result.rows[0]);
    } catch (err) {
      console.error('Customers route error:', err);
-     res.status(500).json({ error: 'Internal server error' });
+     res.status(500).json({ error: 'Server error' });
    }
 });
 
@@ -41,7 +41,7 @@ router.get('/:id', async (req, res) => {
     res.json(result.rows[0]);
    } catch (err) {
      console.error('Customers route error:', err);
-     res.status(500).json({ error: 'Internal server error' });
+     res.status(500).json({ error: 'Server error' });
    }
 });
 
@@ -57,7 +57,7 @@ router.put('/:id', async (req, res) => {
     res.json(result.rows[0]);
    } catch (err) {
      console.error('Customers route error:', err);
-     res.status(500).json({ error: 'Internal server error' });
+     res.status(500).json({ error: 'Server error' });
    }
 });
 
@@ -68,7 +68,7 @@ router.delete('/:id', async (req, res) => {
     res.json({ message: 'Deleted' });
    } catch (err) {
      console.error('Customers route error:', err);
-     res.status(500).json({ error: 'Internal server error' });
+     res.status(500).json({ error: 'Server error' });
    }
 });
 

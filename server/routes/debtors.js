@@ -1,6 +1,5 @@
 import express from 'express';
 import { query, pool } from '../config/db.js';
-import Joi from 'joi';
 
 const router = express.Router();
 

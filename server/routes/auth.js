@@ -103,12 +103,12 @@ router.post('/register', auditLogger('auth.register'), async (req, res) => {
 
     const user = userResult.rows[0];
     const token = generateToken(user);
-    const refreshToken = generateRefreshToken();
+    const newRefreshToken = generateRefreshToken();
     const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     await query(
       'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
-      [user.id, refreshToken, refreshExpiresAt]
+      [user.id, newRefreshToken, refreshExpiresAt]
     );
 
     await query(
@@ -119,13 +119,20 @@ router.post('/register', auditLogger('auth.register'), async (req, res) => {
 
     await recordLoginAttempt(email, req.ip, true);
 
+    const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await query(
+      `INSERT INTO business_subscriptions (business_id, status, start_date, trial_ends_at, amount)
+       VALUES ($1, 'trial', CURRENT_DATE, $2, 0)`,
+      [business_id, trialEndsAt]
+    );
+
     sendWelcomeEmail(email, { name: user.name, business_name }).catch(console.error);
 
     const isProduction = process.env.NODE_ENV === 'production';
-    res.cookie('refreshToken', refreshToken, {
+    res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'strict',
+      sameSite: isProduction ? 'none' : 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/api/auth',
     });
@@ -135,6 +142,7 @@ router.post('/register', auditLogger('auth.register'), async (req, res) => {
     res.status(201).json({ 
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
       business: { id: business_id, name: business_name },
+      subscription: { status: 'trial', trial_ends_at: trialEndsAt.toISOString() },
       token,
     });
   } catch (err) {
@@ -216,9 +224,15 @@ router.post('/login', auditLogger('auth.login'), async (req, res) => {
 
     setCsrfCookie(req, res);
 
+    const subResult = await query(
+      `SELECT status, trial_ends_at FROM business_subscriptions WHERE business_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [userData.business_id]
+    );
+
     res.json({ 
       user: { id: userData.id, name: userData.name, email: userData.email, role: userData.role },
       business: { id: userData.business_id, name: userData.business_name },
+      subscription: subResult.rows[0] || { status: 'trial' },
       token,
     });
   } catch (err) {
@@ -379,7 +393,7 @@ router.post('/refresh-token', auditLogger('auth.refresh-token'), async (req, res
     );
 
     if (result.rows.length === 0) {
-      res.clearCookie('refreshToken', { path: '/api/auth/refresh' });
+      res.clearCookie('refreshToken', { path: '/api/auth' });
       return res.status(401).json({ error: 'Invalid or expired refresh token' });
     }
 
@@ -396,7 +410,7 @@ router.post('/refresh-token', auditLogger('auth.refresh-token'), async (req, res
     );
 
     const isProduction = process.env.NODE_ENV === 'production';
-    res.cookie('refreshToken', refreshToken, {
+    res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? 'none' : 'strict',

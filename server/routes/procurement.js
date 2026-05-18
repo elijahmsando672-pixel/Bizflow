@@ -3,8 +3,11 @@ import { query } from '../config/db.js';
 
 const router = express.Router();
 
-async function getNextPONumber() {
-  const result = await query(`SELECT COALESCE(MAX(CAST(SUBSTRING(po_number FROM 3) AS INTEGER)), 0) + 1 as next_num FROM purchase_orders`);
+async function getNextPONumber(business_id) {
+  const result = await query(
+    `SELECT COALESCE(MAX(CAST(SUBSTRING(po_number FROM 4) AS INTEGER)), 0) + 1 as next_num FROM purchase_orders WHERE business_id = $1`,
+    [business_id]
+  );
   return `PO-${String(result.rows[0].next_num).padStart(5, '0')}`;
 }
 
@@ -82,7 +85,7 @@ router.delete('/vendors/:id', async (req, res) => {
 router.post('/purchase-orders', async (req, res) => {
   try {
     const { vendor_id, expected_delivery, notes, items } = req.body;
-    const poNumber = await getNextPONumber();
+    const poNumber = await getNextPONumber(req.business_id);
 
     const subtotal = items.reduce((sum, item) => sum + (item.qty * item.unit_price), 0);
     const taxAmount = subtotal * 0.16;
@@ -106,8 +109,8 @@ router.post('/purchase-orders', async (req, res) => {
       );
     }
 
-    const fullResult = await query(`SELECT * FROM purchase_orders WHERE id = $1`, [poId]);
-    const poItems = await query(`SELECT * FROM po_items WHERE po_id = $1`, [poId]);
+    const fullResult = await query(`SELECT * FROM purchase_orders WHERE id = $1 AND business_id = $2`, [poId, req.business_id]);
+    const poItems = await query(`SELECT * FROM po_items WHERE po_id = $1 AND business_id = $2`, [poId, req.business_id]);
     res.status(201).json({ ...fullResult.rows[0], items: poItems.rows });
   } catch (error) {
     console.error('Create PO error:', error);
@@ -147,7 +150,7 @@ router.get('/purchase-orders/:id', async (req, res) => {
     );
     if (!poResult.rows.length) return res.status(404).json({ error: 'Purchase order not found' });
 
-    const itemsResult = await query(`SELECT * FROM po_items WHERE po_id = $1`, [req.params.id]);
+    const itemsResult = await query(`SELECT * FROM po_items WHERE po_id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
     res.json({ ...poResult.rows[0], items: itemsResult.rows });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch purchase order' });

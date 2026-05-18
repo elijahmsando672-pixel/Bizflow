@@ -27,6 +27,7 @@ import procurementRoutes from './routes/procurement.js';
 import timetrackingRoutes from './routes/timetracking.js';
 import permissionsRoutes from './routes/permissions.js';
 import importExportRoutes from './routes/importExport.js';
+import userRoutes from './routes/users.js';
 import { protect } from './middleware/protect.js';
 import { requirePermission } from './middleware/rbac.js';
 
@@ -148,6 +149,7 @@ app.use('/api/timetracking', protect, timetrackingRoutes);
 app.use('/api/permissions', protect, permissionsRoutes);
 app.use('/api/import', protect, express.json({ limit: '10mb' }), importExportRoutes);
 app.use('/api/export', protect, importExportRoutes);
+app.use('/api/users', protect, requirePermission, userRoutes);
 
 // Auth routes (no CSRF, have their own protections)
 app.use('/api/auth', authRoutes);
@@ -197,12 +199,18 @@ Scope: All our services and infrastructure
 
 // Error handlers
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { requireSubscription, seedDefaultPlans } from './middleware/subscription.js';
+
+// Apply subscription check to all protected API routes
+app.use('/api', requireSubscription);
+
 app.use(notFoundHandler);
 app.use(errorHandler);
 
 const startServer = async () => {
   try {
     await initDatabase();
+    await seedDefaultPlans();
     const server = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`CORS: ${allowedOrigins.join(', ')}`);

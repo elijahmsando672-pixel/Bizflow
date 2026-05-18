@@ -15,15 +15,24 @@ interface Business {
   name: string;
 }
 
+export interface Subscription {
+  status: string;
+  trial_ends_at?: string;
+  current_period_end?: string;
+  plan_name?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   business: Business | null;
+  subscription: Subscription | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string, businessName: string, phone?: string) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
   hasPermission: (resource: string, action: 'create' | 'read' | 'update' | 'delete') => Promise<boolean>;
+  refreshSubscription: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,6 +49,7 @@ function decodeJWT(token: string): { exp: number } | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
@@ -57,10 +67,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!response.ok) {
         setUser(null);
         setBusiness(null);
+        setSubscription(null);
         setToken(null);
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         localStorage.removeItem("business");
+        localStorage.removeItem("subscription");
         return false;
       }
       const data = await response.json();
@@ -70,10 +82,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       setUser(null);
       setBusiness(null);
+      setSubscription(null);
       setToken(null);
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       localStorage.removeItem("business");
+      localStorage.removeItem("subscription");
       return false;
     }
   }, []);
@@ -82,11 +96,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const savedToken = localStorage.getItem("token");
     const savedUser = localStorage.getItem("user");
     const savedBusiness = localStorage.getItem("business");
+    const savedSubscription = localStorage.getItem("subscription");
 
     if (savedToken && savedUser && savedBusiness) {
       setToken(savedToken);
       setUser(JSON.parse(savedUser));
       setBusiness(JSON.parse(savedBusiness));
+      if (savedSubscription) setSubscription(JSON.parse(savedSubscription));
       fetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/csrf-token`,
         { method: "GET", credentials: 'include' }
@@ -128,6 +144,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [isLoading, token, router]);
 
+  const refreshSubscription = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/subscriptions/current`,
+        { credentials: 'include' }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setSubscription(data);
+        localStorage.setItem("subscription", JSON.stringify(data));
+      }
+    } catch {}
+  }, []);
+
   const login = async (email: string, password: string) => {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/login`,
@@ -135,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
-        credentials: 'include', // Accept httpOnly cookie
+        credentials: 'include',
       }
     );
 
@@ -148,10 +178,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(data.token);
     setUser(data.user);
     setBusiness(data.business);
+    setSubscription(data.subscription || null);
 
     localStorage.setItem("token", data.token);
     localStorage.setItem("user", JSON.stringify(data.user));
     localStorage.setItem("business", JSON.stringify(data.business));
+    if (data.subscription) localStorage.setItem("subscription", JSON.stringify(data.subscription));
 
     router.push("/");
   };
@@ -175,10 +207,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(data.token);
     setUser(data.user);
     setBusiness(data.business);
+    setSubscription(data.subscription || null);
 
     localStorage.setItem("token", data.token);
     localStorage.setItem("user", JSON.stringify(data.user));
     localStorage.setItem("business", JSON.stringify(data.business));
+    if (data.subscription) localStorage.setItem("subscription", JSON.stringify(data.subscription));
 
     router.push("/");
   };
@@ -197,10 +231,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } finally {
       setUser(null);
       setBusiness(null);
+      setSubscription(null);
       setToken(null);
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       localStorage.removeItem("business");
+      localStorage.removeItem("subscription");
       router.push("/login");
     }
   };
@@ -222,7 +258,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, business, token, login, register, logout, isLoading, hasPermission }}>
+    <AuthContext.Provider value={{ user, business, subscription, token, login, register, logout, isLoading, hasPermission, refreshSubscription }}>
       {children}
     </AuthContext.Provider>
   );
