@@ -21,7 +21,8 @@ router.get('/current', async (req, res) => {
       `SELECT bs.*, sp.name as plan_name, sp.price as plan_price, sp.features
        FROM business_subscriptions bs
        LEFT JOIN subscription_plans sp ON bs.plan_id = sp.id
-       WHERE bs.business_id = $1`,
+       WHERE bs.business_id = $1
+       ORDER BY bs.created_at DESC`,
       [req.business_id]
     );
 
@@ -68,6 +69,11 @@ router.post('/activate', async (req, res) => {
     if (plan.billing_cycle === 'monthly') periodEnd.setMonth(periodEnd.getMonth() + 1);
     else if (plan.billing_cycle === 'yearly') periodEnd.setFullYear(periodEnd.getFullYear() + 1);
     else periodEnd.setDate(periodEnd.getDate() + 7);
+
+    await query(
+      `UPDATE business_subscriptions SET status = 'cancelled' WHERE business_id = $1 AND status IN ('trial', 'active')`,
+      [req.business_id]
+    );
 
     const result = await query(
       `INSERT INTO business_subscriptions (business_id, plan_id, status, start_date, current_period_start, current_period_end, next_billing_date, amount)

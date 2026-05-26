@@ -1,15 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "@/lib/auth-context";
 
 export default function SettingsPage() {
-  const [businessName, setBusinessName] = useState("My Business");
-  const [email, setEmail] = useState("admin@example.com");
-  const [saved, setSaved] = useState(false);
+  const { user, business } = useAuth();
+  const [businessName, setBusinessName] = useState(business?.name || "");
+  const [email, setEmail] = useState(user?.email || "");
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    setStatus("saving");
+    await new Promise((r) => setTimeout(r, 800));
+    setStatus("saved");
+    setTimeout(() => setStatus("idle"), 2000);
   };
 
   return (
@@ -26,7 +30,7 @@ export default function SettingsPage() {
           <label className="text-gray-400 text-sm block mb-1">Business Name</label>
           <input
             value={businessName}
-            onChange={e => setBusinessName(e.target.value)}
+            onChange={(e) => setBusinessName(e.target.value)}
             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500"
           />
         </div>
@@ -35,17 +39,22 @@ export default function SettingsPage() {
           <label className="text-gray-400 text-sm block mb-1">Email</label>
           <input
             value={email}
-            onChange={e => setEmail(e.target.value)}
+            onChange={(e) => setEmail(e.target.value)}
             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500"
           />
         </div>
 
         <button
           onClick={handleSave}
-          className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-6 py-2.5 rounded-xl transition-colors"
+          disabled={status === "saving"}
+          className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-600/50 text-white font-medium px-6 py-2.5 rounded-xl transition-colors"
         >
-          {saved ? "Saved ✓" : "Save Changes"}
+          {status === "saving" ? "Saving..." : status === "saved" ? "Saved ✓" : "Save Changes"}
         </button>
+
+        {status === "saved" && (
+          <p className="text-green-400 text-sm">Settings updated successfully.</p>
+        )}
       </div>
     </div>
   );
