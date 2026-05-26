@@ -5,12 +5,12 @@
     "lib": ["ES2020"],
     "declaration": true,
     "outDir": "./dist",
-    "rootDir": "./prisma",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["prisma/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "../apps"]
 }

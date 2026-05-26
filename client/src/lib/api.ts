@@ -388,6 +388,11 @@ const api = {
     updateBulkPermissions: (role: string, permissions: unknown) => fetchApi('/permissions/permissions/bulk', { method: 'POST', body: JSON.stringify({ role_name: role, permissions }) }),
     checkPermission: (role: string, resource: string) => fetchApi(`/permissions/check?role=${role}&resource=${resource}`),
   },
+  admin: {
+    getStats: () => fetchApi('/admin/stats'),
+    getBusinesses: () => fetchApi('/admin/businesses'),
+    updateBusinessStatus: (id: string, status: string) => fetchApi(`/admin/businesses/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  },
   importExport: {
     importData: (resource: string, data: unknown[]) => fetchApi(`/import/import/${resource}`, { method: 'POST', body: JSON.stringify({ data, format: 'json' }) }),
     importCsv: (resource: string, csvContent: string) => fetchApi(`/import/import-csv/${resource}`, { method: 'POST', body: JSON.stringify({ csvContent }) }),

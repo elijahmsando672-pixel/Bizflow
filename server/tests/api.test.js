@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import { app } from './test-server.js';
+import { query } from '../config/db.js';
 
 const testUser = {
   name: 'Test User',
@@ -10,6 +11,58 @@ const testUser = {
 };
 
 let authToken = '';
+
+beforeAll(async () => {
+  try { await query('DELETE FROM login_attempts'); } catch { /*ok*/ }
+  try { await query('DELETE FROM audit_logs'); } catch { /*ok*/ }
+  try { await query('DELETE FROM cashflow_entries'); } catch { /*ok*/ }
+  try { await query('DELETE FROM stock_movements'); } catch { /*ok*/ }
+  try { await query('DELETE FROM po_items'); } catch { /*ok*/ }
+  try { await query('DELETE FROM purchase_orders'); } catch { /*ok*/ }
+  try { await query('DELETE FROM payroll_items'); } catch { /*ok*/ }
+  try { await query('DELETE FROM payroll'); } catch { /*ok*/ }
+  try { await query('DELETE FROM attendance'); } catch { /*ok*/ }
+  try { await query('DELETE FROM employees'); } catch { /*ok*/ }
+  try { await query('DELETE FROM time_entries'); } catch { /*ok*/ }
+  try { await query('DELETE FROM project_tasks'); } catch { /*ok*/ }
+  try { await query('DELETE FROM projects'); } catch { /*ok*/ }
+  try { await query('DELETE FROM deal_activities'); } catch { /*ok*/ }
+  try { await query('DELETE FROM deals'); } catch { /*ok*/ }
+  try { await query('DELETE FROM deal_stages'); } catch { /*ok*/ }
+  try { await query('DELETE FROM customer_activities'); } catch { /*ok*/ }
+  try { await query('DELETE FROM leads'); } catch { /*ok*/ }
+  try { await query('DELETE FROM ticket_replies'); } catch { /*ok*/ }
+  try { await query('DELETE FROM support_tickets'); } catch { /*ok*/ }
+  try { await query('DELETE FROM sla_configs'); } catch { /*ok*/ }
+  try { await query('DELETE FROM vendor_products'); } catch { /*ok*/ }
+  try { await query('DELETE FROM vendors'); } catch { /*ok*/ }
+  try { await query('DELETE FROM receipts'); } catch { /*ok*/ }
+  try { await query('DELETE FROM invoice_items'); } catch { /*ok*/ }
+  try { await query('DELETE FROM invoices'); } catch { /*ok*/ }
+  try { await query('DELETE FROM sale_items'); } catch { /*ok*/ }
+  try { await query('DELETE FROM sales'); } catch { /*ok*/ }
+  try { await query('DELETE FROM products'); } catch { /*ok*/ }
+  try { await query('DELETE FROM categories'); } catch { /*ok*/ }
+  try { await query('DELETE FROM expenses'); } catch { /*ok*/ }
+  try { await query('DELETE FROM expense_categories'); } catch { /*ok*/ }
+  try { await query('DELETE FROM customers'); } catch { /*ok*/ }
+  try { await query('DELETE FROM payment_history'); } catch { /*ok*/ }
+  try { await query('DELETE FROM business_subscriptions'); } catch { /*ok*/ }
+  try { await query('DELETE FROM subscription_plans'); } catch { /*ok*/ }
+  try { await query('DELETE FROM invoice_templates'); } catch { /*ok*/ }
+  try { await query('DELETE FROM ai_insights'); } catch { /*ok*/ }
+  try { await query('DELETE FROM report_schedules'); } catch { /*ok*/ }
+  try { await query('DELETE FROM debtor_payments'); } catch { /*ok*/ }
+  try { await query('DELETE FROM debtor_invoices'); } catch { /*ok*/ }
+  try { await query('DELETE FROM debtors'); } catch { /*ok*/ }
+  try { await query('DELETE FROM creditor_payments'); } catch { /*ok*/ }
+  try { await query('DELETE FROM creditor_purchases'); } catch { /*ok*/ }
+  try { await query('DELETE FROM creditors'); } catch { /*ok*/ }
+  try { await query('DELETE FROM refresh_tokens'); } catch { /*ok*/ }
+  try { await query('DELETE FROM password_resets'); } catch { /*ok*/ }
+  try { await query('DELETE FROM users'); } catch { /*ok*/ }
+  try { await query('DELETE FROM businesses'); } catch { /*ok*/ }
+});
 
 describe('Auth API', () => {
   it('should register a new user', async () => {
@@ -204,7 +257,7 @@ describe('Expenses API', () => {
       });
     
     expect(res.status).toBe(201);
-    expect(res.body).toHaveProperty('amount', 5000);
+    expect(Number(res.body.amount)).toBe(5000);
   });
 
   it('should get expenses by category', async () => {

@@ -61,11 +61,11 @@ router.post('/', async (req, res) => {
 
     const { customer_id, invoice_date, due_date, items, notes, discount_amount = 0 } = req.body;
 
-    const countResult = await client.query(
-      "SELECT COUNT(*) as count FROM invoices WHERE business_id = $1",
+    const maxResult = await client.query(
+      "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM 5) AS INTEGER)), 0) + 1 as next_num FROM invoices WHERE business_id = $1",
       [req.business_id]
     );
-    const invoiceNumber = `INV-${String(parseInt(countResult.rows[0].count) + 1).padStart(5, '0')}`;
+    const invoiceNumber = `INV-${String(parseInt(maxResult.rows[0].next_num)).padStart(5, '0')}`;
 
     // Calculate totals
     let subtotal = 0;
