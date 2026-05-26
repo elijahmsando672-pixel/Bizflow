@@ -1,0 +1,20 @@
+{
+  "name": "@bizflow/ui",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.6.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/react": "^19.0.0",
+    "vitest": "^2.1.0"
+  }
+}

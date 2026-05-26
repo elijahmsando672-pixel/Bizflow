@@ -5,33 +5,22 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
-  ShoppingCart,
-  Users,
-  Package,
-  DollarSign,
-  CreditCard,
   BarChart3,
-  FileText,
-  Bell,
-  Settings,
-  UserPlus,
-  UserCog,
-  HardHat,
-  BadgeDollarSign,
-  Brain,
-  UserCheck,
-  Target,
-  FolderKanban,
-  Ticket,
-  FolderOpen,
-  Truck,
-  Clock,
-  Shield,
+  ShoppingCart,
+  Package,
   Database,
-  ChevronDown,
+  Tags,
+  Users,
+  Star,
+  MessageSquare,
+  CreditCard,
+  Settings,
+  User,
+  LogOut,
+  X,
   type LucideIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useAuth } from "@/lib/auth-context";
 
 interface NavItem {
   name: string;
@@ -46,138 +35,137 @@ interface NavGroup {
 
 const navigation: NavGroup[] = [
   {
-    title: "Sales & CRM",
+    title: "Main",
     items: [
-      { name: "CRM", href: "/crm", icon: Target },
-      { name: "Pipeline", href: "/pipeline", icon: FolderKanban },
-      { name: "Sales", href: "/sales", icon: ShoppingCart },
-      { name: "Debtors", href: "/debtors", icon: BadgeDollarSign },
+      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { name: "Analytics", href: "/analytics", icon: BarChart3 },
+      { name: "Orders", href: "/orders", icon: ShoppingCart },
     ],
   },
   {
-    title: "Operations",
+    title: "Store",
     items: [
-      { name: "Projects", href: "/projects", icon: FolderOpen },
-      { name: "Procurement", href: "/procurement", icon: Truck },
-      { name: "Time Tracking", href: "/timetracking", icon: Clock },
       { name: "Products", href: "/products", icon: Package },
+      { name: "Inventory", href: "/inventory", icon: Database },
+      { name: "Categories", href: "/categories", icon: Tags },
     ],
   },
   {
-    title: "Money",
-    items: [
-      { name: "Expenses", href: "/expenses", icon: DollarSign },
-      { name: "Creditors", href: "/creditors", icon: CreditCard },
-    ],
-  },
-  {
-    title: "Support",
-    items: [
-      { name: "Tickets", href: "/support", icon: Ticket },
-    ],
-  },
-  {
-    title: "People",
+    title: "Customers",
     items: [
       { name: "Customers", href: "/customers", icon: Users },
-      { name: "Users", href: "/users", icon: UserCog },
-      { name: "Team", href: "/team", icon: UserPlus },
-      { name: "Employees", href: "/employees", icon: HardHat },
-    ],
-  },
-  {
-    title: "Insights",
-    items: [
-      { name: "Reports", href: "/reports", icon: BarChart3 },
-      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { name: "AI Insights", href: "/ai", icon: Brain },
+      { name: "Reviews", href: "/reviews", icon: Star },
+      { name: "Messages", href: "/messages", icon: MessageSquare },
     ],
   },
   {
     title: "System",
     items: [
-      { name: "Permissions", href: "/permissions", icon: Shield },
-      { name: "Data Import", href: "/data-import", icon: Database },
-      { name: "Documents", href: "/documents", icon: FileText },
-      { name: "Notifications", href: "/notifications", icon: Bell },
-      { name: "Subscription", href: "/subscription", icon: UserCheck },
+      { name: "Payments", href: "/payments", icon: CreditCard },
       { name: "Settings", href: "/settings", icon: Settings },
+      { name: "Profile", href: "/profile", icon: User },
     ],
   },
 ];
 
 function NavGroupItem({ group, pathname }: { group: NavGroup; pathname: string }) {
-  const [isOpen, setIsOpen] = useState(true);
-
   return (
-    <div className="mb-3">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-      >
+    <div className="mb-1">
+      <div className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
         {group.title}
-        <ChevronDown
-          className={cn(
-            "h-3 w-3 transition-transform",
-            isOpen && "rotate-180"
-          )}
-        />
-      </button>
-      {isOpen && (
-        <div className="mt-1 space-y-0.5 px-2">
-          {group.items.map((item) => {
-            const active = pathname === item.href;
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
+      </div>
+      <div className="space-y-0.5 px-2">
+        {group.items.map((item) => {
+          const active = pathname === item.href || pathname.startsWith(item.href + "/");
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                active
+                  ? "bg-indigo-500/15 text-indigo-400"
+                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+              )}
+            >
+              <span
                 className={cn(
-                  "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                  "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
                   active
-                    ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                    ? "bg-indigo-500/20 text-indigo-400"
+                    : "text-gray-500 group-hover:text-gray-300"
                 )}
               >
-                <span
-                  className={cn(
-                    "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
-                    active
-                      ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400"
-                      : "text-gray-400 group-hover:bg-gray-200 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:bg-gray-700 dark:group-hover:text-gray-300"
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                </span>
-                {item.name}
-              </Link>
-            );
-          })}
-        </div>
-      )}
+                <Icon className="h-4 w-4" />
+              </span>
+              {item.name}
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => void }) {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
 
-  return (
-    <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-      <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-5 dark:border-gray-800">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs font-bold shadow-sm">
-          B
+  const sidebarContent = (
+    <>
+      <div className="flex h-16 items-center justify-between gap-3 border-b border-white/10 px-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs font-bold shadow-sm">
+            B
+          </div>
+          <h1 className="text-lg font-bold text-white">BizFlow</h1>
         </div>
-        <div>
-          <h1 className="text-lg font-bold text-gray-900 dark:text-white">BizFlow</h1>
-          <p className="text-[11px] leading-tight text-gray-500 dark:text-gray-400">Business OS</p>
-        </div>
+        {onClose && (
+          <button onClick={onClose} className="text-gray-400 hover:text-white lg:hidden">
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto py-4">
         {navigation.map((group) => (
           <NavGroupItem key={group.title} group={group} pathname={pathname} />
         ))}
       </div>
-    </aside>
+      <div className="border-t border-white/10 p-4">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-xs font-semibold text-white shadow-sm">
+            {(user?.name || user?.email || "U").charAt(0).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-white truncate">{user?.name || "User"}</p>
+            <p className="text-xs text-gray-400 truncate capitalize">{user?.role || "Unknown"}</p>
+          </div>
+        </div>
+        <button
+          onClick={logout}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-400 hover:bg-white/5 hover:text-gray-200 transition-all"
+        >
+          <LogOut className="h-4 w-4" />
+          Logout
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <>
+      <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-[#0B1020] border-r border-white/10 h-screen">
+        {sidebarContent}
+      </aside>
+      {open && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+          <aside className="fixed left-0 top-0 z-50 flex h-full w-64 flex-col bg-[#0B1020] border-r border-white/10">
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }

@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  phone         String?   @unique
+  passwordHash  String
+  name          String?
+  avatarUrl     String?
+  role          Role      @default(OWNER)
+  businessId    String?
+  business      Business? @relation(fields: [businessId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tasks         Task[]
+  sessions      Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token        String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@map("sessions")
+}
+
+model Business {
+  id            String   @id @default(uuid())
+  name          String
+  type          BusinessType
+  currency      String   @default("USD")
+  timezone      String   @default("UTC")
+  logoUrl       String?
+  settings      Json     @default("{}")
+  
+  users         User[]
+  products      Product[]
+  customers     Customer[]
+  transactions  Transaction[]
+  tasks         Task[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("businesses")
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  name          String
+  description   String?
+  sku           String?  @unique
+  price         Decimal  @db.Decimal(12, 2)
+  cost          Decimal? @db.Decimal(12, 2)
+  stock         Int      @default(0)
+  lowStockAlert Int      @default(10)
+  category      String?
+  isActive      Boolean  @default(true)
+  
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  
+  transactionItems TransactionItem[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("products")
+}
+
+model Customer {
+  id            String   @id @default(uuid())
+  name          String
+  email         String?
+  phone         String?
+  address       String?
+  whatsappId    String?
+  notes         String?
+  tags          String[]
+  metadata      Json     @default("{}")
+  
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  
+  transactions  Transaction[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("customers")
+}
+
+model Transaction {
+  id            String   @id @default(uuid())
+  type          TransactionType
+  amount        Decimal  @db.Decimal(12, 2)
+  description   String?
+  category      String?
+  reference     String?
+  date          DateTime @default(now())
+  
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id])
+  
+  items         TransactionItem[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("transactions")
+}
+
+model TransactionItem {
+  id            String   @id @default(uuid())
+  quantity      Int      @default(1)
+  unitPrice     Decimal  @db.Decimal(12, 2)
+  total         Decimal  @db.Decimal(12, 2)
+  
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  
+  productId     String?
+  product       Product? @relation(fields: [productId], references: [id])
+
+  @@map("transaction_items")
+}
+
+model Task {
+  id            String   @id @default(uuid())
+  title         String
+  description   String?
+  status        TaskStatus @default(TODO)
+  priority      Priority  @default(MEDIUM)
+  dueDate       DateTime?
+  completedAt   DateTime?
+  
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  
+  assignedToId  String?
+  assignedTo    User?    @relation(fields: [assignedToId], references: [id])
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("tasks")
+}
+
+model WhatsAppSession {
+  id            String   @id @default(uuid())
+  businessId    String
+  phoneNumber   String
+  isActive      Boolean  @default(true)
+  lastMessageAt DateTime?
+  
+  metadata      Json     @default("{}")
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("whatsapp_sessions")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum BusinessType {
+  RETAIL
+  SERVICE
+  RESTAURANT
+  CONSULTING
+  ECOMMERCE
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}

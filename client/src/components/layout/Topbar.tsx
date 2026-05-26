@@ -3,11 +3,11 @@
 import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Bell, Search, LogOut, ShoppingCart, Package, User, FileEdit, Sun, Moon, Sparkles } from "lucide-react";
+import { Bell, Search, LogOut, ShoppingCart, Package, User, FileEdit, Sun, Moon, Sparkles, Menu } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-provider";
 
-export function Topbar() {
+export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [open, setOpen] = useState(false);
@@ -31,9 +31,14 @@ export function Topbar() {
   ];
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-gray-200 bg-white/80 px-6 backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/80">
+    <header className="flex h-16 items-center justify-between border-b border-gray-200 bg-white/80 px-4 lg:px-6 backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/80">
       <div className="flex flex-1 items-center gap-3">
-        <div className="relative w-80">
+        {onMenuClick && (
+          <Button variant="ghost" size="icon" className="lg:hidden text-gray-500 dark:text-gray-400" onClick={onMenuClick}>
+            <Menu className="h-5 w-5" />
+          </Button>
+        )}
+        <div className="relative w-full max-w-xs lg:max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
             placeholder="Search anything..."
@@ -41,11 +46,11 @@ export function Topbar() {
           />
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 lg:gap-2">
         <div className="relative" ref={dropdownRef}>
           <Button
             size="sm"
-            className="gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-sm hover:from-indigo-600 hover:to-purple-700"
+            className="gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-sm hover:from-indigo-600 hover:to-purple-700 hidden sm:inline-flex"
             onClick={() => setOpen(!open)}
           >
             <Sparkles className="h-3.5 w-3.5" />
@@ -86,8 +91,8 @@ export function Topbar() {
           <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-indigo-500 ring-2 ring-white dark:ring-gray-900" />
         </Button>
 
-        <div className="ml-2 flex items-center gap-3 border-l border-gray-200 pl-3 dark:border-gray-700">
-          <div className="flex flex-col items-end">
+        <div className="ml-1 lg:ml-2 flex items-center gap-2 lg:gap-3 border-l border-gray-200 pl-2 lg:pl-3 dark:border-gray-700">
+          <div className="hidden lg:flex flex-col items-end">
             <span className="text-sm font-medium text-gray-900 dark:text-white">{user?.name || user?.email}</span>
             <span className="text-xs capitalize text-gray-500 dark:text-gray-400">{user?.role}</span>
           </div>
