@@ -118,6 +118,10 @@ export const login = async (req, res) => {
     if (result.rows.length === 0) { await recordLoginAttempt(email, ip, false); return res.status(401).json({ error: 'Invalid credentials' }); }
 
     const user = result.rows[0];
+    if (!user.password) {
+      await recordLoginAttempt(email, ip, false);
+      return res.status(401).json({ error: 'This account uses Google/Apple sign-in. Please sign in with the appropriate method.' });
+    }
     const valid = await verifyPassword(password, user.password);
     if (!valid) {
       await recordLoginAttempt(email, ip, false);

@@ -27,6 +27,7 @@ import timetrackingRoutes from './routes/timetracking.js';
 import permissionsRoutes from './routes/permissions.js';
 import importExportRoutes from './routes/importExport.js';
 import userRoutes from './routes/users.js';
+import oauthRoutes from './routes/oauth.js';
 import { protect } from './middleware/protect.js';
 import { requirePermission } from './middleware/rbac.js';
 
@@ -117,6 +118,7 @@ import { sanitizeInput } from './middleware/security.js';
 app.use('/api', sanitizeInput);
 
 import { globalRateLimiter, userRateLimiter, authRateLimiter, passwordResetRateLimiter, refreshTokenRateLimiter } from './middleware/security.js';
+import { passport } from './config/oauth.js';
 app.use('/api/health', (req, res, next) => next());
 app.use('/api/auth/refresh-token', refreshTokenRateLimiter);
 app.use(globalRateLimiter);
@@ -153,6 +155,10 @@ app.use('/api/permissions', protect, permissionsRoutes);
 app.use('/api/import', protect, express.json({ limit: '10mb' }), importExportRoutes);
 app.use('/api/export', protect, importExportRoutes);
 app.use('/api/users', protect, requirePermission, userRoutes);
+
+// OAuth routes (no auth middleware — passport handles it)
+app.use(passport.initialize());
+app.use('/auth', oauthRoutes);
 
 // Auth routes (no CSRF, have their own protections)
 app.use('/api/auth', authRoutes);

@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sun, Moon, Eye, EyeOff, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 import { useTheme } from "@/lib/theme-provider";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const BASE_URL = API_URL.replace(/\/api$/, "").replace(/\/$/, "");
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -17,6 +20,12 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const { login } = useAuth();
   const { theme, toggleTheme } = useTheme();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get("error");
+    if (err) setError({ google_auth_failed: "Google sign-in failed. Please try again.", apple_auth_failed: "Apple sign-in failed. Please try again.", server_error: "Something went wrong. Please try again.", invalid_callback_data: "Invalid sign-in data received.", missing_params: "Missing sign-in parameters." }[err] || "Sign-in failed. Please try again.");
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -222,6 +231,7 @@ export default function LoginPage() {
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <button
                   type="button"
+                  onClick={() => window.location.href = `${BASE_URL}/auth/google`}
                   className="flex h-11 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                 >
                   <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -234,6 +244,7 @@ export default function LoginPage() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => window.location.href = `${BASE_URL}/auth/apple`}
                   className="flex h-11 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                 >
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">

@@ -101,11 +101,21 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
       business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
       name VARCHAR(255) NOT NULL,
       email VARCHAR(255) UNIQUE NOT NULL,
-      password VARCHAR(255) NOT NULL,
+      password VARCHAR(255),
       role VARCHAR(20) DEFAULT 'staff',
       is_active BOOLEAN DEFAULT true,
       last_login TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS social_accounts (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      provider VARCHAR(50) NOT NULL,
+      provider_id VARCHAR(255) NOT NULL,
+      email VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(provider, provider_id)
     );
 
     -- ========================================
