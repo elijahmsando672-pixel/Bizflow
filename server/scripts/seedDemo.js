@@ -116,10 +116,16 @@ async function seedDemo() {
     // 3. Expense Categories
     const expCats = ['Office Supplies', 'Utilities', 'Transport', 'Marketing', 'Software Subscriptions', 'Rent'];
     for (const cat of expCats) {
-      await query(
-        `INSERT INTO expense_categories (business_id, name, description) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
-        [BUSINESS_ID, cat, `Expenses for ${cat.toLowerCase()}`]
+      const existing = await query(
+        `SELECT id FROM expense_categories WHERE business_id = $1 AND name = $2 LIMIT 1`,
+        [BUSINESS_ID, cat]
       );
+      if (existing.rows.length === 0) {
+        await query(
+          `INSERT INTO expense_categories (business_id, name, description) VALUES ($1,$2,$3)`,
+          [BUSINESS_ID, cat, `Expenses for ${cat.toLowerCase()}`]
+        );
+      }
     }
     console.log(`✅ ${expCats.length} expense categories`);
 

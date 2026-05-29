@@ -208,7 +208,7 @@ export const resetPassword = async (req, res) => {
     const { token, password } = req.body;
     if (!token || !password) return res.status(400).json({ error: 'Token and new password are required' });
 
-    const result = await query(`SELECT * FROM password_resets WHERE expires_at > NOW() AND used = false ORDER BY created_at DESC`, []);
+    const result = await query(`SELECT * FROM password_resets WHERE expires_at > NOW() AND used = false ORDER BY created_at DESC LIMIT 1`, []);
     let resetRecord = null;
     for (const record of result.rows) {
       if (await verifyPassword(token, record.token)) { resetRecord = record; break; }
@@ -247,11 +247,11 @@ export const refreshToken = async (req, res) => {
     if (result.rows.length === 0) { res.clearCookie('refreshToken', { path: '/api/auth' }); return res.status(401).json({ error: 'Invalid or expired refresh token' }); }
 
     const oldTokenRecord = result.rows[0];
-    await query('DELETE FROM refresh_tokens WHERE id = $1', [oldTokenRecord.id]);
 
     const newRefreshToken = generateRefreshToken();
     const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [oldTokenRecord.user_id, newRefreshToken, refreshExpiresAt]);
+    await query('DELETE FROM refresh_tokens WHERE id = $1', [oldTokenRecord.id]);
 
     const userForToken = { id: oldTokenRecord.user_id, email: oldTokenRecord.email, business_id: oldTokenRecord.business_id, role: oldTokenRecord.role };
     const accessToken = generateToken(userForToken);

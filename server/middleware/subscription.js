@@ -10,7 +10,7 @@ const FREE_ROUTES = [
 ];
 
 export const requireSubscription = async (req, res, next) => {
-  const path = req.baseUrl || req.path;
+  const path = req.originalUrl;
   if (FREE_ROUTES.some((route) => path.startsWith(route))) {
     return next();
   }

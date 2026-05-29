@@ -62,12 +62,12 @@ router.get('/insights', async (req, res) => {
 
     const prompt = `Analyze this business data and provide actionable insights. Keep it concise and practical.
     
-Revenue (30 days): $${data.revenue.current} (change: ${data.revenue.change}%)
-Expenses (30 days): $${data.expenses}
-Profit: $${data.profit}
+Revenue (30 days): KES ${data.revenue.current} (change: ${data.revenue.change}%)
+Expenses (30 days): KES ${data.expenses}
+Profit: KES ${data.profit}
 New Customers: ${data.newCustomers}
 Low Stock Items: ${data.lowStockProducts}
-Top Products: ${data.topProducts.map(p => `${p.name} (${p.qty_sold} sold, $${parseFloat(p.revenue)})`).join(', ')}
+Top Products: ${data.topProducts.map(p => `${p.name} (${p.qty_sold} sold, KES ${parseFloat(p.revenue)})`).join(', ')}
 
 Provide:
 1. A brief summary (2-3 sentences)
@@ -160,9 +160,9 @@ function generateFallbackInsights(data) {
   const insights = [];
   
   if (data.profit > 0) {
-    insights.push(`Good news: Your business is profitable with $${data.profit.toFixed(2)} in net profit this month.`);
+    insights.push(`Good news: Your business is profitable with KES ${data.profit.toFixed(2)} in net profit this month.`);
   } else {
-    insights.push(`Warning: Expenses ($${data.expenses.toFixed(2)}) exceed revenue ($${data.revenue.current.toFixed(2)}). Review costs immediately.`);
+    insights.push(`Warning: Expenses (KES ${data.expenses.toFixed(2)}) exceed revenue (KES ${data.revenue.current.toFixed(2)}). Review costs immediately.`);
   }
   
   if (parseFloat(data.revenue.change) > 0) {

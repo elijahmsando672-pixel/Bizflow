@@ -167,7 +167,7 @@ interface SaleData {
 
 interface InvoiceData {
   customer_id: string;
-  items: Array<{ description: string; quantity: number; price: number }>;
+  items: Array<{ product_name: string; qty: number; unit_price: number; product_id?: string; discount?: number }>;
   total: number;
   due_date?: string;
 }

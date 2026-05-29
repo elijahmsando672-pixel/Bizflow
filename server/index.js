@@ -30,6 +30,7 @@ import importExportRoutes from './routes/importExport.js';
 import userRoutes from './routes/users.js';
 import { protect } from './middleware/protect.js';
 import { requirePermission } from './middleware/rbac.js';
+import { requireSubscription, seedDefaultPlans } from './middleware/subscription.js';
 
 dotenv.config();
 
@@ -131,6 +132,9 @@ app.use(['/api/auth/forgot-password', '/api/auth/reset-password'], passwordReset
 // Per-user rate limiting for authenticated API routes
 app.use('/api', userRateLimiter(120, 15 * 60 * 1000));
 
+// Apply subscription check to all protected API routes
+app.use('/api', requireSubscription);
+
 // Protected resource routes - authenticate + CSRF + RBAC validation
 app.use('/api/customers', protect, requirePermission, customerRoutes);
 app.use('/api/products', protect, requirePermission, productRoutes);
@@ -206,10 +210,6 @@ Scope: All our services and infrastructure
 
 // Error handlers
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
-import { requireSubscription, seedDefaultPlans } from './middleware/subscription.js';
-
-// Apply subscription check to all protected API routes
-app.use('/api', requireSubscription);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

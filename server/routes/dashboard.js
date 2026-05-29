@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
     );
     
     const pendingPayments = await query(
-      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status = 'draft'`,
+      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status = 'pending'`,
       [businessId]
     );
     
