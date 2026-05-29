@@ -47,8 +47,6 @@ beforeAll(async () => {
   try { await query('DELETE FROM expense_categories'); } catch { /*ok*/ }
   try { await query('DELETE FROM customers'); } catch { /*ok*/ }
   try { await query('DELETE FROM payment_history'); } catch { /*ok*/ }
-  try { await query('DELETE FROM business_subscriptions'); } catch { /*ok*/ }
-  try { await query('DELETE FROM subscription_plans'); } catch { /*ok*/ }
   try { await query('DELETE FROM invoice_templates'); } catch { /*ok*/ }
   try { await query('DELETE FROM ai_insights'); } catch { /*ok*/ }
   try { await query('DELETE FROM report_schedules'); } catch { /*ok*/ }

@@ -14,7 +14,6 @@ import notificationRoutes from './routes/notifications.js';
 import adminRoutes from './routes/admin.js';
 import teamRoutes from './routes/team.js';
 import employeeRoutes from './routes/employees.js';
-import subscriptionRoutes from './routes/subscriptions.js';
 import debtorRoutes from './routes/debtors.js';
 import creditorRoutes from './routes/creditors.js';
 import reportRoutes from './routes/reports.js';
@@ -30,7 +29,7 @@ import importExportRoutes from './routes/importExport.js';
 import userRoutes from './routes/users.js';
 import { protect } from './middleware/protect.js';
 import { requirePermission } from './middleware/rbac.js';
-import { requireSubscription, seedDefaultPlans } from './middleware/subscription.js';
+
 
 dotenv.config();
 
@@ -132,9 +131,6 @@ app.use(['/api/auth/forgot-password', '/api/auth/reset-password'], passwordReset
 // Per-user rate limiting for authenticated API routes
 app.use('/api', userRateLimiter(120, 15 * 60 * 1000));
 
-// Apply subscription check to all protected API routes
-app.use('/api', requireSubscription);
-
 // Protected resource routes - authenticate + CSRF + RBAC validation
 app.use('/api/customers', protect, requirePermission, customerRoutes);
 app.use('/api/products', protect, requirePermission, productRoutes);
@@ -146,7 +142,6 @@ app.use('/api/notifications', protect, notificationRoutes);
 app.use('/api/admin', protect, adminRoutes);
 app.use('/api/team', protect, requirePermission, teamRoutes);
 app.use('/api/employees', protect, requirePermission, employeeRoutes);
-app.use('/api/subscriptions', protect, subscriptionRoutes);
 app.use('/api/debtors', protect, debtorRoutes);
 app.use('/api/creditors', protect, requirePermission, creditorRoutes);
 app.use('/api/reports', protect, requirePermission, reportRoutes);
@@ -232,7 +227,6 @@ const startServer = async () => {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       await initDatabase();
-      await seedDefaultPlans();
       console.log('Database ready');
       return;
     } catch (error) {

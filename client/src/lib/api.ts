@@ -280,14 +280,6 @@ const api = {
     createPayroll: (data: unknown) => fetchApi('/employees/payroll', { method: 'POST', body: JSON.stringify(data) }),
     updatePayroll: (id: string, data: unknown) => fetchApi(`/employees/payroll/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   },
-  subscriptions: {
-    getPlans: () => fetchApi('/subscriptions/plans'),
-    getCurrent: () => fetchApi('/subscriptions/current'),
-    activate: (planId: string) => fetchApi('/subscriptions/activate', { method: 'POST', body: JSON.stringify({ plan_id: planId }) }),
-    cancel: () => fetchApi('/subscriptions/cancel', { method: 'POST' }),
-    getPayments: () => fetchApi('/subscriptions/payments'),
-    recordPayment: (data: unknown) => fetchApi('/subscriptions/payments/record', { method: 'POST', body: JSON.stringify(data) }),
-  },
   creditors: {
     getAll: () => fetchApi('/creditors'),
     create: (data: unknown) => fetchApi('/creditors', { method: 'POST', body: JSON.stringify(data) }),

@@ -539,51 +539,14 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
     );
 
     -- ========================================
-    -- FEATURE 5: Subscription / Billing Module
+    -- FEATURE 5: (reserved)
     -- ========================================
-
-    CREATE TABLE IF NOT EXISTS subscription_plans (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      name VARCHAR(100) NOT NULL,
-      description TEXT,
-      price DECIMAL(10,2) NOT NULL,
-      currency VARCHAR(10) DEFAULT 'USD',
-      billing_cycle VARCHAR(20) DEFAULT 'monthly',
-      max_users INTEGER DEFAULT 5,
-      max_products INTEGER,
-      features JSONB DEFAULT '[]',
-      is_active BOOLEAN DEFAULT true,
-      trial_days INTEGER DEFAULT 14,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS business_subscriptions (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
-      plan_id UUID REFERENCES subscription_plans(id),
-      status VARCHAR(20) DEFAULT 'trial',
-      start_date DATE DEFAULT CURRENT_DATE,
-      current_period_start DATE,
-      current_period_end DATE,
-      trial_ends_at TIMESTAMP,
-      cancelled_at TIMESTAMP,
-      cancelled_by UUID REFERENCES users(id),
-      stripe_customer_id VARCHAR(255),
-      stripe_subscription_id VARCHAR(255),
-      last_payment_date DATE,
-      next_billing_date DATE,
-      amount DECIMAL(10,2),
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_business_subscriptions ON business_subscriptions(business_id);
 
     CREATE TABLE IF NOT EXISTS payment_history (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
-      subscription_id UUID REFERENCES business_subscriptions(id),
       amount DECIMAL(10,2) NOT NULL,
-      currency VARCHAR(10) DEFAULT 'USD',
+      currency VARCHAR(10) DEFAULT 'KES',
       status VARCHAR(20) DEFAULT 'pending',
       payment_method VARCHAR(50),
       transaction_id VARCHAR(255),

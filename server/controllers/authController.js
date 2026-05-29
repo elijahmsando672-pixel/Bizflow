@@ -86,9 +86,6 @@ export const register = async (req, res) => {
     await query(`INSERT INTO expense_categories (business_id, name) VALUES ($1, 'Rent'), ($1, 'Utilities'), ($1, 'Salaries'), ($1, 'Supplies'), ($1, 'Marketing'), ($1, 'Transport'), ($1, 'Other')`, [business_id]);
     await recordLoginAttempt(email, req.ip, true);
 
-    const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await query(`INSERT INTO business_subscriptions (business_id, status, start_date, trial_ends_at, amount) VALUES ($1, 'trial', CURRENT_DATE, $2, 0)`, [business_id, trialEndsAt]);
-
     sendWelcomeEmail(email, { name: user.name, business_name }).catch(console.error);
     setRefreshCookie(res, refreshToken);
     setCsrfCookie(req, res);
@@ -96,7 +93,6 @@ export const register = async (req, res) => {
     res.status(201).json({
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
       business: { id: business_id, name: business_name },
-      subscription: { status: 'trial', trial_ends_at: trialEndsAt.toISOString() },
       token,
     });
   } catch (err) {
@@ -140,12 +136,9 @@ export const login = async (req, res) => {
     setRefreshCookie(res, refreshToken);
     setCsrfCookie(req, res);
 
-    const subResult = await query(`SELECT status, trial_ends_at FROM business_subscriptions WHERE business_id = $1 ORDER BY created_at DESC LIMIT 1`, [userData.business_id]);
-
     res.json({
       user: { id: userData.id, name: userData.name, email: userData.email, role: userData.role },
       business: { id: userData.business_id, name: userData.business_name },
-      subscription: subResult.rows[0] || { status: 'trial' },
       token,
     });
   } catch (err) {
