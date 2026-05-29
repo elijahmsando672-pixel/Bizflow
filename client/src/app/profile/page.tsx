@@ -12,13 +12,13 @@ import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
 export default function ProfilePage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState({ name: "", email: "" });
   const [passwordForm, setPasswordForm] = useState({ current: "", new: "", confirm: "" });
-  const [passwordDialog, setPasswordDialog] = useState(false);
+  const [, setPasswordDialog] = useState(false);
 
   const loadProfile = useCallback(async () => {
     try {

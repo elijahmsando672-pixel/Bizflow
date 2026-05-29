@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, ShoppingCart, Package, Users, X, LayoutDashboard, TrendingUp, CreditCard, Settings, LogOut } from "lucide-react";
+import { BarChart3, ShoppingCart, Package, Users, X, TrendingUp, CreditCard, Settings, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";

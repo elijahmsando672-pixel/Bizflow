@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, MessageSquare, Mail, Phone, Tag, Inbox, Send, CheckCircle, Archive } from "lucide-react";
+import { Search, MessageSquare, Mail, Phone, Inbox, Send, CheckCircle, Archive } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -35,7 +35,7 @@ export default function MessagesPage() {
     return matchSearch && matchFilter;
   });
 
-  const selectedMessage = mockMessages.find((m) => m.id === selected);
+
 
   return (
     <div className="space-y-6">
