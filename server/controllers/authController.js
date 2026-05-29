@@ -24,19 +24,21 @@ const loginSchema = Joi.object({
   password: Joi.string().min(1).required(),
 });
 
+// bruteforce check — 5 failed attempts = 15min lockout
 const isLocked = async (email, ip) => {
   const cutoff = new Date(Date.now() - ATTEMPT_WINDOW_MS);
   const result = await query(
     `SELECT COUNT(*) as failed_count FROM login_attempts WHERE email = $1 AND ip_address = $2 AND success = false AND attempted_at > $3`,
     [email, ip, cutoff]
   );
-  return result.rows[0].failed_count >= MAX_LOGIN_ATTEMPTS;
+  return parseInt(result.rows[0].failed_count) >= MAX_LOGIN_ATTEMPTS;
 };
 
 const recordLoginAttempt = async (email, ip, success) => {
   await query('INSERT INTO login_attempts (email, ip_address, success) VALUES ($1, $2, $3)', [email, ip, success]);
 };
 
+// short-lived access token, refresh via /auth/refresh-token
 const generateToken = (user) => {
   return jwt.sign(
     { id: user.id, email: user.email, business_id: user.business_id, role: user.role },
@@ -62,6 +64,7 @@ export const register = async (req, res) => {
     if (error) return res.status(400).json({ error: error.details[0].message });
 
     const { name, email, password, business_name, phone } = value;
+    // don't reveal if email exists — just say "invalid"
     const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) return res.status(400).json({ error: 'Invalid registration details' });
 
@@ -201,6 +204,7 @@ export const resetPassword = async (req, res) => {
     const { token, password } = req.body;
     if (!token || !password) return res.status(400).json({ error: 'Token and new password are required' });
 
+    // tokens are hashed in the DB, so we scan recent ones and verify each
     const result = await query(`SELECT * FROM password_resets WHERE expires_at > NOW() AND used = false ORDER BY created_at DESC LIMIT 1`, []);
     let resetRecord = null;
     for (const record of result.rows) {

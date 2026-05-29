@@ -45,15 +45,13 @@ if (!process.env.DATABASE_URL) {
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Hide Express identifier
 app.disable('x-powered-by');
 
-// Set to 1 if behind one proxy (nginx, Heroku, etc.)
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 
-// HTTPS redirect in production (when behind proxy, X-Forwarded-Proto indicates original protocol)
+// https redirect for prod — trust proxy needs to be on for this
 if (process.env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
     const forwardedProto = req.headers['x-forwarded-proto'];
@@ -67,7 +65,7 @@ if (process.env.NODE_ENV === 'production') {
 
 app.use(cookieParser());
 
-// CORS configuration
+// CORS — keep this in sync with the frontend URL in .env
 const allowedOrigins = [
   ...(process.env.CORS_ORIGINS?.split(',').filter(Boolean) || [
     'http://localhost:3000',
@@ -114,24 +112,23 @@ app.use(express.urlencoded({
   parameterLimit: 500,
 }));
 
-// Input sanitization (applied before any route handler)
+// sanitize all /api inputs
 import { sanitizeInput } from './middleware/security.js';
 app.use('/api', sanitizeInput);
 
-// Global rate limiter (skip health and auth)
 import { globalRateLimiter, userRateLimiter, authRateLimiter, passwordResetRateLimiter, refreshTokenRateLimiter } from './middleware/security.js';
 app.use('/api/health', (req, res, next) => next());
 app.use('/api/auth/refresh-token', refreshTokenRateLimiter);
 app.use(globalRateLimiter);
 
-// Apply stricter rate limiting to auth endpoints
+// login/register get hammered, limit them harder
 app.use(['/api/auth/login', '/api/auth/register'], authRateLimiter);
 app.use(['/api/auth/forgot-password', '/api/auth/reset-password'], passwordResetRateLimiter);
 
-// Per-user rate limiting for authenticated API routes
+// per-user rate limit — 120 req / 15min
 app.use('/api', userRateLimiter(120, 15 * 60 * 1000));
 
-// Protected resource routes - authenticate + CSRF + RBAC validation
+// all protected routes need auth + permission checks
 app.use('/api/customers', protect, requirePermission, customerRoutes);
 app.use('/api/products', protect, requirePermission, productRoutes);
 app.use('/api/invoices', protect, requirePermission, invoiceRoutes);
@@ -210,19 +207,17 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 const startServer = async () => {
-  // Start listening immediately so Render/Vercel health checks pass right away
+  // listen first so health checks pass immediately (render needs this)
   const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`CORS: ${allowedOrigins.join(', ')}`);
-    console.log('Security: CSRF, rate limiting, HSTS (prod)');
   });
 
-  // Server timeouts to prevent slowloris attacks
   server.timeout = 30000;
   server.keepAliveTimeout = 65000;
   server.headersTimeout = 35000;
 
-  // Initialize DB asynchronously after listening (with retries)
+  // TODO: maybe move DB init to before listen? kept failing in CI so we retry here
   const maxRetries = 10;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {

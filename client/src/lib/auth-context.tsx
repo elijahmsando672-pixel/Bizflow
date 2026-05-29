@@ -28,6 +28,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// quick & dirty jwt decode — just need the expiration
 function decodeJWT(token: string): { exp: number } | null {
   try {
     const payload = token.split('.')[1];

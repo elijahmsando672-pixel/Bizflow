@@ -7,6 +7,7 @@ router.get('/', async (req, res) => {
   try {
     const businessId = req.business_id;
     
+    // --- summary cards ---
     const totalCustomers = await query(
       'SELECT COUNT(*) as count FROM customers WHERE business_id = $1',
       [businessId]
@@ -17,6 +18,7 @@ router.get('/', async (req, res) => {
       [businessId]
     );
     
+    // TODO: also include invoices that are due but not paid
     const pendingPayments = await query(
       `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status = 'pending'`,
       [businessId]
