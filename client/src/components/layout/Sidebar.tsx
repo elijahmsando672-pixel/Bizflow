@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -119,8 +120,8 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
     <>
       <div className="flex h-16 items-center justify-between gap-3 border-b border-white/10 px-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs font-bold shadow-sm">
-            B
+          <div className="relative h-9 w-9">
+            <Image src="/logo.png" alt="BizFlow" fill className="object-contain" />
           </div>
           <h1 className="text-lg font-bold text-white">BizFlow</h1>
         </div>
