@@ -121,7 +121,7 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
       <div className="flex h-16 items-center justify-between gap-3 border-b border-white/10 px-5">
         <div className="flex items-center gap-3">
           <div className="relative h-10 w-10">
-            <Image src="/logo.png" alt="BizFlow" fill className="object-contain" />
+            <Image src="/logo.png" alt="BizFlow" fill sizes="40px" className="object-contain" />
           </div>
           <h1 className="text-lg font-bold text-white">BizFlow</h1>
         </div>
