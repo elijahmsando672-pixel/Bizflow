@@ -186,7 +186,7 @@ export default function AnalyticsPage() {
                     <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `KES ${(v / 1000).toFixed(0)}k`} />
                     <Tooltip
                       contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 13 }}
-                      formatter={(value: number) => [`KES ${Number(value).toLocaleString()}`, "Revenue"]}
+                      formatter={(value) => [`KES ${Number(value).toLocaleString()}`, "Revenue"]}
                     />
                     <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={2} fill="url(#revenueGrad)" />
                   </AreaChart>
@@ -212,7 +212,7 @@ export default function AnalyticsPage() {
                         </Pie>
                         <Tooltip
                           contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 13 }}
-                          formatter={(value: number) => [`KES ${Number(value).toLocaleString()}`, "Total"]}
+                          formatter={(value) => [`KES ${Number(value).toLocaleString()}`, "Total"]}
                         />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
                       </PieChart>
@@ -236,7 +236,7 @@ export default function AnalyticsPage() {
                         <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={120} />
                         <Tooltip
                           contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 13 }}
-                          formatter={(value: number) => [value.toLocaleString(), "Sold"]}
+                          formatter={(value) => [Number(value).toLocaleString(), "Sold"]}
                         />
                         <Bar dataKey="total_sold" fill="#6366f1" radius={[0, 4, 4, 0]} />
                       </BarChart>
