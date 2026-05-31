@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshAccessToken = useCallback(async () => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/refresh-token`,
+        `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/refresh-token`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -89,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(JSON.parse(savedUser));
       setBusiness(JSON.parse(savedBusiness));
       fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/csrf-token`,
+        `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/csrf-token`,
         { method: "GET", credentials: 'include' }
       ).catch(() => {});
       setIsLoading(false);
@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshAccessToken().then((success) => {
         if (success) {
           fetch(
-            `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/csrf-token`,
+            `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/csrf-token`,
             { method: "GET", credentials: 'include' }
           ).catch(() => {});
         }
@@ -131,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/login`,
+      `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/login`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -159,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (name: string, email: string, password: string, businessName: string, phone?: string) => {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/register`,
+      `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/register`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -187,7 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/logout`,
+        `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/logout`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -211,7 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user.role === 'owner' || user.role === 'admin') return true;
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/permissions/check?role=${user.role}&resource=${resource}`,
+        `${process.env.NEXT_PUBLIC_API_URL || "/api"}/permissions/check?role=${user.role}&resource=${resource}`,
         { method: "GET", credentials: 'include' }
       );
       if (!response.ok) return false;

@@ -75,6 +75,7 @@ const allowedOrigins = [
     'http://127.0.0.1:5173',
   ]),
   ...(process.env.APP_URL ? [process.env.APP_URL.replace(/\/+$/, '')] : []),
+  ...(process.env.NEXT_PUBLIC_API_URL ? [new URL(process.env.NEXT_PUBLIC_API_URL).origin] : []),
 ];
 
 app.use(cors({
@@ -82,6 +83,19 @@ app.use(cors({
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
+    } else if (process.env.NODE_ENV === 'production') {
+      // In production, accept any origin that matches the APP_URL pattern
+      // and log unknown origins for debugging without blocking
+      if (process.env.CORS_ALLOW_ALL === 'true') {
+        return callback(null, true);
+      }
+      // Also accept origins that start with known patterns (Vercel preview URLs etc.)
+      const appUrl = (process.env.APP_URL || '').replace(/\/+$/, '');
+      if (appUrl && origin.startsWith(new URL(appUrl).origin)) {
+        return callback(null, true);
+      }
+      console.warn(`Blocked CORS request from unknown origin: ${origin}. Allowed: ${allowedOrigins.join(', ')}`);
+      callback(new Error('Not allowed by CORS'));
     } else {
       console.warn(`Blocked CORS request from origin: ${origin}. Allowed: ${allowedOrigins.join(', ')}`);
       callback(new Error('Not allowed by CORS'));

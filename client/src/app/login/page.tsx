@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Sun, Moon, Eye, EyeOff, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 import { useTheme } from "@/lib/theme-provider";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 const BASE_URL = API_URL.replace(/\/api$/, "").replace(/\/$/, "");
 
 export default function LoginPage() {
@@ -35,7 +35,12 @@ export default function LoginPage() {
     try {
       await login(email, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      const msg = err instanceof Error ? err.message : "Login failed";
+      if (msg === "Failed to fetch" || msg.includes("fetch") || msg.includes("NetworkError") || msg.includes("Network")) {
+        setError("Unable to reach server. Check your internet connection or the API URL may be misconfigured.");
+      } else {
+        setError(msg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -48,7 +53,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/forgot-password`,
+        `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/forgot-password`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

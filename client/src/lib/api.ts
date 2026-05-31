@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 class ApiError extends Error {
   status: number;
@@ -40,7 +40,7 @@ async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<u
   if (response.status === 403 && isStateChanging) {
     try {
       const csrfResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/csrf-token`,
+        `${API_BASE_URL}/auth/csrf-token`,
         { method: 'GET', credentials: 'include' }
       );
       if (csrfResponse.ok) {
@@ -65,7 +65,7 @@ async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<u
   if (response.status === 401) {
     try {
       const refreshResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/refresh-token`,
+        `${API_BASE_URL}/auth/refresh-token`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
