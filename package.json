@@ -7,7 +7,7 @@
     "dev": "npm --prefix client run dev",
     "server": "node server/index.js",
     "dev:all": "concurrently \"npm --prefix client run dev\" \"npm run server\"",
-    "build": "npm --prefix client run build",
+    "build": "cd client && npm install && npm run build",
     "start": "npm --prefix client run start",
     "lint": "npm --prefix client run lint",
     "validate": "node scripts/validate-endpoints.js",
