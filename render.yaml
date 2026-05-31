@@ -34,9 +34,11 @@ services:
           name: bizflow-db
           property: password
       - key: CORS_ORIGINS
-        sync: false
+        value: https://bizflow.vercel.app
       - key: APP_URL
-        sync: false
+        value: https://bizflow.vercel.app
+      - key: BUSINESS_NAME
+        value: BizFlow
 
 databases:
   - name: bizflow-db
