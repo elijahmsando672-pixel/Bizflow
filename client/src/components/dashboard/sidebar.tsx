@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import { motion, AnimatePresence } from "framer-motion";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
@@ -22,12 +23,12 @@ export function DashboardSidebar({ open, onClose }: { open?: boolean; onClose?: 
 
   const sidebarContent = (
     <>
-      <div className="flex items-center justify-between mb-10">
-        <h1 className="text-2xl font-bold text-white">
-          Biz<span className="text-blue-500">Flow</span>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-xl font-bold text-foreground">
+          Biz<span className="text-primary">Flow</span>
         </h1>
         {onClose && (
-          <button onClick={onClose} className="text-gray-400 hover:text-white lg:hidden">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground lg:hidden">
             <X className="h-5 w-5" />
           </button>
         )}
@@ -41,10 +42,10 @@ export function DashboardSidebar({ open, onClose }: { open?: boolean; onClose?: 
               href={href}
               onClick={onClose}
               className={cn(
-                "flex items-center gap-3 w-full px-4 py-3 rounded-xl transition text-sm font-medium",
+                "flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all duration-200 text-sm font-medium",
                 active
-                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
               )}
             >
               <Icon size={18} />
@@ -53,26 +54,26 @@ export function DashboardSidebar({ open, onClose }: { open?: boolean; onClose?: 
           );
         })}
       </nav>
-      <div className="mt-auto">
-        <div className="bg-blue-500/10 rounded-2xl p-4 border border-blue-500/20 mb-4">
-          <p className="text-sm text-gray-300">
+      <div className="mt-auto pt-4 border-t border-border">
+        <div className="bg-primary/10 rounded-xl p-4 border border-primary/20 mb-4">
+          <p className="text-sm text-muted-foreground">
             Upgrade to Pro for AI analytics and automation tools.
           </p>
-          <button className="mt-4 w-full bg-blue-600 hover:bg-blue-700 transition rounded-xl py-2 text-sm font-medium text-white">
+          <button className="mt-3 w-full bg-primary text-primary-foreground hover:opacity-90 transition rounded-xl py-2 text-sm font-medium shadow-sm">
             Upgrade
           </button>
         </div>
-        <div className="flex items-center gap-3 mb-3 px-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-xs font-semibold text-white shadow-sm">
+        <div className="flex items-center gap-3 mb-3 px-1">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground shadow-sm">
             {(user?.name || user?.email || "U").charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">{user?.name || "User"}</p>
+            <p className="text-sm font-medium text-foreground truncate">{user?.name || "User"}</p>
           </div>
         </div>
         <button
           onClick={logout}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-400 hover:bg-white/5 hover:text-gray-200 transition-all"
+          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-muted-foreground hover:bg-white/[0.04] hover:text-foreground transition-all duration-200"
         >
           <LogOut className="h-4 w-4" />
           Logout
@@ -83,17 +84,32 @@ export function DashboardSidebar({ open, onClose }: { open?: boolean; onClose?: 
 
   return (
     <>
-      <aside className="hidden lg:flex lg:flex-col w-72 bg-[#121A2B] border-r border-white/10 p-6">
+      <aside className="hidden lg:flex lg:flex-col w-64 bg-sidebar border-r border-border p-5">
         {sidebarContent}
       </aside>
-      {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-          <aside className="fixed left-0 top-0 z-50 flex h-full w-72 flex-col bg-[#121A2B] border-r border-white/10 p-6">
-            {sidebarContent}
-          </aside>
-        </div>
-      )}
+      <AnimatePresence>
+        {open && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={onClose}
+            />
+            <motion.aside
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed left-0 top-0 z-50 flex h-full w-64 flex-col bg-sidebar border-r border-border p-5 shadow-dropdown"
+            >
+              {sidebarContent}
+            </motion.aside>
+          </div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

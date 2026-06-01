@@ -104,8 +104,12 @@ temp/
 *.sqlite
 *.sqlite3
 
+# Core dumps
+core.*
+
 # Webdev artifacts (checkpoint zips, migrations, etc.)
 .webdev/
 
 # Manus version file (auto-generated, not part of source)
 client/public/__manus__/version.json
+.vercel

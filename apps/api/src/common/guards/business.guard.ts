@@ -32,6 +32,27 @@ export class BusinessGuard implements CanActivate {
       return false;
     }
 
+    if (!businessId) {
+      const userRecord = await this.prisma.user.findUnique({
+        where: { id: user.id },
+        include: { business: true },
+      });
+      if (userRecord?.business) {
+        request.business = userRecord.business;
+        return true;
+      }
+      return false;
+    }
+
+    const userRecord = await this.prisma.user.findUnique({
+      where: { id: user.id },
+    });
+    if (!userRecord) return false;
+
+    if (userRecord.businessId !== businessId && userRecord.role !== 'OWNER') {
+      return false;
+    }
+
     const business = await this.prisma.business.findUnique({
       where: { id: businessId },
     });

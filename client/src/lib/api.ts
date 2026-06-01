@@ -15,8 +15,9 @@ interface FetchOptions extends RequestInit {
 async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<unknown> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   
+  const isFormData = options.body instanceof FormData;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };

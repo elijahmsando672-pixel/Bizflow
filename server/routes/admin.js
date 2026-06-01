@@ -7,16 +7,32 @@ const router = express.Router();
 
 router.get('/businesses', async (req, res) => {
   try {
-    
-    const businesses = await query(`
-      SELECT b.*, 
-             u.name as owner_name, u.email as owner_email,
-             (SELECT COUNT(*) FROM users WHERE business_id = b.id) as user_count,
-             (SELECT COUNT(*) FROM customers WHERE business_id = b.id) as customer_count
-      FROM businesses b
-      LEFT JOIN users u ON u.business_id = b.id AND u.role = 'owner'
-      ORDER BY b.created_at DESC
-    `);
+    const result = await query('SELECT role FROM users WHERE id = $1 AND business_id = $2', [req.user.id, req.business_id]);
+    const isOwner = result.rows.length && result.rows[0].role === 'owner';
+    let businesses;
+    if (isOwner) {
+      businesses = await query(`
+        SELECT b.*,
+               u.name as owner_name, u.email as owner_email,
+               (SELECT COUNT(*) FROM users WHERE business_id = b.id) as user_count,
+               (SELECT COUNT(*) FROM customers WHERE business_id = b.id) as customer_count
+        FROM businesses b
+        LEFT JOIN users u ON u.business_id = b.id AND u.role = 'owner'
+        WHERE b.id = $1
+        ORDER BY b.created_at DESC
+      `, [req.business_id]);
+    } else {
+      businesses = await query(`
+        SELECT b.*,
+               u.name as owner_name, u.email as owner_email,
+               (SELECT COUNT(*) FROM users WHERE business_id = b.id) as user_count,
+               (SELECT COUNT(*) FROM customers WHERE business_id = b.id) as customer_count
+        FROM businesses b
+        LEFT JOIN users u ON u.business_id = b.id AND u.role = 'owner'
+        WHERE b.id = $1
+        ORDER BY b.created_at DESC
+      `, [req.business_id]);
+    }
     
     res.json(businesses.rows);
   } catch (err) {
@@ -27,7 +43,10 @@ router.get('/businesses', async (req, res) => {
 
 router.patch('/businesses/:id/status', async (req, res) => {
   try {
-    
+    const authResult = await query('SELECT role FROM users WHERE id = $1 AND business_id = $2', [req.user.id, req.business_id]);
+    if (!authResult.rows.length || authResult.rows[0].role !== 'owner') {
+      return res.status(403).json({ error: 'Only business owner can change status' });
+    }
     const { status } = req.body;
     if (!['active', 'suspended', 'pending'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
@@ -47,7 +66,6 @@ router.patch('/businesses/:id/status', async (req, res) => {
 
 router.get('/stats', async (req, res) => {
   try {
-    
     const totalBusinesses = await query('SELECT COUNT(*) FROM businesses');
     const activeBusinesses = await query("SELECT COUNT(*) FROM businesses WHERE status = 'active'");
     const pendingBusinesses = await query("SELECT COUNT(*) FROM businesses WHERE status = 'pending'");

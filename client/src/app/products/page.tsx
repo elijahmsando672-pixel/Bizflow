@@ -1,48 +1,29 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Plus, Search, AlertTriangle, Package, Loader2 } from "lucide-react";
-import api from "@/lib/api";
-import { useToast } from "@/components/ui/toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Package, Plus, Pencil, Trash2 } from "lucide-react";
+import { formatCurrency } from "@/lib/data";
+import api from "@/lib/api";
 
 interface Product {
   id: string;
   name: string;
   sku: string;
-  category_name: string;
-  category_id: string;
   selling_price: number;
   cost_price: number;
   stock_qty: number;
   reorder_level: number;
-  description: string;
+  category_name: string;
+  category_id?: string;
+  description?: string;
 }
 
 interface Category {
@@ -50,375 +31,280 @@ interface Category {
   name: string;
 }
 
-interface ProductForm {
-  name: string;
-  sku: string;
-  category_id: string;
-  selling_price: string;
-  stock_qty: string;
-  reorder_level: string;
-  description: string;
-}
+const columns: Column<Product>[] = [
+  { key: "name", label: "Product", sortable: true, render: (p) => (
+    <div className="flex items-center gap-3">
+      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+        <Package className="h-4 w-4 text-primary" />
+      </div>
+      <div>
+        <p className="font-medium text-foreground">{p.name}</p>
+        {p.category_name && (
+          <p className="text-xs text-muted-foreground">{p.category_name}</p>
+        )}
+      </div>
+    </div>
+  )},
+  { key: "sku", label: "SKU", hideOnMobile: true },
+  { key: "selling_price", label: "Price", sortable: true, render: (p) => (
+    <span className="font-medium">{formatCurrency(p.selling_price)}</span>
+  )},
+  { key: "cost_price", label: "Cost", sortable: true, hideOnMobile: true, render: (p) => (
+    <span className="text-muted-foreground">{formatCurrency(p.cost_price)}</span>
+  )},
+  { key: "stock_qty", label: "Stock", sortable: true, render: (p) => {
+    const low = p.stock_qty <= (p.reorder_level || 0);
+    const out = p.stock_qty === 0;
+    return (
+      <Badge variant={out ? "destructive" : low ? "warning" : "default"}>
+        {p.stock_qty} {out ? "(Out)" : low ? "(Low)" : ""}
+      </Badge>
+    );
+  }},
+];
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [data, setData] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [productForm, setProductForm] = useState<ProductForm>({ name: "", sku: "", category_id: "", selling_price: "", stock_qty: "", reorder_level: "", description: "" });
   const [categories, setCategories] = useState<Category[]>([]);
-  const toast = useToast();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editItem, setEditItem] = useState<Product | null>(null);
+  const [form, setForm] = useState({
+    name: "", sku: "", selling_price: "", cost_price: "",
+    stock_qty: "", reorder_level: "", category_id: "", description: "",
+  });
 
-  const loadProducts = useCallback(async () => {
+  const fetchData = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const data = await api.products.getAll();
-      setProducts(data as Product[]);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to load products";
-      toast.error(message);
-    }
-  }, [toast]);
-
-  const loadCategories = useCallback(async () => {
-    try {
-      const data = await api.products.getCategories();
-      setCategories(data as Category[]);
-    } catch (err: unknown) {
-      console.error("Failed to load categories:", err);
+      const [productsRes, catsRes] = await Promise.all([
+        api.products.getAll(),
+        api.products.getCategories().catch(() => []),
+      ]);
+      const products = (productsRes as { products?: Product[]; data?: Product[] }).products
+        || (productsRes as { products?: Product[]; data?: Product[] }).data
+        || (productsRes as Product[]);
+      setData(Array.isArray(products) ? products : []);
+      setCategories(Array.isArray(catsRes) ? catsRes as Category[] : []);
+    } catch (err) {
+      console.error("Failed to load products:", err);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadProducts();
-    loadCategories();
-  }, [loadProducts, loadCategories]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleCreateProduct = async () => {
-    if (!productForm.name || !productForm.selling_price) {
-      toast.error("Name and selling price are required");
-      return;
-    }
-    try {
-      await api.products.create({
-        name: productForm.name,
-        sku: productForm.sku || undefined,
-        category_id: productForm.category_id || undefined,
-        selling_price: parseFloat(productForm.selling_price),
-        stock_qty: parseInt(productForm.stock_qty) || 0,
-        reorder_level: parseInt(productForm.reorder_level) || 0,
-        description: productForm.description || undefined,
-      });
-      toast.success("Product created");
-      setDialogOpen(false);
-      setProductForm({ name: "", sku: "", category_id: "", selling_price: "", stock_qty: "", reorder_level: "", description: "" });
-      loadProducts();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to create product";
-      toast.error(message);
-    }
+  const openCreate = () => {
+    setEditItem(null);
+    setForm({ name: "", sku: "", selling_price: "", cost_price: "", stock_qty: "", reorder_level: "", category_id: "", description: "" });
+    setDialogOpen(true);
   };
 
-  const handleEditProduct = (product: Product) => {
-    setEditingProduct(product);
-    setProductForm({
-      name: product.name || "",
-      sku: product.sku || "",
-      category_id: product.category_id || "",
-      selling_price: product.selling_price?.toString() || "",
-      stock_qty: product.stock_qty?.toString() || "",
-      reorder_level: product.reorder_level?.toString() || "",
-      description: product.description || "",
+  const openEdit = (p: Product) => {
+    setEditItem(p);
+    setForm({
+      name: p.name, sku: p.sku || "",
+      selling_price: String(p.selling_price || ""),
+      cost_price: String(p.cost_price || ""),
+      stock_qty: String(p.stock_qty || ""),
+      reorder_level: String(p.reorder_level || ""),
+      category_id: p.category_id || "",
+      description: p.description || "",
     });
-    setEditDialogOpen(true);
+    setDialogOpen(true);
   };
 
-  const handleUpdateProduct = async () => {
-    if (!productForm.name || !productForm.selling_price) {
-      toast.error("Name and selling price are required");
-      return;
-    }
-    if (!editingProduct) return;
+  const handleSubmit = async () => {
     try {
-      await api.products.update(editingProduct.id, {
-        name: productForm.name,
-        sku: productForm.sku || undefined,
-        category_id: productForm.category_id || undefined,
-        selling_price: parseFloat(productForm.selling_price),
-        stock_qty: parseInt(productForm.stock_qty) || 0,
-        reorder_level: parseInt(productForm.reorder_level) || 0,
-        description: productForm.description || undefined,
-      });
-      toast.success("Product updated");
-      setEditDialogOpen(false);
-      setEditingProduct(null);
-      loadProducts();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to update product";
-      toast.error(message);
+      const payload = {
+        name: form.name,
+        sku: form.sku,
+        selling_price: parseFloat(form.selling_price) || 0,
+        cost_price: parseFloat(form.cost_price) || 0,
+        stock_qty: parseInt(form.stock_qty) || 0,
+        reorder_level: parseInt(form.reorder_level) || 0,
+        category_id: form.category_id || undefined,
+        description: form.description || undefined,
+      };
+      if (editItem) {
+        await api.products.update(editItem.id, payload);
+      } else {
+        await api.products.create(payload);
+      }
+      setDialogOpen(false);
+      fetchData();
+    } catch {
+      alert("Failed to save product");
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure?")) return;
+    if (!confirm("Delete this product?")) return;
     try {
       await api.products.delete(id);
-      toast.success("Product deleted");
-      loadProducts();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to delete product";
-      toast.error(message);
+      fetchData();
+    } catch {
+      alert("Failed to delete product");
     }
   };
 
-  const filteredProducts = products.filter((p) =>
-    p.name?.toLowerCase().includes(search.toLowerCase()) ||
-    p.sku?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const lowStockProducts = products.filter((p) => p.stock_qty <= p.reorder_level);
-  const outOfStock = products.filter((p) => p.stock_qty === 0);
+  const totalValue = data.reduce((s, p) => s + (p.selling_price || 0) * (p.stock_qty || 0), 0);
+  const lowStock = data.filter((p) => p.stock_qty <= (p.reorder_level || 0)).length;
+  const outOfStock = data.filter((p) => p.stock_qty === 0).length;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">Products</h2>
-          <p className="text-gray-500">Manage your product inventory</p>
+          <h1 className="text-2xl font-bold text-foreground">Products</h1>
+          <p className="text-sm text-muted-foreground">Manage your product inventory</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => { setProductForm({ name: "", sku: "", category_id: "", selling_price: "", stock_qty: "", reorder_level: "", description: "" }); setDialogOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Product
+        <Button onClick={openCreate}>
+          <Plus className="h-4 w-4" /> Add Product
         </Button>
       </div>
 
-      <div className="flex gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input
-            placeholder="Search products..."
-            className="pl-10"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Total Products</CardDescription>
-            <CardTitle className="text-3xl">{products.length}</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Products</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <Package className="h-4 w-4" />
-              In stock
-            </div>
+            <p className="text-2xl font-bold text-foreground">{data.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Low Stock Items</CardDescription>
-            <CardTitle className="text-3xl text-yellow-600">{lowStockProducts.length}</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Stock Value</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-2 text-sm text-yellow-600">
-              <AlertTriangle className="h-4 w-4" />
-              Need restocking
-            </div>
+            <p className="text-2xl font-bold text-foreground">{formatCurrency(totalValue)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Out of Stock</CardDescription>
-            <CardTitle className="text-3xl text-red-600">{outOfStock.length}</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Low Stock</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-2 text-sm text-red-600">
-              <AlertTriangle className="h-4 w-4" />
-              Urgent attention
-            </div>
+            <p className="text-2xl font-bold text-warning">{lowStock}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Out of Stock</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-destructive">{outOfStock}</p>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All Products</CardTitle>
-          <CardDescription>View and manage your product inventory</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Stock</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell className="text-gray-500">{product.sku}</TableCell>
-                    <TableCell>{product.category_name || "—"}</TableCell>
-                    <TableCell>KSh {product.selling_price?.toLocaleString()}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`font-medium ${
-                            product.stock_qty <= product.reorder_level
-                              ? "text-yellow-600"
-                              : "text-gray-900"
-                          }`}
-                        >
-                          {product.stock_qty}
-                        </span>
-                        {product.stock_qty <= product.reorder_level && (
-                          <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)}>
-                          Edit
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(product.id)}>
-                          Delete
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filteredProducts.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                      No products found
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <DataTable<Product>
+        data={data}
+        columns={[
+          ...columns,
+          {
+            key: "actions" as never,
+            label: "",
+            render: (p) => (
+              <div className="flex gap-2">
+                <Button variant="ghost" size="icon" onClick={() => openEdit(p)}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            ),
+          },
+        ]}
+        keyExtractor={(p) => p.id}
+        searchKeys={["name", "sku", "category_name"]}
+        searchPlaceholder="Search products..."
+        selectable
+        pageSize={15}
+        loading={loading}
+        emptyMessage="No products found. Add your first product to get started."
+        onSelectionChange={setSelected}
+        onExport={() => {
+          const csv = [
+            ["Name", "SKU", "Price", "Cost", "Stock", "Category"].join(","),
+            ...data.map((p) => [p.name, p.sku, p.selling_price, p.cost_price, p.stock_qty, p.category_name].join(",")),
+          ].join("\n");
+          const blob = new Blob([csv], { type: "text/csv" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url; a.download = "products.csv"; a.click();
+          URL.revokeObjectURL(url);
+        }}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Product</DialogTitle>
-            <DialogDescription>Create a new product</DialogDescription>
+            <DialogTitle>{editItem ? "Edit Product" : "Add Product"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Product Name</Label>
-              <Input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} placeholder="Product name" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>SKU</Label>
-                <Input value={productForm.sku} onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })} placeholder="SKU" />
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Name *</label>
+                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Product name" />
               </div>
-              <div>
-                <Label>Category</Label>
-                <Select value={productForm.category_id} onValueChange={(v) => setProductForm({ ...productForm, category_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat: Category) => (
-                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">SKU</label>
+                <Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} placeholder="SKU code" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Selling Price</Label>
-                <Input type="number" value={productForm.selling_price} onChange={(e) => setProductForm({ ...productForm, selling_price: e.target.value })} placeholder="0.00" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Selling Price *</label>
+                <Input value={form.selling_price} onChange={(e) => setForm({ ...form, selling_price: e.target.value })} placeholder="0" type="number" />
               </div>
-              <div>
-                <Label>Stock Qty</Label>
-                <Input type="number" value={productForm.stock_qty} onChange={(e) => setProductForm({ ...productForm, stock_qty: e.target.value })} placeholder="0" />
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Cost Price</label>
+                <Input value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: e.target.value })} placeholder="0" type="number" />
               </div>
             </div>
-            <div>
-              <Label>Reorder Level</Label>
-              <Input type="number" value={productForm.reorder_level} onChange={(e) => setProductForm({ ...productForm, reorder_level: e.target.value })} placeholder="0" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Stock Quantity</label>
+                <Input value={form.stock_qty} onChange={(e) => setForm({ ...form, stock_qty: e.target.value })} placeholder="0" type="number" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Reorder Level</label>
+                <Input value={form.reorder_level} onChange={(e) => setForm({ ...form, reorder_level: e.target.value })} placeholder="0" type="number" />
+              </div>
             </div>
-            <div>
-              <Label>Description</Label>
-              <Textarea value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} placeholder="Optional description" />
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Category</label>
+              <select
+                value={form.category_id}
+                onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">No category</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
             </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleCreateProduct}>Create Product</Button>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Description</label>
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="Optional description"
+                rows={2}
+                className="w-full resize-y rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Product</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Product Name</Label>
-              <Input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>SKU</Label>
-                <Input value={productForm.sku} onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })} />
-              </div>
-              <div>
-                <Label>Category</Label>
-                <Select value={productForm.category_id} onValueChange={(v) => setProductForm({ ...productForm, category_id: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat: Category) => (
-                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Selling Price</Label>
-                <Input type="number" value={productForm.selling_price} onChange={(e) => setProductForm({ ...productForm, selling_price: e.target.value })} />
-              </div>
-              <div>
-                <Label>Stock Qty</Label>
-                <Input type="number" value={productForm.stock_qty} onChange={(e) => setProductForm({ ...productForm, stock_qty: e.target.value })} />
-              </div>
-            </div>
-            <div>
-              <Label>Reorder Level</Label>
-              <Input type="number" value={productForm.reorder_level} onChange={(e) => setProductForm({ ...productForm, reorder_level: e.target.value })} />
-            </div>
-            <div>
-              <Label>Description</Label>
-              <Textarea value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-              <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleUpdateProduct}>Update Product</Button>
-            </div>
-          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSubmit}>{editItem ? "Update" : "Create"}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

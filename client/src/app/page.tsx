@@ -1,312 +1,167 @@
+"use client";
+
 import Link from "next/link";
-import { Check, ChevronRight, Zap, Shield, Building2, Smartphone } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Check, Menu, X, Receipt, ChartLine, Box, ArrowLeftRight, Building2 } from "lucide-react";
 
 const features = [
-  { title: "Point of Sale", desc: "Fast, intuitive POS system for quick transactions and seamless customer experience." },
-  { title: "Real-time Analytics", desc: "Track sales, profit margins, and cash flow with comprehensive dashboard insights." },
-  { title: "Inventory Management", desc: "Monitor stock levels, get low-stock alerts, and manage your products effortlessly." },
-  { title: "Stock Transfer", desc: "Seamlessly transfer inventory between locations with automatic tracking and approval workflows." },
-  { title: "Credit Management", desc: "Track customer credit, monitor overdue payments, and manage receivables efficiently." },
-  { title: "Customer Management", desc: "Build customer profiles, track purchase history, and strengthen relationships." },
-  { title: "Expense Tracking", desc: "Record and categorize business expenses to understand true profitability." },
-  { title: "Excel Export", desc: "Export all your reports, inventory, sales data, and analytics to Excel with one click." },
-];
-
-const reasons = [
-  { icon: Zap, title: "Lightning Fast", desc: "Process transactions in seconds with our optimized POS system" },
-  { icon: Shield, title: "Secure & Reliable", desc: "Enterprise-grade security to protect your business data" },
-  { icon: Building2, title: "Multi-tenant", desc: "Perfect for managing multiple business locations" },
-  { icon: Smartphone, title: "Mobile Ready", desc: "Access your business metrics anywhere, anytime" },
+  { icon: Receipt, title: "Point of Sale", desc: "Fast and intuitive POS." },
+  { icon: ChartLine, title: "Analytics", desc: "Track profits and growth." },
+  { icon: Box, title: "Inventory", desc: "Manage stock levels." },
+  { icon: ArrowLeftRight, title: "Transfers", desc: "Move stock between stores." },
 ];
 
 const plans = [
-  {
-    name: "Starter", price: "2,500", period: "month",
-    desc: "Perfect for small businesses just getting started",
-    popular: false,
-    features: ["Up to 100 products", "Basic POS functionality", "1 user account", "Daily reports", "Excel export", "Email support"],
-    href: "/register",
-  },
-  {
-    name: "Professional", price: "5,500", period: "month",
-    desc: "Ideal for growing businesses with multiple users",
-    popular: true,
-    features: ["Unlimited products", "Advanced POS features", "Up to 5 user accounts", "Real-time analytics", "Credit management", "Stock transfer", "Excel export", "Priority support"],
-    href: "/register",
-  },
-  {
-    name: "Enterprise", price: null, period: null,
-    desc: "For large businesses with custom needs",
-    popular: false,
-    features: ["Everything in Professional", "Unlimited users", "Multi-location support", "Custom integrations", "Advanced Excel reporting", "Dedicated account manager", "24/7 phone support"],
-    href: "/register",
-  },
+  { name: "Starter", price: "Ksh 2,500", popular: false, cta: "Start Free Trial", href: "/register" },
+  { name: "Professional", price: "Ksh 5,500", popular: true, cta: "Start Free Trial", href: "/register" },
+  { name: "Enterprise", price: "Custom", popular: false, cta: "Contact Sales", href: "/register" },
+];
+
+const stats = [
+  { value: "10,000+", label: "Transactions Processed" },
+  { value: "500+", label: "Businesses Served" },
+  { value: "99.9%", label: "System Uptime" },
+  { value: "24/7", label: "Support" },
 ];
 
 export default function LandingPage() {
-  return (
-    <div className="flex min-h-screen flex-col">
-      <Navbar />
-      <main>
-        <Hero />
-        <FeaturesSection />
-        <WhyChoose />
-        <Pricing />
-        <Contact />
-        <CTA />
-      </main>
-      <Footer />
-    </div>
-  );
-}
+  const router = useRouter();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
-function Navbar() {
+  useEffect(() => {
+    if (localStorage.getItem("token")) {
+      router.replace("/dashboard");
+    }
+  }, [router]);
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/80 text-primary-foreground text-sm font-bold">B</div>
-          <span className="text-lg font-semibold tracking-tight">BizFlow</span>
+    <div className="min-h-screen bg-[#f8fafc] text-[#111827]">
+      <header className="sticky top-0 z-100 flex items-center justify-between bg-white px-5 lg:px-20 py-5 shadow-[0_1px_10px_rgba(0,0,0,0.05)]">
+        <Link href="/" className="flex items-center gap-2.5 text-2xl font-bold text-[#2563eb]">
+          <Building2 className="h-6 w-6" />
+          <span>BizFlow</span>
         </Link>
-        <nav className="hidden items-center gap-8 md:flex">
-          <Link href="#features" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Features</Link>
-          <Link href="#pricing" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Pricing</Link>
-          <Link href="#contact" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Contact</Link>
-          <Link href="/login" className="text-sm font-medium text-foreground transition-colors hover:text-primary">Sign In</Link>
-          <Link href="/register" className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.97]">Get Started</Link>
+        <nav className="hidden md:flex items-center gap-[30px]">
+          <a href="#features" className="text-[#374151] font-medium">Features</a>
+          <a href="#benefits" className="text-[#374151] font-medium">Benefits</a>
+          <a href="#pricing" className="text-[#374151] font-medium">Pricing</a>
+          <a href="#contact" className="text-[#374151] font-medium">Contact</a>
         </nav>
-        <button type="button" className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-accent md:hidden" aria-label="Toggle menu">
-          <MenuIcon />
+        <div className="hidden md:flex items-center gap-[15px]">
+          <Link href="/login" className="rounded-xl border border-[#ddd] bg-white px-6 py-[14px] text-sm font-medium">Sign In</Link>
+          <Link href="/register" className="rounded-xl bg-[#2563eb] px-7 py-[14px] text-sm font-medium text-white">Get Started</Link>
+        </div>
+        <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2 rounded-lg hover:bg-gray-100" aria-label="Toggle menu">
+          {mobileOpen ? <X className="h-6 w-6 text-gray-600" /> : <Menu className="h-6 w-6 text-gray-600" />}
         </button>
-      </div>
-    </header>
-  );
-}
+      </header>
 
-function MenuIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-    </svg>
-  );
-}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-40 bg-white pt-20 px-5">
+          <nav className="flex flex-col gap-4">
+            <a href="#features" onClick={() => setMobileOpen(false)} className="py-2 text-[#374151] font-medium">Features</a>
+            <a href="#benefits" onClick={() => setMobileOpen(false)} className="py-2 text-[#374151] font-medium">Benefits</a>
+            <a href="#pricing" onClick={() => setMobileOpen(false)} className="py-2 text-[#374151] font-medium">Pricing</a>
+            <a href="#contact" onClick={() => setMobileOpen(false)} className="py-2 text-[#374151] font-medium">Contact</a>
+            <hr className="my-2 border-gray-200" />
+            <Link href="/login" onClick={() => setMobileOpen(false)} className="block text-center rounded-xl border border-[#ddd] px-6 py-[14px] text-sm font-medium">Sign In</Link>
+            <Link href="/register" onClick={() => setMobileOpen(false)} className="block text-center rounded-xl bg-[#2563eb] px-7 py-[14px] text-sm font-medium text-white">Get Started</Link>
+          </nav>
+        </div>
+      )}
 
-function Hero() {
-  return (
-    <section className="relative overflow-hidden border-b border-border/40">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
-      <div className="mx-auto max-w-7xl px-4 pb-20 pt-16 sm:px-6 lg:px-8 lg:pb-28 lg:pt-24">
-        <div className="mx-auto max-w-3xl text-center">
-          <div className="mb-6 inline-flex items-center rounded-full border border-border bg-muted/50 px-4 py-1.5 text-xs font-medium text-muted-foreground">
-            Modern Business Management
-          </div>
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-            Manage Your Business{" "}
-            <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">With Confidence</span>
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-[50px] px-5 lg:px-20 py-20 items-center">
+        <div>
+          <span className="inline-block rounded-full bg-[#e0e7ff] px-[18px] py-[10px] text-sm text-[#2563eb] font-medium mb-5">
+            All-in-One Business Management Platform
+          </span>
+          <h1 className="text-[40px] sm:text-[60px] font-bold leading-[1.1] mb-5">
+            Run Your Entire Business From <span className="text-[#2563eb]">One Platform</span>
           </h1>
-          <p className="mt-6 text-lg leading-relaxed text-muted-foreground sm:text-xl">
-            All-in-one platform for POS, inventory, sales tracking, and business analytics. Built for modern African businesses.
+          <p className="text-lg sm:text-xl text-[#6b7280] mb-[25px]">
+            POS, Inventory, Payments, Customers, Analytics and Multi-Branch Management.
           </p>
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link href="/register" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-primary to-primary/90 px-8 text-base font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:from-primary/90 hover:to-primary/80 active:scale-[0.97] sm:w-auto">
-              Start Free Trial
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-            <Link href="/login" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-input bg-background/50 px-8 text-base font-medium text-foreground shadow-sm backdrop-blur-sm transition-all hover:bg-accent/50 active:scale-[0.97] sm:w-auto">
-              Sign In
-            </Link>
-          </div>
-          <div className="mt-8 flex items-center justify-center gap-6 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-secondary" /> No credit card required</span>
-            <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-secondary" /> 14-day free trial</span>
-            <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-secondary" /> Cancel anytime</span>
+          <ul className="space-y-[10px] mb-[30px] text-[#374151]">
+            <li>✓ No credit card required</li>
+            <li>✓ 14-day free trial</li>
+            <li>✓ Cancel anytime</li>
+          </ul>
+          <div className="flex flex-col sm:flex-row gap-[15px]">
+            <Link href="/register" className="inline-flex items-center justify-center rounded-xl bg-[#2563eb] px-7 py-[14px] text-sm font-medium text-white">Start Free Trial</Link>
+            <Link href="/login" className="inline-flex items-center justify-center rounded-xl border-2 border-[#2563eb] px-7 py-[14px] text-sm font-medium text-[#2563eb]">Sign In</Link>
           </div>
         </div>
-      </div>
-    </section>
-  );
-}
-
-function FeaturesSection() {
-  return (
-    <section id="features" className="border-b border-border/40 py-20 sm:py-28">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Everything You Need to Succeed</h2>
-          <p className="mt-4 text-lg text-muted-foreground">Powerful features designed to streamline your business operations and boost profitability</p>
-        </div>
-        <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {features.map((f) => (
-            <div key={f.title} className="group rounded-xl border border-border/50 bg-card p-6 shadow-sm transition-all hover:border-primary/20 hover:shadow-md hover:shadow-primary/5">
-              <h3 className="text-base font-semibold">{f.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.desc}</p>
+        <div className="hidden lg:block">
+          {imgError ? (
+            <div className="aspect-video rounded-[20px] bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center text-gray-400 shadow-[0_20px_60px_rgba(0,0,0,0.15)]">
+              <div className="text-center p-8">
+                <Building2 className="h-16 w-16 mx-auto mb-4 text-blue-300" />
+                <p className="text-lg font-medium">Dashboard Preview</p>
+              </div>
             </div>
-          ))}
+          ) : (
+            <img
+              src="/dashboard-preview.png"
+              alt="Dashboard"
+              className="w-full rounded-[20px] shadow-[0_20px_60px_rgba(0,0,0,0.15)]"
+              onError={() => setImgError(true)}
+            />
+          )}
         </div>
-      </div>
-    </section>
-  );
-}
+      </section>
 
-function WhyChoose() {
-  return (
-    <section className="border-b border-border/40 bg-muted/30 py-20 sm:py-28">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Why Choose BizFlow?</h2>
-          <p className="mt-4 text-lg text-muted-foreground">Built with modern technology and designed for the African market</p>
-        </div>
-        <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-          {reasons.map((r) => {
-            const Icon = r.icon;
+      <section className="grid grid-cols-2 sm:grid-cols-4 gap-[30px] bg-white px-5 lg:px-20 py-[60px]">
+        {stats.map((s) => (
+          <div key={s.label} className="text-center">
+            <h2 className="text-[32px] sm:text-[40px] font-bold text-[#2563eb]">{s.value}</h2>
+            <p className="text-[#6b7280]">{s.label}</p>
+          </div>
+        ))}
+      </section>
+
+      <section id="features" className="px-5 lg:px-20 py-[100px] text-center">
+        <h2 className="text-[32px] sm:text-[42px] font-bold mb-[50px]">Everything You Need To Succeed</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[25px]">
+          {features.map((f) => {
+            const Icon = f.icon;
             return (
-              <div key={r.title} className="text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5">
-                  <Icon className="h-7 w-7 text-primary" />
-                </div>
-                <h3 className="mt-5 text-base font-semibold">{r.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{r.desc}</p>
+              <div key={f.title} className="bg-white p-[30px] rounded-[20px] shadow-[0_10px_30px_rgba(0,0,0,0.05)] transition-all duration-300 hover:-translate-y-2">
+                <Icon className="h-[35px] w-[35px] text-[#2563eb] mb-5 mx-auto" />
+                <h3 className="text-xl font-bold mb-2">{f.title}</h3>
+                <p className="text-[#6b7280]">{f.desc}</p>
               </div>
             );
           })}
         </div>
-      </div>
-    </section>
-  );
-}
+      </section>
 
-function Pricing() {
-  return (
-    <section id="pricing" className="border-b border-border/40 py-20 sm:py-28">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Simple, Transparent Pricing</h2>
-          <p className="mt-4 text-lg text-muted-foreground">Choose the perfect plan for your business. All plans include a 14-day free trial.</p>
-        </div>
-        <div className="mt-16 grid gap-8 lg:grid-cols-3">
+      <section id="pricing" className="px-5 lg:px-20 py-[100px] text-center bg-white">
+        <h2 className="text-[32px] sm:text-[42px] font-bold">Choose Your Plan</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-[30px] mt-[50px] max-w-5xl mx-auto">
           {plans.map((plan) => (
-            <div
-              key={plan.name}
-              className={`relative flex flex-col rounded-2xl border p-8 shadow-sm transition-all hover:shadow-md ${
-                plan.popular
-                  ? "border-primary/30 bg-card ring-1 ring-primary/20"
-                  : "border-border/50 bg-card"
-              }`}
-            >
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-primary to-secondary px-4 py-1 text-xs font-medium text-primary-foreground shadow-sm">
-                  Most Popular
-                </div>
-              )}
-              <div>
-                <h3 className="text-lg font-semibold">{plan.name}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{plan.desc}</p>
-                <div className="mt-6">
-                  {plan.price ? (
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-sm font-medium text-muted-foreground">Ksh</span>
-                      <span className="text-4xl font-bold tracking-tight">{plan.price}</span>
-                      <span className="text-sm text-muted-foreground">/{plan.period}</span>
-                    </div>
-                  ) : (
-                    <span className="text-4xl font-bold tracking-tight">Custom</span>
-                  )}
-                </div>
-              </div>
-              <ul className="mt-8 flex-1 space-y-3">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-3 text-sm">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href={plan.href}
-                className={`mt-8 inline-flex h-11 w-full items-center justify-center rounded-xl text-sm font-medium shadow-sm transition-all active:scale-[0.97] ${
-                  plan.popular
-                    ? "bg-gradient-to-b from-primary to-primary/90 text-primary-foreground shadow-primary/10 hover:from-primary/90 hover:to-primary/80"
-                    : "border border-input bg-background/50 text-foreground backdrop-blur-sm hover:bg-accent/50"
-                }`}
-              >
-                {plan.name === "Enterprise" ? "Contact Sales" : "Start Free Trial"}
-              </Link>
+            <div key={plan.name} className={`bg-white p-10 rounded-[20px] shadow-[0_10px_30px_rgba(0,0,0,0.05)] ${plan.popular ? "border-2 border-[#2563eb] scale-[1.05]" : ""}`}>
+              <h3 className="text-2xl font-bold">{plan.name}</h3>
+              <h1 className="text-4xl font-bold text-[#2563eb] my-5">{plan.price}</h1>
+              <Link href={plan.href} className="block w-full rounded-xl bg-[#2563eb] py-[14px] text-sm font-medium text-white">{plan.cta}</Link>
             </div>
           ))}
         </div>
-      </div>
-    </section>
-  );
-}
+      </section>
 
-function Contact() {
-  return (
-    <section id="contact" className="border-b border-border/40 bg-muted/30 py-20 sm:py-28">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Get in Touch</h2>
-          <p className="mt-4 text-lg text-muted-foreground">Have questions? Our team is here to help you get started</p>
+      <section id="contact" className="mx-5 lg:mx-20 my-[100px] rounded-[24px] bg-gradient-to-br from-[#2563eb] to-[#1d4ed8] p-[60px] flex flex-col sm:flex-row items-center justify-between gap-8 text-white">
+        <div>
+          <h2 className="text-3xl sm:text-4xl font-bold">Ready to Transform Your Business?</h2>
+          <p className="mt-2 text-white/80">Join hundreds of businesses using BizFlow.</p>
         </div>
-        <div className="mt-16 grid gap-8 sm:grid-cols-3">
-          <div className="text-center">
-            <div className="text-2xl font-semibold tracking-tight">Phone</div>
-            <p className="mt-2 text-sm text-muted-foreground">071773274, 0110966572</p>
-            <p className="mt-1 text-xs text-muted-foreground">Mon-Fri, 8am-6pm EAT</p>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-semibold tracking-tight">Email</div>
-            <p className="mt-2 text-sm text-muted-foreground">elijahmsando672@gmail.com</p>
-            <p className="mt-1 text-xs text-muted-foreground">24/7 support</p>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-semibold tracking-tight">Location</div>
-            <p className="mt-2 text-sm text-muted-foreground">Nairobi, Kenya — East Africa</p>
-            <p className="mt-1 text-xs text-muted-foreground">East Africa</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+        <Link href="/register" className="rounded-xl bg-white px-[30px] py-4 font-semibold text-[#2563eb] flex-shrink-0">Start Free Trial</Link>
+      </section>
 
-function CTA() {
-  return (
-    <section className="border-b border-border/40 py-20 sm:py-28">
-      <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
-        <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Ready to Transform Your Business?</h2>
-        <p className="mt-4 text-lg text-muted-foreground">Join hundreds of businesses already using BizFlow to streamline operations and increase profits.</p>
-        <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Link href="/register" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-primary to-primary/90 px-8 text-base font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:from-primary/90 hover:to-primary/80 active:scale-[0.97] sm:w-auto">
-            Start Your Free Trial
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-          <Link href="/login" className="inline-flex h-12 w-full items-center justify-center rounded-xl border border-input bg-background/50 px-8 text-base font-medium text-foreground shadow-sm backdrop-blur-sm transition-all hover:bg-accent/50 active:scale-[0.97] sm:w-auto">
-            Sign In
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Footer() {
-  const year = new Date().getFullYear();
-  return (
-    <footer className="border-t border-border/40 bg-background py-12">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-primary to-primary/80 text-primary-foreground text-xs font-bold">B</div>
-            <span className="text-sm font-semibold">BizFlow</span>
-          </div>
-          <p className="text-xs text-muted-foreground">&copy; {year} BizFlow. All rights reserved.</p>
-          <div className="flex gap-6 text-xs text-muted-foreground">
-            <span>Multi-tenant</span>
-            <span>Secure</span>
-            <span>Scalable</span>
-          </div>
-        </div>
-      </div>
-    </footer>
+      <footer className="bg-[#0f172a] text-white px-5 lg:px-20 py-20 text-center">
+        <div className="text-2xl font-bold">BizFlow</div>
+        <p className="mt-5 opacity-70 max-w-md mx-auto">Modern business management software built for African entrepreneurs.</p>
+      </footer>
+    </div>
   );
 }

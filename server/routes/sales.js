@@ -1,13 +1,18 @@
 import express from 'express';
+import sanitizeHtml from 'sanitize-html';
 import { query, pool } from '../config/db.js';
 
 const router = express.Router();
 
+function sanitize(str) {
+  return sanitizeHtml(String(str || ''), { allowedTags: [], allowedAttributes: {} });
+}
+
 function generateReceiptHTML(business, sale, items) {
   const rows = items.map(item => `
     <tr>
-      <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${item.product_name || item.name || 'Item'}</td>
-      <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:center;">${item.qty}</td>
+      <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${sanitize(item.product_name || item.name || 'Item')}</td>
+      <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:center;">${sanitize(item.qty)}</td>
       <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">KSh ${parseFloat(item.unit_price || item.price || 0).toLocaleString()}</td>
       <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">KSh ${parseFloat(item.total || item.qty * (item.unit_price || item.price || 0)).toLocaleString()}</td>
     </tr>
@@ -47,9 +52,9 @@ function generateReceiptHTML(business, sale, items) {
   <button class="no-print" onclick="window.print()" style="position:fixed;top:20px;right:20px;padding:10px 20px;background:#4f46e5;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">🖨️ Print Receipt</button>
   <div class="header">
     <div class="logo">
-      <h1>${business.name || 'BizFlow'}</h1>
-      <p>${business.phone || ''}${business.address ? '<br>' + business.address : ''}</p>
-      ${business.tax_id ? `<p style="margin-top:4px;">Tax ID: ${business.tax_id}</p>` : ''}
+      <h1>${sanitize(business.name) || 'BizFlow'}</h1>
+      <p>${sanitize(business.phone) || ''}${business.address ? '<br>' + sanitize(business.address) : ''}</p>
+      ${business.tax_id ? `<p style="margin-top:4px;">Tax ID: ${sanitize(business.tax_id)}</p>` : ''}
     </div>
     <div class="receipt-info">
       <div class="receipt-number">${sale.invoice_number || sale.receipt_number || 'RECEIPT'}</div>
@@ -61,9 +66,9 @@ function generateReceiptHTML(business, sale, items) {
   ${sale.customer_name ? `
   <div class="customer-section">
     <h3>Customer</h3>
-    <p><strong>${sale.customer_name}</strong></p>
-    ${sale.customer_phone ? `<p>Phone: ${sale.customer_phone}</p>` : ''}
-    ${sale.customer_email ? `<p>Email: ${sale.customer_email}</p>` : ''}
+    <p>    <strong>${sanitize(sale.customer_name)}</strong></p>
+    ${sale.customer_phone ? `<p>Phone: ${sanitize(sale.customer_phone)}</p>` : ''}
+    ${sale.customer_email ? `<p>Email: ${sanitize(sale.customer_email)}</p>` : ''}
   </div>
   ` : ''}
   <table>
@@ -312,9 +317,13 @@ router.post('/', async (req, res) => {
       );
 
       if (item.product_id) {
-        const productResult = await client.query('SELECT stock_qty FROM products WHERE id = $1', [item.product_id]);
-        const oldQty = productResult.rows[0]?.stock_qty || 0;
-        const newQty = oldQty - item.qty;
+        const productResult = await client.query('SELECT stock_qty FROM products WHERE id = $1 FOR UPDATE', [item.product_id]);
+        const currentStock = productResult.rows[0]?.stock_qty || 0;
+        if (currentStock < item.qty) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: `Insufficient stock for ${item.product_name || 'item'}. Available: ${currentStock}, requested: ${item.qty}` });
+        }
+        const newQty = currentStock - item.qty;
 
         await client.query(
           'UPDATE products SET stock_qty = $1, updated_at = NOW() WHERE id = $2',
@@ -324,7 +333,7 @@ router.post('/', async (req, res) => {
         await client.query(
           `INSERT INTO stock_movements (business_id, product_id, qty_before, qty_change, qty_after, reason, reference_type, reference_id)
            VALUES ($1, $2, $3, $4, $5, 'sale', 'sale', $6)`,
-          [req.business_id, item.product_id, oldQty, -item.qty, newQty, sale.id]
+          [req.business_id, item.product_id, currentStock, -item.qty, newQty, sale.id]
         );
       }
     }
@@ -352,31 +361,81 @@ router.post('/', async (req, res) => {
 });
 
 router.put('/:id', async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     const { status, notes } = req.body;
 
-    let paidDate = null;
-    if (status === 'paid') {
-      paidDate = new Date();
+    const saleResult = await client.query(
+      'SELECT id, status, total FROM sales WHERE id = $1 AND business_id = $2 FOR UPDATE',
+      [req.params.id, req.business_id]
+    );
+    if (saleResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Not found' });
     }
 
-    const result = await query(
-      `UPDATE sales SET status = COALESCE($1, status), notes = COALESCE($2, notes), amount_paid = CASE WHEN $1 = 'paid' THEN total ELSE amount_paid END,
+    const currentSale = saleResult.rows[0];
+    const transitioningToPaid = status === 'paid' && currentSale.status !== 'paid';
+
+    let paidDate = null;
+    if (transitioningToPaid) {
+      paidDate = new Date();
+
+      const items = await client.query(
+        'SELECT product_id, qty, product_name FROM sale_items WHERE sale_id = $1 AND business_id = $2',
+        [req.params.id, req.business_id]
+      );
+
+      for (const item of items.rows) {
+        if (item.product_id) {
+          const productResult = await client.query(
+            'SELECT stock_qty FROM products WHERE id = $1 FOR UPDATE',
+            [item.product_id]
+          );
+          const currentStock = productResult.rows[0]?.stock_qty || 0;
+          if (currentStock < item.qty) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+              error: `Insufficient stock for ${item.product_name || 'item'}. Available: ${currentStock}, requested: ${item.qty}`
+            });
+          }
+          const newQty = currentStock - item.qty;
+          await client.query(
+            'UPDATE products SET stock_qty = $1, updated_at = NOW() WHERE id = $2',
+            [newQty, item.product_id]
+          );
+          await client.query(
+            `INSERT INTO stock_movements (business_id, product_id, qty_before, qty_change, qty_after, reason, reference_type, reference_id)
+             VALUES ($1, $2, $3, $4, $5, 'sale', 'sale', $6)`,
+            [req.business_id, item.product_id, currentStock, -item.qty, newQty, req.params.id]
+          );
+        }
+      }
+    }
+
+    const result = await client.query(
+      `UPDATE sales SET status = COALESCE($1, status), notes = COALESCE($2, notes),
+       amount_paid = CASE WHEN $1 = 'paid' THEN total ELSE amount_paid END,
        paid_date = CASE WHEN $1 = 'paid' THEN $3 ELSE paid_date END,
        updated_at = NOW() WHERE id = $4 AND business_id = $5 RETURNING *`,
       [status, notes, paidDate, req.params.id, req.business_id]
     );
 
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    await client.query('COMMIT');
 
-    if (status === 'paid') {
+    if (transitioningToPaid) {
       generateReceipt(req.business_id, req.params.id).catch(err => console.error('Auto-receipt error:', err));
     }
 
     res.json(result.rows[0]);
    } catch (err) {
+     await client.query('ROLLBACK');
      console.error('Sales route error:', err);
      res.status(500).json({ error: 'Server error' });
+   } finally {
+     client.release();
    }
 });
 

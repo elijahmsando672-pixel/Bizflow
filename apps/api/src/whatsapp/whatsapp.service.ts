@@ -250,10 +250,16 @@ ${profit >= 0 ? '✅' : '❌'} Net Profit: $${profit.toFixed(2)}`;
         },
       );
 
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => 'Unknown error');
+        console.error(`Twilio API error (${response.status}):`, errorBody);
+        return { success: false, error: `Twilio API responded with ${response.status}` };
+      }
+
       return await response.json();
     } catch (error) {
       console.error('WhatsApp send error:', error);
-      return { success: false, error };
+      return { success: false, error: error.message };
     }
   }
 

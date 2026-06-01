@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import Joi from 'joi';
 import { query } from '../config/db.js';
 import { sendTeamInvitationEmail } from '../utils/email.js';
+import { hashPassword } from '../utils/password.js';
+import { generateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -87,7 +89,6 @@ router.post('/accept', async (req, res) => {
       return res.status(400).json({ error: 'User already exists' });
     }
 
-    const { hashPassword } = await import('../utils/password.js');
     const hashedPassword = await hashPassword(password);
 
     const userResult = await query(
@@ -98,7 +99,6 @@ router.post('/accept', async (req, res) => {
 
     await query(`UPDATE team_invitations SET status = 'accepted' WHERE id = $1`, [invite.id]);
 
-    const { generateToken } = await import('../middleware/auth.js');
     const user = userResult.rows[0];
     const authToken = generateToken(user);
 

@@ -1,4 +1,4 @@
-import { query } from '../config/db.js';
+import { query, pool } from '../config/db.js';
 
 export const getCategories = async (req, res) => {
   try {
@@ -84,17 +84,23 @@ export const create = async (req, res) => {
 };
 
 export const update = async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     const { name, sku, barcode, description, category_id, unit, cost_price, selling_price, stock_qty, reorder_level, is_active, image_url } = req.body;
 
-    const current = await query('SELECT stock_qty FROM products WHERE id=$1 AND business_id=$2', [req.params.id, req.business_id]);
-    if (current.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
+    const current = await client.query('SELECT stock_qty FROM products WHERE id=$1 AND business_id=$2 FOR UPDATE', [req.params.id, req.business_id]);
+    if (current.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Product not found' });
+    }
 
     const oldQty = parseInt(current.rows[0].stock_qty || 0);
     const newQty = parseInt(stock_qty || 0);
     const qtyDiff = newQty - oldQty;
 
-    const result = await query(
+    const result = await client.query(
       `UPDATE products SET name=$1, sku=$2, barcode=$3, description=$4, category_id=$5, unit=$6, cost_price=$7, selling_price=$8,
        stock_qty=$9, reorder_level=$10, is_active=$11, image_url=$12, updated_at=NOW()
        WHERE id=$13 AND business_id=$14 RETURNING *`,
@@ -102,17 +108,21 @@ export const update = async (req, res) => {
     );
 
     if (qtyDiff !== 0) {
-      await query(
+      await client.query(
         `INSERT INTO stock_movements (business_id, product_id, qty_before, qty_change, qty_after, reason)
          VALUES ($1, $2, $3, $4, $5, 'adjustment')`,
         [req.business_id, req.params.id, oldQty, qtyDiff, newQty]
       );
     }
 
+    await client.query('COMMIT');
     res.json(result.rows[0]);
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('Product update error:', err);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 

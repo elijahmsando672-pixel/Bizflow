@@ -2,7 +2,15 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
 import { initDatabase } from './config/db.js';
+import { protect } from './middleware/protect.js';
+import { requirePermission } from './middleware/rbac.js';
+import { logAudit, getClientIp } from './utils/audit.js';
+import { securityHeaders, sanitizeInput, xssPrevent, globalRateLimiter, userRateLimiter, authRateLimiter, passwordResetRateLimiter, refreshTokenRateLimiter } from './middleware/security.js';
+import { reportSuspiciousAccess } from './utils/securityMonitor.js';
+import { passport } from './config/oauth.js';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.js';
 import customerRoutes from './routes/customers.js';
 import productRoutes from './routes/products.js';
@@ -28,9 +36,6 @@ import permissionsRoutes from './routes/permissions.js';
 import importExportRoutes from './routes/importExport.js';
 import userRoutes from './routes/users.js';
 import oauthRoutes from './routes/oauth.js';
-import { protect } from './middleware/protect.js';
-import { requirePermission } from './middleware/rbac.js';
-import { logAudit, getClientIp } from './utils/audit.js';
 
 const auditCrud = (resource) => (req, res, next) => {
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && req.user) {
@@ -93,7 +98,7 @@ const allowedOrigins = [
     'http://127.0.0.1:5173',
   ]),
   ...(process.env.APP_URL ? [process.env.APP_URL.replace(/\/+$/, '')] : []),
-  ...(process.env.NEXT_PUBLIC_API_URL ? [new URL(process.env.NEXT_PUBLIC_API_URL).origin] : []),
+  ...(() => { try { return process.env.NEXT_PUBLIC_API_URL ? [new URL(process.env.NEXT_PUBLIC_API_URL).origin] : []; } catch { return []; } })(),
 ];
 
 app.use(cors({
@@ -125,12 +130,7 @@ app.use(cors({
   maxAge: 86400,
 }));
 
-// Security headers
-import { securityHeaders } from './middleware/security.js';
 app.use(securityHeaders);
-
-// Compression
-import compression from 'compression';
 app.use(compression());
 
 // Request size limits
@@ -145,12 +145,7 @@ app.use(express.urlencoded({
   parameterLimit: 500,
 }));
 
-// sanitize all /api inputs
-import { sanitizeInput } from './middleware/security.js';
-app.use('/api', sanitizeInput);
-
-import { globalRateLimiter, userRateLimiter, authRateLimiter, passwordResetRateLimiter, refreshTokenRateLimiter } from './middleware/security.js';
-import { passport } from './config/oauth.js';
+app.use('/api', sanitizeInput, xssPrevent);
 app.use('/api/health', (req, res, next) => next());
 app.use('/api/auth/refresh-token', refreshTokenRateLimiter);
 app.use(globalRateLimiter);
@@ -162,8 +157,6 @@ app.use(['/api/auth/forgot-password', '/api/auth/reset-password'], passwordReset
 // per-user rate limit — 120 req / 15min
 app.use('/api', userRateLimiter(120, 15 * 60 * 1000));
 
-// Security monitoring — alert admin on suspicious access patterns (403, 429)
-import { reportSuspiciousAccess } from './utils/securityMonitor.js';
 app.use('/api', (req, res, next) => {
   const originalJson = res.json.bind(res);
   res.json = function(body) {
@@ -253,9 +246,6 @@ Scope: All our services and infrastructure
   res.setHeader('Content-Type', 'text/plain');
   res.send(securityText.trim());
 });
-
-// Error handlers
-import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
 app.use(notFoundHandler);
 app.use(errorHandler);

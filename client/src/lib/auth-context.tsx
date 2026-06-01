@@ -28,11 +28,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// quick & dirty jwt decode — just need the expiration
 function decodeJWT(token: string): { exp: number } | null {
   try {
     const payload = token.split('.')[1];
-    return JSON.parse(atob(payload));
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+    return JSON.parse(atob(padded));
   } catch {
     return null;
   }
@@ -154,7 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("user", JSON.stringify(data.user));
     localStorage.setItem("business", JSON.stringify(data.business));
 
-    router.push("/");
+    router.push("/dashboard");
   };
 
   const register = async (name: string, email: string, password: string, businessName: string, phone?: string) => {
@@ -181,7 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("user", JSON.stringify(data.user));
     localStorage.setItem("business", JSON.stringify(data.business));
 
-    router.push("/");
+    router.push("/dashboard");
   };
 
   const logout = async () => {
@@ -194,16 +195,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           credentials: 'include',
         }
       );
-      } catch {
-        } finally {
-      setUser(null);
-      setBusiness(null);
-      setToken(null);
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      localStorage.removeItem("business");
-      router.push("/login");
+    } catch {
+      console.error('Logout request failed');
     }
+    setUser(null);
+    setBusiness(null);
+    setToken(null);
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("business");
+    router.push("/login");
   };
 
   const hasPermission = useCallback(async (resource: string, action: 'create' | 'read' | 'update' | 'delete'): Promise<boolean> => {

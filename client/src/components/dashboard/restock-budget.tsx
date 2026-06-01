@@ -42,40 +42,40 @@ export function RestockBudget({
 
   if (!data?.items?.length) {
     return (
-      <div className="bg-[#121A2B] rounded-2xl p-6 border border-white/10">
-        <h3 className="flex items-center gap-2 text-white font-semibold mb-2">
-          <Calculator className="h-5 w-5 text-purple-400" /> Restock Budget
+      <div className="bg-card rounded-2xl p-6 border border-border">
+        <h3 className="flex items-center gap-2 text-card-foreground font-semibold mb-2">
+          <Calculator className="h-5 w-5 text-primary" /> Restock Budget
         </h3>
-        <p className="text-sm text-gray-400 text-center py-8">No items need restocking</p>
+        <p className="text-sm text-muted-foreground text-center py-8">No items need restocking</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-[#121A2B] rounded-2xl p-6 border border-white/10">
-      <h3 className="flex items-center gap-2 text-white font-semibold mb-1">
-        <Calculator className="h-5 w-5 text-purple-400" /> Restock Budget Calculator
+    <div className="bg-card rounded-2xl p-6 border border-border">
+      <h3 className="flex items-center gap-2 text-card-foreground font-semibold mb-1">
+        <Calculator className="h-5 w-5 text-primary" /> Restock Budget Calculator
       </h3>
-      <p className="text-sm text-gray-400 mb-4">
+      <p className="text-sm text-muted-foreground mb-4">
         {data.itemCount} items need restocking &middot; Total estimated: {formatCurrency(data.totalBudget)}
       </p>
       <div className="space-y-4">
         <div className="flex gap-4 items-end">
           <div className="flex-1">
-            <label className="text-sm font-medium text-gray-400">Stock Multiplier</label>
+            <label className="text-sm font-medium text-muted-foreground">Stock Multiplier</label>
             <input
               type="number"
               value={multiplier}
               onChange={(e) => setMultiplier(e.target.value)}
               min="1" max="5" step="0.5"
-              className="mt-1 w-full bg-[#0B1020] border border-white/10 rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-blue-500"
+              className="mt-1 w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground text-sm outline-none focus:border-primary"
             />
-            <p className="text-xs text-gray-500 mt-1">Target = reorder level &times; multiplier - current stock</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">Target = reorder level &times; multiplier - current stock</p>
           </div>
           <button
             onClick={handleCreate}
             disabled={loading || created}
-            className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 px-4 py-2.5 rounded-xl text-sm font-medium transition"
+            className="bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 px-4 py-2.5 rounded-xl text-sm font-medium transition"
           >
             {created ? (
               <><CheckCircle className="h-4 w-4 mr-2 inline" /> Created!</>
@@ -86,9 +86,9 @@ export function RestockBudget({
             )}
           </button>
         </div>
-        <div className="border border-white/10 rounded-xl max-h-48 overflow-y-auto">
+        <div className="border border-border rounded-xl max-h-48 overflow-y-auto">
           <table className="w-full text-sm">
-            <thead className="text-gray-400 border-b border-white/10">
+            <thead className="text-muted-foreground border-b border-border">
               <tr>
                 <th className="text-left py-3 px-3">Product</th>
                 <th className="text-right py-3">Current</th>
@@ -103,12 +103,12 @@ export function RestockBudget({
                 const orderQty = Math.max(0, targetQty - item.stock_qty);
                 const estCost = orderQty * (item.cost_price || 0);
                 return (
-                  <tr key={`${item.id}-${i}`} className="border-b border-white/5">
-                    <td className="py-3 px-3 font-medium text-white text-sm">{item.name}</td>
-                    <td className="py-3 text-right text-gray-300">{item.stock_qty}</td>
-                    <td className="py-3 text-right text-gray-300">{targetQty}</td>
-                    <td className="py-3 text-right font-semibold text-white">{orderQty}</td>
-                    <td className="py-3 text-right pr-3 text-gray-300">{formatCurrency(estCost)}</td>
+                  <tr key={`${item.id}-${i}`} className="border-b border-border/50">
+                    <td className="py-3 px-3 font-medium text-card-foreground text-sm">{item.name}</td>
+                    <td className="py-3 text-right text-card-foreground/70">{item.stock_qty}</td>
+                    <td className="py-3 text-right text-card-foreground/70">{targetQty}</td>
+                    <td className="py-3 text-right font-semibold text-card-foreground">{orderQty}</td>
+                    <td className="py-3 text-right pr-3 text-muted-foreground">{formatCurrency(estCost)}</td>
                   </tr>
                 );
               })}

@@ -117,27 +117,31 @@ router.post('/', async (req, res) => {
 });
 
 router.put('/:id', async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     const { status, due_date, notes, customer_id, items, discount_amount } = req.body;
     
-    const existingInvoice = await query(
-      'SELECT * FROM invoices WHERE id = $1 AND business_id = $2',
+    const existingInvoice = await client.query(
+      'SELECT * FROM invoices WHERE id = $1 AND business_id = $2 FOR UPDATE',
       [req.params.id, req.business_id]
     );
     
     if (existingInvoice.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Invoice not found' });
     }
     
     let subtotal = existingInvoice.rows[0].subtotal;
     if (items && items.length > 0) {
-      await query('DELETE FROM invoice_items WHERE invoice_id = $1 AND business_id = $2', [req.params.id, req.business_id]);
+      await client.query('DELETE FROM invoice_items WHERE invoice_id = $1 AND business_id = $2', [req.params.id, req.business_id]);
       
       subtotal = 0;
       for (const item of items) {
         const itemTotal = (item.qty * item.unit_price) - (item.discount || 0);
         subtotal += itemTotal;
-        await query(
+        await client.query(
           `INSERT INTO invoice_items (business_id, invoice_id, product_id, product_name, qty, unit_price, discount, total)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [req.business_id, req.params.id, item.product_id, item.product_name, item.qty, item.unit_price, item.discount || 0, itemTotal]
@@ -148,7 +152,7 @@ router.put('/:id', async (req, res) => {
     const total = subtotal - (discount_amount || existingInvoice.rows[0].discount_amount);
     const paidDate = status === 'paid' ? new Date() : existingInvoice.rows[0].paid_date;
     
-    const result = await query(
+    const result = await client.query(
       `UPDATE invoices 
        SET status = COALESCE($1, status), customer_id = COALESCE($2, customer_id), due_date = COALESCE($3, due_date), 
            notes = COALESCE($4, notes), subtotal = $5, discount_amount = $6, total = $7, 
@@ -157,18 +161,21 @@ router.put('/:id', async (req, res) => {
        RETURNING *`,
       [status, customer_id, due_date, notes, subtotal, discount_amount || existingInvoice.rows[0].discount_amount, total, paidDate, req.params.id, req.business_id]
     );
+
+    await client.query('COMMIT');
     
     res.json(result.rows[0]);
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Update invoice error:', error);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 });
 
 router.delete('/:id', async (req, res) => {
   try {
-    await query('DELETE FROM invoice_items WHERE invoice_id = $1 AND business_id = $2', [req.params.id, req.business_id]);
-    
     const result = await query(
       'DELETE FROM invoices WHERE id = $1 AND business_id = $2 RETURNING id',
       [req.params.id, req.business_id]

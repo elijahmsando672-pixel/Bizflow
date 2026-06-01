@@ -50,6 +50,10 @@ export const pool = new Pool({
     : undefined,
 });
 
+pool.on('error', (err) => {
+  console.error('Unexpected pool error:', err.message);
+});
+
 export const query = (text, params) => pool.query(text, params);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -951,5 +955,17 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
     }
   }
 };
+
+const shutdown = async () => {
+  try {
+    await pool.end();
+    console.log('Database pool closed');
+  } catch (err) {
+    console.error('Error closing pool:', err.message);
+  }
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 export default { pool, query, initDatabase };

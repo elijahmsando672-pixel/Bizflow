@@ -22,6 +22,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface NavItem {
   name: string;
@@ -72,7 +73,7 @@ const navigation: NavGroup[] = [
 function NavGroupItem({ group, pathname }: { group: NavGroup; pathname: string }) {
   return (
     <div className="mb-1">
-      <div className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500/70">
+      <div className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
         {group.title}
       </div>
       <div className="space-y-0.5 px-2">
@@ -84,21 +85,21 @@ function NavGroupItem({ group, pathname }: { group: NavGroup; pathname: string }
               key={item.href}
               href={item.href}
               className={cn(
-                "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150",
+                "group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
                 active
-                  ? "text-indigo-300"
-                  : "text-gray-400 hover:bg-white/[0.03] hover:text-gray-200"
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
               )}
             >
               {active && (
-                <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-gradient-to-b from-indigo-400 to-purple-400" />
+                <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
               )}
               <span
                 className={cn(
-                  "flex h-7 w-7 items-center justify-center rounded-md transition-all duration-150",
+                  "flex h-7 w-7 items-center justify-center rounded-lg transition-all duration-200",
                   active
-                    ? "bg-gradient-to-br from-indigo-500/20 to-purple-500/20 text-indigo-400 shadow-sm shadow-indigo-500/10"
-                    : "text-gray-500 group-hover:text-gray-300"
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground/70 group-hover:text-foreground"
                 )}
               >
                 <Icon className="h-4 w-4" />
@@ -118,15 +119,15 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
 
   const sidebarContent = (
     <>
-      <div className="flex h-16 items-center justify-between gap-3 border-b border-white/10 px-5">
+      <div className="flex h-16 items-center justify-between gap-3 border-b border-border px-5">
         <div className="flex items-center gap-3">
-          <div className="relative h-10 w-10">
-            <Image src="/logo.png" alt="BizFlow" fill sizes="40px" className="object-contain" />
+          <div className="relative h-9 w-9">
+            <Image src="/logo.png" alt="BizFlow" fill sizes="36px" className="object-contain" />
           </div>
-          <h1 className="text-lg font-bold text-white">BizFlow</h1>
+          <h1 className="text-lg font-bold text-foreground">BizFlow</h1>
         </div>
         {onClose && (
-          <button onClick={onClose} className="text-gray-400 hover:text-white lg:hidden">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground lg:hidden">
             <X className="h-5 w-5" />
           </button>
         )}
@@ -136,19 +137,19 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
           <NavGroupItem key={group.title} group={group} pathname={pathname} />
         ))}
       </div>
-      <div className="border-t border-white/10 p-4">
+      <div className="border-t border-border p-4">
         <div className="flex items-center gap-3 mb-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-xs font-semibold text-white shadow-sm">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground shadow-sm">
             {(user?.name || user?.email || "U").charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">{user?.name || "User"}</p>
-            <p className="text-xs text-gray-400 truncate capitalize">{user?.role || "Unknown"}</p>
+            <p className="text-sm font-medium text-foreground truncate">{user?.name || "User"}</p>
+            <p className="text-xs text-muted-foreground truncate capitalize">{user?.role || "Unknown"}</p>
           </div>
         </div>
         <button
           onClick={logout}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-400 hover:bg-white/5 hover:text-gray-200 transition-all"
+          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-muted-foreground hover:bg-white/[0.04] hover:text-foreground transition-all duration-200"
         >
           <LogOut className="h-4 w-4" />
           Logout
@@ -159,17 +160,32 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
 
   return (
     <>
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-[#080d1a] border-r border-[var(--border)] h-screen">
+      <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-sidebar border-r border-border h-screen">
         {sidebarContent}
       </aside>
-      {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-          <aside className="fixed left-0 top-0 z-50 flex h-full w-64 flex-col bg-[#080d1a] border-r border-[var(--border)]">
-            {sidebarContent}
-          </aside>
-        </div>
-      )}
+      <AnimatePresence>
+        {open && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={onClose}
+            />
+            <motion.aside
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed left-0 top-0 z-50 flex h-full w-64 flex-col bg-sidebar border-r border-border shadow-dropdown"
+            >
+              {sidebarContent}
+            </motion.aside>
+          </div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

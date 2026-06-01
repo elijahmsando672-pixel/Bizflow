@@ -1,5 +1,6 @@
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import sanitizeHtml from 'sanitize-html';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -118,6 +119,35 @@ export const sanitizeInput = (req, res, next) => {
 
   if (req.body && typeof req.body === 'object') {
     req.body = sanitizeValue(req.body);
+  }
+  if (req.query && typeof req.query === 'object') {
+    for (const [key, val] of Object.entries(req.query)) {
+      if (typeof val === 'string') {
+        req.query[key] = val.replace(/[\x00-\x1F\x7F]/g, '').trim();
+      }
+    }
+  }
+  next();
+};
+
+const XSS_PATTERNS = /<script[\s>]|javascript:\s*\(|onerror\s*=|onload\s*=|onclick\s*=|onmouseover\s*=|expression\s*\(|<embed[\s>]|<object[\s>]/i;
+
+export const xssPrevent = (req, res, next) => {
+  const checkValue = (value) => {
+    if (typeof value === 'string' && XSS_PATTERNS.test(value)) {
+      return true;
+    }
+    if (Array.isArray(value)) {
+      return value.some(checkValue);
+    }
+    if (value && typeof value === 'object') {
+      return Object.values(value).some(checkValue);
+    }
+    return false;
+  };
+
+  if (req.body && typeof req.body === 'object' && checkValue(req.body)) {
+    return res.status(400).json({ error: 'Invalid input detected' });
   }
   next();
 };

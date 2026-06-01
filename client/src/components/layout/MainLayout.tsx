@@ -6,14 +6,14 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 
-const AUTH_PATHS = ["/login", "/signup", "/reset-password", "/accept-invite", "/auth", "/auth/callback"];
+const SKIP_PATHS = ["/login", "/signup", "/reset-password", "/accept-invite", "/auth", "/auth/callback", "/dashboard"];
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
-  const isAuthPage = AUTH_PATHS.includes(pathname);
+  const skipLayout = SKIP_PATHS.includes(pathname) || pathname.startsWith("/dashboard/");
 
-  if (isAuthPage) {
+  if (skipLayout) {
     return <>{children}</>;
   }
 

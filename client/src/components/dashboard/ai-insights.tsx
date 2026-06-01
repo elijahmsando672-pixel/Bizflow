@@ -8,9 +8,9 @@ function InsightCard({
   desc: string;
 }) {
   return (
-    <div className="bg-white/5 p-4 rounded-xl border border-white/5">
-      <h3 className="font-semibold mb-2 text-white">{title}</h3>
-      <p className="text-sm text-gray-400">{desc}</p>
+    <div className="bg-card p-4 rounded-xl border border-border">
+      <h3 className="font-semibold mb-2 text-card-foreground">{title}</h3>
+      <p className="text-sm text-muted-foreground">{desc}</p>
     </div>
   );
 }
@@ -23,8 +23,8 @@ const insights = [
 
 export function AIInsights() {
   return (
-    <div className="bg-[#121A2B] rounded-2xl p-6 border border-white/10">
-      <h2 className="text-lg font-semibold text-white mb-6">AI Insights</h2>
+    <div className="bg-card rounded-2xl p-6 border border-border">
+      <h2 className="text-lg font-semibold text-card-foreground mb-6">AI Insights</h2>
       <div className="space-y-4">
         {insights.map((item) => (
           <InsightCard key={item.title} {...item} />

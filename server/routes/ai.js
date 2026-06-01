@@ -4,10 +4,11 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const router = express.Router();
 
-if (!process.env.GEMINI_API_KEY) {
-  console.warn('GEMINI_API_KEY not set - AI features will use fallback insights');
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+if (!GEMINI_API_KEY) {
+  console.warn('GEMINI_API_KEY/GOOGLE_API_KEY not set - AI features will use fallback insights');
 }
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
 
 router.get('/insights', async (req, res) => {
   try {
@@ -77,11 +78,14 @@ Provide:
 
     let aiSummary = null;
     try {
+      if (!genAI) throw new Error('AI_API_KEY_MISSING');
       const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
       const result = await model.generateContent(prompt);
       aiSummary = result.response.text();
     } catch (aiError) {
-      console.log('AI generation failed, using fallback:', aiError.message);
+      if (aiError.message !== 'AI_API_KEY_MISSING') {
+        console.log('AI generation failed, using fallback:', aiError.message);
+      }
       aiSummary = generateFallbackInsights(data);
     }
 
@@ -117,6 +121,7 @@ router.get('/predictions', async (req, res) => {
 
     let prediction = null;
     try {
+      if (!genAI) throw new Error('AI_API_KEY_MISSING');
       const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
       const prompt = `Based on these monthly revenue figures, predict the next 3 months. Only return JSON.
 Data: ${JSON.stringify(data)}
@@ -129,6 +134,9 @@ Return format: {"predictions": [{"month": "2026-05", "predicted_revenue": 10000,
         prediction = JSON.parse(jsonMatch[0]);
       }
     } catch (aiError) {
+      if (aiError.message !== 'AI_API_KEY_MISSING') {
+        console.log('AI prediction failed, using fallback:', aiError.message);
+      }
       prediction = { predictions: data.slice(-3).map((d, i) => ({
         month: getNextMonth(d.month, i + 1),
         predicted_revenue: d.revenue * 1.1,

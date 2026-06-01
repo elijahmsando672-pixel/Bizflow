@@ -1,7 +1,9 @@
 // Centralized error handler - prevents information disclosure
 export const errorHandler = (err, req, res, next) => {
+  if (!err) return next();
+
   console.error('Error:', {
-    message: err.message,
+    message: err.message || 'Unknown error',
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
     url: req.url,
     method: req.method,
@@ -9,11 +11,10 @@ export const errorHandler = (err, req, res, next) => {
     userId: req.user?.id || null,
   });
 
-  // Default error response - don't leak internal details
   const statusCode = err.status || 500;
   const message = statusCode === 500 
     ? 'Internal server error' 
-    : err.message;
+    : (err.message || 'Unknown error');
 
   res.status(statusCode).json({ error: message });
 };

@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import Joi from 'joi';
 import crypto from 'crypto';
-import { query } from '../config/db.js';
+import { query, pool } from '../config/db.js';
 import { sendWelcomeEmail, sendPasswordResetEmail } from '../utils/email.js';
 import { setCsrfCookie, clearCsrfCookie } from '../middleware/csrf.js';
 import { reportAccountLockout } from '../utils/securityMonitor.js';
@@ -25,12 +25,12 @@ const loginSchema = Joi.object({
   password: Joi.string().min(1).required(),
 });
 
-// bruteforce check — 5 failed attempts = 15min lockout
-const isLocked = async (email, ip) => {
+// bruteforce check — 5 failed attempts = 15min lockout (per-account, not per-IP)
+const isLocked = async (email) => {
   const cutoff = new Date(Date.now() - ATTEMPT_WINDOW_MS);
   const result = await query(
-    `SELECT COUNT(*) as failed_count FROM login_attempts WHERE email = $1 AND ip_address = $2 AND success = false AND attempted_at > $3`,
-    [email, ip, cutoff]
+    `SELECT COUNT(*) as failed_count FROM login_attempts WHERE email = $1 AND success = false AND attempted_at > $2`,
+    [email, cutoff]
   );
   return parseInt(result.rows[0].failed_count) >= MAX_LOGIN_ATTEMPTS;
 };
@@ -113,7 +113,7 @@ export const login = async (req, res) => {
     const { email, password } = value;
     const ip = req.ip || req.socket.remoteAddress;
 
-    if (await isLocked(email, ip)) {
+    if (await isLocked(email)) {
       reportAccountLockout(email, ip);
       return res.status(429).json({ error: 'Too many failed attempts. Please try again later.' });
     }
@@ -129,7 +129,7 @@ export const login = async (req, res) => {
     const valid = await verifyPassword(password, user.password);
     if (!valid) {
       await recordLoginAttempt(email, ip, false);
-      if (await isLocked(email, ip)) {
+      if (await isLocked(email)) {
         reportAccountLockout(email, ip);
         return res.status(429).json({ error: 'Account temporarily locked.' });
       }
@@ -137,7 +137,7 @@ export const login = async (req, res) => {
     }
 
     await query('DELETE FROM refresh_tokens WHERE user_id = $1', [user.id]);
-    await query('DELETE FROM login_attempts WHERE email = $1 AND ip_address = $2 AND success = false', [email, ip]);
+    await query('DELETE FROM login_attempts WHERE email = $1 AND success = false', [email]);
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
 
     const token = generateToken(user);
@@ -192,7 +192,7 @@ export const logout = async (req, res) => {
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email || !Joi.string().email().validate(email).error) {
+    if (!email || Joi.string().email().validate(email).error) {
       return res.json({ message: 'If the email exists in our system, a password reset link will be sent.' });
     }
     const result = await query('SELECT id FROM users WHERE email = $1', [email]);
@@ -216,7 +216,7 @@ export const resetPassword = async (req, res) => {
     if (!token || !password) return res.status(400).json({ error: 'Token and new password are required' });
 
     // tokens are hashed in the DB, so we scan recent ones and verify each
-    const result = await query(`SELECT * FROM password_resets WHERE expires_at > NOW() AND used = false ORDER BY created_at DESC LIMIT 1`, []);
+    const result = await query(`SELECT * FROM password_resets WHERE expires_at > NOW() AND used = false ORDER BY created_at DESC`, []);
     let resetRecord = null;
     for (const record of result.rows) {
       if (await verifyPassword(token, record.token)) { resetRecord = record; break; }
@@ -230,9 +230,19 @@ export const resetPassword = async (req, res) => {
     if (passwordValidation.error) return res.status(400).json({ error: 'Password must be at least 10 characters with uppercase, lowercase, number, and special character' });
 
     const hashedPassword = await hashPassword(password);
-    await query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userResult.rows[0].id]);
-    await query('UPDATE password_resets SET used = true WHERE id = $1', [resetRecord.id]);
-    await query('DELETE FROM refresh_tokens WHERE user_id = $1', [userResult.rows[0].id]);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userResult.rows[0].id]);
+      await client.query('UPDATE password_resets SET used = true WHERE id = $1', [resetRecord.id]);
+      await client.query('DELETE FROM refresh_tokens WHERE user_id = $1', [userResult.rows[0].id]);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
     res.json({ message: 'Password reset successfully' });
   } catch (err) {
     console.error('Reset password error:', err);
@@ -258,8 +268,8 @@ export const refreshToken = async (req, res) => {
 
     const newRefreshToken = generateRefreshToken();
     const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [oldTokenRecord.user_id, newRefreshToken, refreshExpiresAt]);
     await query('DELETE FROM refresh_tokens WHERE id = $1', [oldTokenRecord.id]);
+    await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [oldTokenRecord.user_id, newRefreshToken, refreshExpiresAt]);
 
     const userForToken = { id: oldTokenRecord.user_id, email: oldTokenRecord.email, business_id: oldTokenRecord.business_id, role: oldTokenRecord.role };
     const accessToken = generateToken(userForToken);

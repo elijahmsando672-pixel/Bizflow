@@ -72,9 +72,19 @@ export const create = async (req, res) => {
 };
 
 export const update = async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     const { category_id, description, amount, date, vendor, reference, is_receipt_attached, notes } = req.body;
-    const result = await query(
+
+    const existing = await client.query('SELECT id, amount FROM expenses WHERE id = $1 AND business_id = $2 FOR UPDATE', [req.params.id, req.business_id]);
+    if (existing.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Expense not found' });
+    }
+
+    const result = await client.query(
       `UPDATE expenses SET category_id = COALESCE($1, category_id), description = COALESCE($2, description),
        amount = COALESCE($3, amount), date = COALESCE($4, date), vendor = COALESCE($5, vendor),
        reference = COALESCE($6, reference), is_receipt_attached = COALESCE($7, is_receipt_attached),
@@ -82,11 +92,24 @@ export const update = async (req, res) => {
        WHERE id = $9 AND business_id = $10 RETURNING *`,
       [category_id, description, amount, date, vendor, reference, is_receipt_attached, notes, req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Expense not found' });
+
+    const newAmount = parseFloat(result.rows[0].amount);
+    if (newAmount > 0) {
+      await client.query(
+        `UPDATE cashflow_entries SET amount = $1, date = $2, description = $3
+         WHERE source_id = $4 AND source_type = 'expense' AND business_id = $5`,
+        [newAmount, date || new Date(), description || 'Expense', req.params.id, req.business_id]
+      );
+    }
+
+    await client.query('COMMIT');
     res.json(result.rows[0]);
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Expense update error:', error);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 
