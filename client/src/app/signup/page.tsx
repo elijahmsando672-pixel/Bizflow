@@ -5,7 +5,6 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign } from "lucide-react";
 import Link from "next/link";
 
 export default function SignupPage() {
@@ -44,9 +43,7 @@ export default function SignupPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600">
-              <DollarSign className="h-8 w-8 text-white" />
-            </div>
+            <img src="/logo.png" alt="BizFlow" className="h-12 w-12 rounded-xl object-contain" />
           </div>
           <CardTitle className="text-2xl">Create Account</CardTitle>
           <CardDescription>

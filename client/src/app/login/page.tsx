@@ -80,9 +80,7 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-40" />
         <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm text-xl font-bold shadow-lg">
-              B
-            </div>
+            <img src="/logo.png" alt="BizFlow" className="h-12 w-12 rounded-xl object-contain bg-white/20 backdrop-blur-sm shadow-lg" />
             <div>
               <h1 className="text-2xl font-bold">BizFlow</h1>
               <p className="text-sm text-indigo-200">Business Operating System</p>
@@ -127,9 +125,7 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           <header className="mb-8 lg:hidden">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-bold text-white shadow-sm">
-                B
-              </div>
+              <img src="/logo.png" alt="BizFlow" className="h-10 w-10 rounded-lg object-contain shadow-sm" />
               <div>
                 <h1 className="text-lg font-bold text-gray-900 dark:text-white">BizFlow</h1>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Business OS</p>

@@ -4,9 +4,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 const API_ORIGIN = API_URL.replace(/\/api\/?$/, '');
 
 const nextConfig: NextConfig = {
-  compiler: {
-    styledComponents: true,
-  },
   output: process.env.VERCEL ? undefined : 'standalone',
   images: {
     remotePatterns: [
