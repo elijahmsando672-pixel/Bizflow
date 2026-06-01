@@ -260,7 +260,7 @@ function Contact() {
           </div>
           <div className="text-center">
             <div className="text-2xl font-semibold tracking-tight">Location</div>
-            <p className="mt-2 text-sm text-muted-foreground">Nairobi, Kenya</p>
+            <p className="mt-2 text-sm text-muted-foreground">Nairobi, Kenya — East Africa</p>
             <p className="mt-1 text-xs text-muted-foreground">East Africa</p>
           </div>
         </div>
