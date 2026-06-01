@@ -162,6 +162,22 @@ app.use(['/api/auth/forgot-password', '/api/auth/reset-password'], passwordReset
 // per-user rate limit — 120 req / 15min
 app.use('/api', userRateLimiter(120, 15 * 60 * 1000));
 
+// Security monitoring — alert admin on suspicious access patterns (403, 429)
+import { reportSuspiciousAccess } from './utils/securityMonitor.js';
+app.use('/api', (req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = function(body) {
+    if ([403, 429].includes(res.statusCode)) {
+      const businessId = req.user?.business_id || req.business_id || null;
+      if (businessId) {
+        reportSuspiciousAccess(businessId, getClientIp(req), res.statusCode, req.user?.email, req.originalUrl);
+      }
+    }
+    return originalJson(body);
+  };
+  next();
+});
+
 // all protected routes need auth + permission checks + audit logging
 app.use('/api/customers', protect, requirePermission, auditCrud('customers'), customerRoutes);
 app.use('/api/products', protect, requirePermission, auditCrud('products'), productRoutes);

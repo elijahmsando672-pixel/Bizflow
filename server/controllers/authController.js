@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { query } from '../config/db.js';
 import { sendWelcomeEmail, sendPasswordResetEmail } from '../utils/email.js';
 import { setCsrfCookie, clearCsrfCookie } from '../middleware/csrf.js';
+import { reportAccountLockout } from '../utils/securityMonitor.js';
 import { JWT_SECRET_KEY as JWT_SECRET } from '../middleware/auth.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 
@@ -112,7 +113,10 @@ export const login = async (req, res) => {
     const { email, password } = value;
     const ip = req.ip || req.socket.remoteAddress;
 
-    if (await isLocked(email, ip)) return res.status(429).json({ error: 'Too many failed attempts. Please try again later.' });
+    if (await isLocked(email, ip)) {
+      reportAccountLockout(email, ip);
+      return res.status(429).json({ error: 'Too many failed attempts. Please try again later.' });
+    }
 
     const result = await query('SELECT u.*, b.name as business_name FROM users u JOIN businesses b ON u.business_id = b.id WHERE u.email = $1', [email]);
     if (result.rows.length === 0) { await recordLoginAttempt(email, ip, false); return res.status(401).json({ error: 'Invalid credentials' }); }
@@ -125,7 +129,10 @@ export const login = async (req, res) => {
     const valid = await verifyPassword(password, user.password);
     if (!valid) {
       await recordLoginAttempt(email, ip, false);
-      if (await isLocked(email, ip)) return res.status(429).json({ error: 'Account temporarily locked.' });
+      if (await isLocked(email, ip)) {
+        reportAccountLockout(email, ip);
+        return res.status(429).json({ error: 'Account temporarily locked.' });
+      }
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
