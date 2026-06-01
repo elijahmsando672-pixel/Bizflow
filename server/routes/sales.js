@@ -279,10 +279,12 @@ router.post('/', async (req, res) => {
     await client.query('BEGIN');
 
     const { customer_id, sale_date, due_date, items, notes, discount_amount = 0, status = 'draft' } = req.body;
+    if (!Array.isArray(items) || !items.length) {
+      return res.status(400).json({ error: 'At least one item is required' });
+    }
 
     const invResult = await client.query(
-      "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM 5) AS INTEGER)), 0) + 1 as next_num FROM sales WHERE business_id = $1",
-      [req.business_id]
+      "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM 5) AS INTEGER)), 0) + 1 as next_num FROM sales"
     );
     const saleNumber = `SAL-${String(parseInt(invResult.rows[0].next_num)).padStart(5, '0')}`;
 

@@ -30,6 +30,24 @@ import userRoutes from './routes/users.js';
 import oauthRoutes from './routes/oauth.js';
 import { protect } from './middleware/protect.js';
 import { requirePermission } from './middleware/rbac.js';
+import { logAudit, getClientIp } from './utils/audit.js';
+
+const auditCrud = (resource) => (req, res, next) => {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && req.user) {
+    const action = `${req.method.toLowerCase()}.${resource}`;
+    logAudit({
+      businessId: req.user?.business_id || null,
+      userId: req.user?.id || null,
+      action,
+      resourceType: resource,
+      resourceId: req.params?.id || null,
+      details: { path: req.originalUrl },
+      ip: getClientIp(req),
+      userAgent: req.get('User-Agent'),
+    }).catch(console.error);
+  }
+  next();
+};
 
 
 dotenv.config();
@@ -89,9 +107,9 @@ app.use(cors({
       if (process.env.CORS_ALLOW_ALL === 'true') {
         return callback(null, true);
       }
-      // Also accept origins that start with known patterns (Vercel preview URLs etc.)
+      // Also accept origins that exactly match known patterns (Vercel preview URLs etc.)
       const appUrl = (process.env.APP_URL || '').replace(/\/+$/, '');
-      if (appUrl && origin.startsWith(new URL(appUrl).origin)) {
+      if (appUrl && origin === new URL(appUrl).origin) {
         return callback(null, true);
       }
       console.warn(`Blocked CORS request from unknown origin: ${origin}. Allowed: ${allowedOrigins.join(', ')}`);
@@ -144,31 +162,31 @@ app.use(['/api/auth/forgot-password', '/api/auth/reset-password'], passwordReset
 // per-user rate limit — 120 req / 15min
 app.use('/api', userRateLimiter(120, 15 * 60 * 1000));
 
-// all protected routes need auth + permission checks
-app.use('/api/customers', protect, requirePermission, customerRoutes);
-app.use('/api/products', protect, requirePermission, productRoutes);
-app.use('/api/invoices', protect, requirePermission, invoiceRoutes);
-app.use('/api/sales', protect, requirePermission, saleRoutes);
-app.use('/api/expenses', protect, requirePermission, expenseRoutes);
-app.use('/api/dashboard', protect, dashboardRoutes);
-app.use('/api/notifications', protect, notificationRoutes);
-app.use('/api/admin', protect, adminRoutes);
-app.use('/api/team', protect, requirePermission, teamRoutes);
-app.use('/api/employees', protect, requirePermission, employeeRoutes);
-app.use('/api/debtors', protect, debtorRoutes);
-app.use('/api/creditors', protect, requirePermission, creditorRoutes);
-app.use('/api/reports', protect, requirePermission, reportRoutes);
-app.use('/api/ai', protect, aiRoutes);
-app.use('/api/crm', protect, requirePermission, crmRoutes);
-app.use('/api/pipeline', protect, requirePermission, pipelineRoutes);
-app.use('/api/support', protect, requirePermission, supportRoutes);
-app.use('/api/projects', protect, requirePermission, projectRoutes);
-app.use('/api/procurement', protect, requirePermission, procurementRoutes);
-app.use('/api/timetracking', protect, timetrackingRoutes);
-app.use('/api/permissions', protect, permissionsRoutes);
-app.use('/api/import', protect, express.json({ limit: '10mb' }), importExportRoutes);
-app.use('/api/export', protect, importExportRoutes);
-app.use('/api/users', protect, requirePermission, userRoutes);
+// all protected routes need auth + permission checks + audit logging
+app.use('/api/customers', protect, requirePermission, auditCrud('customers'), customerRoutes);
+app.use('/api/products', protect, requirePermission, auditCrud('products'), productRoutes);
+app.use('/api/invoices', protect, requirePermission, auditCrud('invoices'), invoiceRoutes);
+app.use('/api/sales', protect, requirePermission, auditCrud('sales'), saleRoutes);
+app.use('/api/expenses', protect, requirePermission, auditCrud('expenses'), expenseRoutes);
+app.use('/api/dashboard', protect, auditCrud('dashboard'), dashboardRoutes);
+app.use('/api/notifications', protect, auditCrud('notifications'), notificationRoutes);
+app.use('/api/admin', protect, requirePermission, auditCrud('admin'), adminRoutes);
+app.use('/api/team', protect, requirePermission, auditCrud('team'), teamRoutes);
+app.use('/api/employees', protect, requirePermission, auditCrud('employees'), employeeRoutes);
+app.use('/api/debtors', protect, auditCrud('debtors'), debtorRoutes);
+app.use('/api/creditors', protect, requirePermission, auditCrud('creditors'), creditorRoutes);
+app.use('/api/reports', protect, requirePermission, auditCrud('reports'), reportRoutes);
+app.use('/api/ai', protect, auditCrud('ai'), aiRoutes);
+app.use('/api/crm', protect, requirePermission, auditCrud('crm'), crmRoutes);
+app.use('/api/pipeline', protect, requirePermission, auditCrud('pipeline'), pipelineRoutes);
+app.use('/api/support', protect, requirePermission, auditCrud('support'), supportRoutes);
+app.use('/api/projects', protect, requirePermission, auditCrud('projects'), projectRoutes);
+app.use('/api/procurement', protect, requirePermission, auditCrud('procurement'), procurementRoutes);
+app.use('/api/timetracking', protect, auditCrud('timetracking'), timetrackingRoutes);
+app.use('/api/permissions', protect, auditCrud('permissions'), permissionsRoutes);
+app.use('/api/import', protect, express.json({ limit: '10mb' }), auditCrud('import'), importExportRoutes);
+app.use('/api/export', protect, auditCrud('export'), importExportRoutes);
+app.use('/api/users', protect, requirePermission, auditCrud('users'), userRoutes);
 
 // OAuth routes (no auth middleware — passport handles it)
 app.use(passport.initialize());

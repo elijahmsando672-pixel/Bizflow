@@ -3,14 +3,10 @@ import { query } from '../config/db.js';
 
 const router = express.Router();
 
-// Protected by global `protect` middleware
-// Role-based checks performed per-route below
+// Protected by global `protect` + `requirePermission` middleware
 
 router.get('/businesses', async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
     
     const businesses = await query(`
       SELECT b.*, 
@@ -31,9 +27,6 @@ router.get('/businesses', async (req, res) => {
 
 router.patch('/businesses/:id/status', async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
     
     const { status } = req.body;
     if (!['active', 'suspended', 'pending'].includes(status)) {
@@ -54,9 +47,6 @@ router.patch('/businesses/:id/status', async (req, res) => {
 
 router.get('/stats', async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
     
     const totalBusinesses = await query('SELECT COUNT(*) FROM businesses');
     const activeBusinesses = await query("SELECT COUNT(*) FROM businesses WHERE status = 'active'");

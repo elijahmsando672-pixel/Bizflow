@@ -16,6 +16,7 @@ const resourceRouteMap = {
   '/api/employees': 'employees',
   '/api/team': 'team',
   '/api/reports': 'reports',
+  '/api/admin': 'admin',
 };
 
 const actionMap = {
@@ -56,7 +57,7 @@ export const requirePermission = async (req, res, next) => {
     next();
   } catch (error) {
     console.error('Permission check error:', error.message);
-    next();
+    return res.status(500).json({ error: 'Access check failed' });
   }
 };
 

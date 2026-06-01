@@ -96,10 +96,15 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000);
 
+// Strips ASCII control chars from input strings — data quality, NOT a security control.
+// SQL injection is prevented by parameterized queries; XSS by output encoding.
 export const sanitizeInput = (req, res, next) => {
   const sanitizeValue = (value) => {
     if (typeof value === 'string') {
       return value.replace(/[\x00-\x1F\x7F]/g, '').trim();
+    }
+    if (Array.isArray(value)) {
+      return value.map(sanitizeValue);
     }
     if (typeof value === 'object' && value !== null) {
       const result = {};
@@ -107,9 +112,6 @@ export const sanitizeInput = (req, res, next) => {
         result[key] = sanitizeValue(val);
       }
       return result;
-    }
-    if (Array.isArray(value)) {
-      return value.map(sanitizeValue);
     }
     return value;
   };
