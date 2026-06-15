@@ -66,24 +66,12 @@ router.patch('/businesses/:id/status', async (req, res) => {
 
 router.get('/stats', async (req, res) => {
   try {
-    const totalBusinesses = await query('SELECT COUNT(*) FROM businesses');
-    const activeBusinesses = await query("SELECT COUNT(*) FROM businesses WHERE status = 'active'");
-    const pendingBusinesses = await query("SELECT COUNT(*) FROM businesses WHERE status = 'pending'");
-    const totalUsers = await query('SELECT COUNT(*) FROM users');
-    
-    const recentRegistrations = await query(`
-      SELECT b.id, b.name, b.created_at, u.email as owner_email
-      FROM businesses b
-      LEFT JOIN users u ON u.business_id = b.id AND u.role = 'owner'
-      ORDER BY b.created_at DESC LIMIT 5
-    `);
+    const totalBusinesses = await query('SELECT COUNT(*) FROM businesses WHERE id = $1', [req.business_id]);
+    const totalUsers = await query('SELECT COUNT(*) FROM users WHERE business_id = $1', [req.business_id]);
     
     res.json({
       totalBusinesses: parseInt(totalBusinesses.rows[0].count),
-      activeBusinesses: parseInt(activeBusinesses.rows[0].count),
-      pendingBusinesses: parseInt(pendingBusinesses.rows[0].count),
       totalUsers: parseInt(totalUsers.rows[0].count),
-      recentRegistrations: recentRegistrations.rows,
     });
   } catch (err) {
     console.error('Admin stats error:', err);

@@ -66,7 +66,8 @@ router.post('/', async (req, res) => {
     }
 
     const maxResult = await client.query(
-      "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM 5) AS INTEGER)), 0) + 1 as next_num FROM invoices"
+      "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM 5) AS INTEGER)), 0) + 1 as next_num FROM invoices WHERE business_id = $1",
+      [req.business_id]
     );
     const invoiceNumber = `INV-${String(parseInt(maxResult.rows[0].next_num)).padStart(5, '0')}`;
 

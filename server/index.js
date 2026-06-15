@@ -35,6 +35,10 @@ import timetrackingRoutes from './routes/timetracking.js';
 import permissionsRoutes from './routes/permissions.js';
 import importExportRoutes from './routes/importExport.js';
 import userRoutes from './routes/users.js';
+import shopRoutes from './routes/shops.js';
+import reviewRoutes from './routes/reviews.js';
+import messageRoutes from './routes/messages.js';
+import quotationRoutes from './routes/quotations.js';
 import oauthRoutes from './routes/oauth.js';
 
 const auditCrud = (resource) => (req, res, next) => {
@@ -158,16 +162,14 @@ app.use(['/api/auth/forgot-password', '/api/auth/reset-password'], passwordReset
 app.use('/api', userRateLimiter(120, 15 * 60 * 1000));
 
 app.use('/api', (req, res, next) => {
-  const originalJson = res.json.bind(res);
-  res.json = function(body) {
+  res.on('finish', () => {
     if ([403, 429].includes(res.statusCode)) {
       const businessId = req.user?.business_id || req.business_id || null;
       if (businessId) {
-        reportSuspiciousAccess(businessId, getClientIp(req), res.statusCode, req.user?.email, req.originalUrl);
+        reportSuspiciousAccess(businessId, getClientIp(req), res.statusCode, req.user?.email, req.originalUrl).catch(() => {});
       }
     }
-    return originalJson(body);
-  };
+  });
   next();
 });
 
@@ -196,6 +198,10 @@ app.use('/api/permissions', protect, auditCrud('permissions'), permissionsRoutes
 app.use('/api/import', protect, express.json({ limit: '10mb' }), auditCrud('import'), importExportRoutes);
 app.use('/api/export', protect, auditCrud('export'), importExportRoutes);
 app.use('/api/users', protect, requirePermission, auditCrud('users'), userRoutes);
+app.use('/api/shops', protect, requirePermission, auditCrud('shops'), shopRoutes);
+app.use('/api/reviews', protect, requirePermission, auditCrud('reviews'), reviewRoutes);
+app.use('/api/messages', protect, requirePermission, auditCrud('messages'), messageRoutes);
+app.use('/api/quotations', protect, requirePermission, auditCrud('quotations'), quotationRoutes);
 
 // OAuth routes (no auth middleware — passport handles it)
 app.use(passport.initialize());

@@ -10,11 +10,11 @@ router.get('/', async (req, res) => {
   try {
     const businessId = req.business_id;
     
-    const pendingSales = await query(
+    const overdueSales = await query(
       `SELECT s.*, c.name as customer_name, c.email as customer_email
        FROM sales s 
        LEFT JOIN customers c ON s.customer_id = c.id
-       WHERE s.business_id = $1 AND s.status = 'draft' AND s.due_date < NOW() - INTERVAL '3 days'`,
+       WHERE s.business_id = $1 AND s.status IN ('pending', 'sent') AND s.due_date < NOW() - INTERVAL '3 days'`,
       [businessId]
     );
     
@@ -29,7 +29,7 @@ router.get('/', async (req, res) => {
     );
     
     res.json({
-      overdueSales: pendingSales.rows,
+      overdueSales: overdueSales.rows,
       lowStockProducts: lowStock.rows,
       systemNotifications: systemNotifications.rows,
     });

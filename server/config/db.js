@@ -1,4 +1,7 @@
 import pg from 'pg';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import net from 'node:net';
 
@@ -46,7 +49,7 @@ export const pool = new Pool({
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
   ssl: process.env.NODE_ENV === 'production'
-    ? { rejectUnauthorized: false }
+    ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' }
     : undefined,
 });
 
@@ -202,6 +205,7 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
       discount_amount DECIMAL(12,2) DEFAULT 0,
       total DECIMAL(12,2) DEFAULT 0,
       amount_paid DECIMAL(12,2) DEFAULT 0,
+      paid_date TIMESTAMP,
       notes TEXT,
       created_by UUID REFERENCES users(id),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -938,10 +942,106 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
     );
 
     CREATE INDEX IF NOT EXISTS idx_permissions ON permissions(business_id, role_name);
+
+    -- ========================================
+    -- MODULE 14: Shops
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS shops (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      location TEXT,
+      phone VARCHAR(50),
+      email VARCHAR(255),
+      status VARCHAR(20) DEFAULT 'active',
+      manager_name VARCHAR(255),
+      opening_time TIME DEFAULT '08:00',
+      closing_time TIME DEFAULT '18:00',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS reviews (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+      customer_name VARCHAR(255),
+      product_id UUID REFERENCES products(id) ON DELETE SET NULL,
+      product_name VARCHAR(255),
+      rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+      comment TEXT,
+      status VARCHAR(20) DEFAULT 'published',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS messages (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      sender_name VARCHAR(255),
+      sender_email VARCHAR(255),
+      subject VARCHAR(255),
+      body TEXT,
+      is_read BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS quotations (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+      customer_name VARCHAR(255),
+      quotation_number VARCHAR(50) NOT NULL,
+      status VARCHAR(20) DEFAULT 'pending',
+      subtotal DECIMAL(12,2) DEFAULT 0,
+      tax_amount DECIMAL(12,2) DEFAULT 0,
+      discount_amount DECIMAL(12,2) DEFAULT 0,
+      total DECIMAL(12,2) DEFAULT 0,
+      valid_until DATE,
+      notes TEXT,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(business_id, quotation_number)
+    );
   `;
 
       await pool.query(schema);
       console.log('Database schema initialized successfully');
+
+      // Run pending migrations
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+          version VARCHAR(255) PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      const __dirname = path.dirname(fileURLToPath(import.meta.url));
+      const migrationsDir = path.join(__dirname, '..', 'migrations');
+      if (fs.existsSync(migrationsDir)) {
+        const files = fs.readdirSync(migrationsDir)
+          .filter(f => f.endsWith('.sql'))
+          .sort();
+
+        for (const file of files) {
+          const version = file.replace(/\.sql$/, '');
+          const existing = await pool.query(
+            'SELECT 1 FROM schema_migrations WHERE version = $1',
+            [version]
+          );
+          if (existing.rows.length > 0) continue;
+
+          const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
+          await pool.query(sql);
+          await pool.query(
+            'INSERT INTO schema_migrations (version, name) VALUES ($1, $2)',
+            [version, file]
+          );
+          console.log(`  Migration applied: ${file}`);
+        }
+      }
       return;
     } catch (err) {
       const isLast = attempt === retries;

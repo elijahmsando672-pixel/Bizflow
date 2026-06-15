@@ -12,16 +12,12 @@ import {
 } from "@/lib/data";
 import type { DashboardData, LowStockItem, TopProduct } from "@/types";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Badge as UIBadge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
@@ -53,8 +49,6 @@ const C = {
 
 // ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
 const radius = { sm: 8, md: 12, lg: 16 };
-const shadow = "0 1px 3px rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.2)";
-const glow = (c: string) => `0 0 20px ${c}22, 0 0 40px ${c}11`;
 const transition = "all .2s cubic-bezier(.4,0,.2,1)";
 
 // ─── SMALL COMPONENTS ─────────────────────────────────────────────────────────
@@ -298,15 +292,8 @@ const PAGE_ICONS: Record<string, string> = {
   settings: "⚙️", "payment-settings": "💳", integrations: "🔗",
   notifications: "🔔", "backup-restore": "💾",
 };
+
 const PAGE_COLORS: Record<string, string> = {
-  dashboard: C.indigo, analytics: C.purple, "activity-feed": C.teal, "quick-actions": C.orange,
-  sales: C.green, orders: C.blue, quotations: C.amber, returns: C.orange, receipts: C.cyan,
-  payments: C.cyan, "pending-payments": C.orange, refunds: C.red, chargebacks: C.pink,
-  "payment-methods": C.indigo, "payment-analytics": C.purple,
-  inventory: C.indigo, "stock-levels": C.teal, categories: C.orange, barcodes: C.cyan,
-  "stock-adjustments": C.amber, transfers: C.green,
-  customers: C.pink, loyalty: C.amber, "credit-accounts": C.purple,
-  reviews: C.amber, messages: C.cyan,
   suppliers: C.green, "purchase-orders": C.blue, "supplier-deliveries": C.teal, "supplier-payments": C.cyan,
   dispatch: C.teal, "logistics-deliveries": C.green, tracking: C.orange, "shipping-partners": C.purple,
   expenses: C.red, revenue: C.green, "profit-loss": C.indigo, "cash-flow": C.teal, "tax-reports": C.orange,
@@ -957,53 +944,99 @@ const ExpensesPage = () => {
 };
 
 // ─── SHOPS PAGE ───────────────────────────────────────────────────────────────
-const ShopsPage = () => (
-  <div>
-    <PageHeader title="Shop Management" subtitle="Manage all your business locations">
-      <Btn color={C.purple}>+ Add New Shop</Btn>
-    </PageHeader>
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
-      <StatCard label="Total Shops" value="1" sub="All registered" icon="🏪" />
-      <StatCard label="Active Shops" value="1" sub="Operating" icon="📈" acolsent={C.green} />
-      <StatCard label="Products" value="8" sub="Across all shops" icon="📦" acolsent={C.purple} />
-      <StatCard label="Staff" value="1" sub="All members" icon="👥" acolsent={C.red} />
-      <StatCard label="Sales" value="0" sub="All locations" icon="📈" acolsent={C.orange} />
-      <StatCard label="Inactive" value="0" sub="Shops paused" icon="🏪" acolsent={C.cyan} />
-    </div>
-    <Card style={{ marginBottom: 12 }}>
-      <SearchBar placeholder="Search by name, code, or location..." value="" onChange={() => { }} />
-    </Card>
-    <Card acolsent={C.green}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: `${C.indigo}18`, border: `1px solid ${C.indigo}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🏪</div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: C.text }}>Main Shop</div>
-            <div style={{ fontSize: 11, color: C.muted }}>MAIN</div>
-          </div>
+const ShopsPage = () => {
+  const [shops, setShops] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [modal, setModal] = useState(false);
+  const [editItem, setEditItem] = useState<any>(null);
+  const [form, setForm] = useState({ name: "", location: "", phone: "", email: "", manager_name: "" });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api.shops.getAll() as any[];
+      setShops(Array.isArray(data) ? data : []);
+    } catch { setShops([]); } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleSubmit = async () => {
+    try {
+      if (editItem) { await api.shops.update(editItem.id, form); }
+      else { await api.shops.create(form); }
+      setModal(false); setEditItem(null);
+      setForm({ name: "", location: "", phone: "", email: "", manager_name: "" });
+      load();
+    } catch { alert("Failed to save shop"); }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this shop?")) return;
+    try { await api.shops.delete(id); load(); } catch { alert("Delete failed"); }
+  };
+
+  const filtered = shops.filter((s: any) =>
+    (s.name || "").toLowerCase().includes(search.toLowerCase()) || (s.location || "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div>
+      <PageHeader title="Shops" subtitle="Manage your business locations">
+        <Btn color={C.purple} onClick={() => { setEditItem(null); setForm({ name: "", location: "", phone: "", email: "", manager_name: "" }); setModal(true); }}>+ Add New Shop</Btn>
+        <Btn outline color={C.muted} onClick={load}>↺ Refresh</Btn>
+      </PageHeader>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
+        <StatCard label="Total Shops" value={String(filtered.length)} sub="All registered" icon="🏪" />
+        <StatCard label="Active Shops" value={String(filtered.filter((s: any) => s.status === "active" || !s.status).length)} sub="Operating" icon="📈" acolsent={C.green} />
+        <StatCard label="Inactive" value={String(filtered.filter((s: any) => s.status === "inactive").length)} sub="Shops paused" icon="🏪" acolsent={C.cyan} />
+      </div>
+      <Card style={{ marginBottom: 12 }}>
+        <SearchBar placeholder="Search by name or location..." value={search} onChange={setSearch} />
+      </Card>
+      {loading ? (
+        <div style={{ padding: 40, textAlign: "center", color: C.muted }}>Loading...</div>
+      ) : filtered.length === 0 ? (
+        <Card><div style={{ textAlign: "center", padding: 40, color: C.muted }}>No shops yet. Create your first shop above.</div></Card>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {filtered.map((s: any) => (
+            <Card key={s.id} acolsent={s.status === "active" || !s.status ? C.green : C.cyan}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: `${C.indigo}18`, border: `1px solid ${C.indigo}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🏪</div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 16, color: C.text }}>{s.name}</div>
+                    {s.manager_name && <div style={{ fontSize: 11, color: C.muted }}>Manager: {s.manager_name}</div>}
+                  </div>
+                </div>
+                <Badge label={(s.status || "ACTIVE").toUpperCase()} color={s.status === "active" || !s.status ? C.green : C.cyan} glow />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 14 }}>
+                {s.location && <div style={{ fontSize: 12, color: C.muted, display: "flex", alignItems: "center", gap: 6 }}><span>📍</span> {s.location}</div>}
+                {s.phone && <div style={{ fontSize: 12, color: C.muted, display: "flex", alignItems: "center", gap: 6 }}><span>📞</span> {s.phone}</div>}
+                {s.email && <div style={{ fontSize: 12, color: C.muted, display: "flex", alignItems: "center", gap: 6 }}><span>✉️</span> {s.email}</div>}
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <Btn small outline color={C.cyan} onClick={() => { setEditItem(s); setForm({ name: s.name || "", location: s.location || "", phone: s.phone || "", email: s.email || "", manager_name: s.manager_name || "" }); setModal(true); }}>✏️ Edit</Btn>
+                <Btn small outline color={C.red} onClick={() => handleDelete(s.id)}>🗑 Delete</Btn>
+              </div>
+            </Card>
+          ))}
         </div>
-        <Badge label="ACTIVE" color={C.green} glow />
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: C.muted, display: "flex", alignItems: "center", gap: 6 }}><span>📍</span> Kiambu</div>
-        <div style={{ fontSize: 12, color: C.muted, display: "flex", alignItems: "center", gap: 6 }}><span>👤</span> Manager: Elijah</div>
-        <div style={{ fontSize: 12, color: C.muted, display: "flex", alignItems: "center", gap: 6 }}><span>📞</span> +254717732274</div>
-      </div>
-      <div style={{ display: "flex", gap: 24, marginBottom: 14 }}>
-        {[["8", "Products"], ["0", "Sales"], ["1", "Staff"]].map(([v, l]) => (
-          <div key={l} style={{ textAlign: "center", background: C.bgCard3, borderRadius: 8, padding: "6px 14px", flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 18, color: C.text }}>{v}</div>
-            <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>{l}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 10 }}>
-        <Btn small outline color={C.cyan}>👁 View</Btn>
-        <Btn small outline color={C.green}>✏️ Edit</Btn>
-      </div>
-    </Card>
-  </div>
-);
+      )}
+      <Modal open={modal} onClose={() => setModal(false)} title={editItem ? "Edit Shop" : "New Shop"}>
+        <InputField label="Shop Name" value={form.name} onChange={v => setForm({ ...form, name: v })} placeholder="Branch name" icon="🏪" />
+        <InputField label="Location" value={form.location} onChange={v => setForm({ ...form, location: v })} placeholder="e.g. Nairobi" icon="📍" />
+        <InputField label="Phone" value={form.phone} onChange={v => setForm({ ...form, phone: v })} placeholder="07XX XXX XXX" icon="📞" />
+        <InputField label="Email" value={form.email} onChange={v => setForm({ ...form, email: v })} placeholder="email@example.com" icon="✉️" type="email" />
+        <InputField label="Manager Name" value={form.manager_name} onChange={v => setForm({ ...form, manager_name: v })} placeholder="Manager name" icon="👤" />
+        <Btn color={C.purple} onClick={handleSubmit} style={{ width: "100%", justifyContent: "center", marginTop: 8, padding: "10px 0" }}>{editItem ? "Update Shop" : "Create Shop"}</Btn>
+      </Modal>
+    </div>
+  );
+};
 
 // ─── INVENTORY PAGE ───────────────────────────────────────────────────────────
 const InventoryPage = () => {
@@ -1390,7 +1423,6 @@ const CustomersPage = () => {
 
 // ─── USERS PAGE ───────────────────────────────────────────────────────────────
 const UsersPage = () => {
-  const { user, business } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -1627,36 +1659,6 @@ const OrdersPage = () => {
   );
 };
 
-// ─── PRODUCTS PAGE ────────────────────────────────────────────────────────────
-const ProductsPage = () => {
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.products.getAll().then(d => setProducts(Array.isArray(d) ? d : [])).catch(() => setProducts([])).finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <Loader />;
-
-  return (
-    <div>
-      <PageHeader title="Products" subtitle="Manage your product catalog" />
-      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-        <StatCard label="Total Products" value={String(products.length)} icon="📦" acolsent={C.indigo} />
-        <StatCard label="In Stock" value={String(products.filter((p: any) => (p.stock || p.quantity || 0) > 0).length)} icon="✅" acolsent={C.green} />
-        <StatCard label="Low Stock" value={String(products.filter((p: any) => (p.stock || p.quantity || 0) <= 5).length)} icon="⚠️" acolsent={C.orange} />
-      </div>
-      <Card>
-        <Table
-          headers={["Name", "SKU", "Price", "Stock", "Category"]}
-          rows={products.map((p: any) => [p.name || "-", p.sku || "-", formatCurrency(p.price || 0), String(p.stock ?? p.quantity ?? 0), p.category || "-"])}
-          acolsent={C.indigo}
-        />
-      </Card>
-    </div>
-  );
-};
-
 // ─── REVIEWS PAGE ─────────────────────────────────────────────────────────────
 const ReviewsPage = () => {
   const [reviews, setReviews] = useState<any[]>([]);
@@ -1742,26 +1744,119 @@ const ActivityFeedPage = () => (
 );
 
 // ─── QUICK ACTIONS PAGE ─────────────────────────────────────────────────────────
-const QuickActionsPage = () => (
-  <div>
-    <PageHeader title="Quick Actions" subtitle="Frequently used shortcuts" />
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-      {[
-        { icon: "🛒", label: "New Sale", color: C.green },
-        { icon: "📦", label: "Add Product", color: C.indigo },
-        { icon: "👥", label: "Add Customer", color: C.pink },
-        { icon: "📉", label: "Add Expense", color: C.red },
-        { icon: "🏪", label: "New Shop", color: C.orange },
-        { icon: "💰", label: "Record Payment", color: C.cyan },
-      ].map(a => (
-        <Card key={a.label} hover style={{ flex: "1 1 calc(33% - 8px)", minWidth: 180, textAlign: "center" }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>{a.icon}</div>
-          <div style={{ fontWeight: 600, fontSize: 14, color: a.color }}>{a.label}</div>
-        </Card>
-      ))}
+const QuickActionsPage = () => {
+  const [modal, setModal] = useState("");
+  const [saleForm, setSaleForm] = useState({ customer_name: "", total: "", sale_date: new Date().toISOString().split("T")[0] });
+  const [productForm, setProductForm] = useState({ name: "", selling_price: "", cost_price: "", stock_qty: "" });
+  const [customerForm, setCustomerForm] = useState({ name: "", email: "", phone: "" });
+  const [expenseForm, setExpenseForm] = useState({ description: "", amount: "", category: "General", expense_date: new Date().toISOString().split("T")[0] });
+  const [shopForm, setShopForm] = useState({ name: "", location: "", phone: "" });
+  const [paymentForm, setPaymentForm] = useState({ sale_id: "", amount: "" });
+
+  const handleSale = async () => {
+    try {
+      await api.sales.create({ customer_name: saleForm.customer_name || "Walk-in", total: parseFloat(saleForm.total) || 0, items: [{ product_name: "Sale", qty: 1, unit_price: parseFloat(saleForm.total) || 0 }], sale_date: saleForm.sale_date });
+      setModal(""); setSaleForm({ customer_name: "", total: "", sale_date: new Date().toISOString().split("T")[0] });
+      alert("Sale created successfully!");
+    } catch { alert("Failed to create sale"); }
+  };
+  const handleProduct = async () => {
+    try {
+      await api.products.create({ name: productForm.name, selling_price: parseFloat(productForm.selling_price) || 0, cost_price: parseFloat(productForm.cost_price) || 0, stock_qty: parseInt(productForm.stock_qty) || 0 });
+      setModal(""); setProductForm({ name: "", selling_price: "", cost_price: "", stock_qty: "" });
+      alert("Product added successfully!");
+    } catch { alert("Failed to add product"); }
+  };
+  const handleCustomer = async () => {
+    try {
+      await api.customers.create(customerForm);
+      setModal(""); setCustomerForm({ name: "", email: "", phone: "" });
+      alert("Customer added successfully!");
+    } catch { alert("Failed to add customer"); }
+  };
+  const handleExpense = async () => {
+    try {
+      await api.expenses.create({ description: expenseForm.description, amount: parseFloat(expenseForm.amount) || 0, category: expenseForm.category, expense_date: expenseForm.expense_date });
+      setModal(""); setExpenseForm({ description: "", amount: "", category: "General", expense_date: new Date().toISOString().split("T")[0] });
+      alert("Expense added successfully!");
+    } catch { alert("Failed to add expense"); }
+  };
+  const handleShop = async () => {
+    try {
+      await api.shops.create(shopForm);
+      setModal(""); setShopForm({ name: "", location: "", phone: "" });
+      alert("Shop created successfully!");
+    } catch { alert("Failed to create shop"); }
+  };
+  const handlePayment = async () => {
+    try {
+      const sales = await api.sales.getAll() as any[];
+      const sale = sales.find((s: any) => s.id === paymentForm.sale_id || s.invoice_number === paymentForm.sale_id);
+      if (!sale) { alert("Sale not found"); return; }
+      await api.sales.update(sale.id, { status: "paid", amount_paid: parseFloat(paymentForm.amount) || sale.total });
+      setModal(""); setPaymentForm({ sale_id: "", amount: "" });
+      alert("Payment recorded!");
+    } catch { alert("Failed to record payment"); }
+  };
+
+  return (
+    <div>
+      <PageHeader title="Quick Actions" subtitle="Frequently used shortcuts" />
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+        {[
+          { icon: "🛒", label: "New Sale", color: C.green, key: "sale" },
+          { icon: "📦", label: "Add Product", color: C.indigo, key: "product" },
+          { icon: "👥", label: "Add Customer", color: C.pink, key: "customer" },
+          { icon: "📉", label: "Add Expense", color: C.red, key: "expense" },
+          { icon: "🏪", label: "New Shop", color: C.orange, key: "shop" },
+          { icon: "💰", label: "Record Payment", color: C.cyan, key: "payment" },
+        ].map(a => (
+          <Card key={a.label} hover style={{ flex: "1 1 calc(33% - 8px)", minWidth: 180, textAlign: "center", cursor: "pointer" }} onClick={() => setModal(a.key)}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>{a.icon}</div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: a.color }}>{a.label}</div>
+          </Card>
+        ))}
+      </div>
+      <Modal open={modal === "sale"} onClose={() => setModal("")} title="New Sale">
+        <InputField label="Customer Name" value={saleForm.customer_name} onChange={v => setSaleForm({ ...saleForm, customer_name: v })} placeholder="Walk-in Customer" icon="👤" />
+        <InputField label="Total Amount (KES)" value={saleForm.total} onChange={v => setSaleForm({ ...saleForm, total: v })} placeholder="0" icon="💰" type="number" />
+        <InputField label="Date" value={saleForm.sale_date} onChange={v => setSaleForm({ ...saleForm, sale_date: v })} type="date" />
+        <Btn color={C.green} onClick={handleSale} style={{ width: "100%", justifyContent: "center", marginTop: 8, padding: "10px 0" }}>Create Sale</Btn>
+      </Modal>
+      <Modal open={modal === "product"} onClose={() => setModal("")} title="Add Product">
+        <InputField label="Product Name" value={productForm.name} onChange={v => setProductForm({ ...productForm, name: v })} placeholder="Product name" icon="📦" />
+        <InputField label="Selling Price (KES)" value={productForm.selling_price} onChange={v => setProductForm({ ...productForm, selling_price: v })} placeholder="0" icon="💰" type="number" />
+        <InputField label="Cost Price (KES)" value={productForm.cost_price} onChange={v => setProductForm({ ...productForm, cost_price: v })} placeholder="0" icon="📊" type="number" />
+        <InputField label="Stock Qty" value={productForm.stock_qty} onChange={v => setProductForm({ ...productForm, stock_qty: v })} placeholder="0" icon="📦" type="number" />
+        <Btn color={C.indigo} onClick={handleProduct} style={{ width: "100%", justifyContent: "center", marginTop: 8, padding: "10px 0" }}>Add Product</Btn>
+      </Modal>
+      <Modal open={modal === "customer"} onClose={() => setModal("")} title="Add Customer">
+        <InputField label="Customer Name" value={customerForm.name} onChange={v => setCustomerForm({ ...customerForm, name: v })} placeholder="Full name" icon="👤" />
+        <InputField label="Email" value={customerForm.email} onChange={v => setCustomerForm({ ...customerForm, email: v })} placeholder="email@example.com" icon="✉️" type="email" />
+        <InputField label="Phone" value={customerForm.phone} onChange={v => setCustomerForm({ ...customerForm, phone: v })} placeholder="07XX XXX XXX" icon="📞" />
+        <Btn color={C.pink} onClick={handleCustomer} style={{ width: "100%", justifyContent: "center", marginTop: 8, padding: "10px 0" }}>Add Customer</Btn>
+      </Modal>
+      <Modal open={modal === "expense"} onClose={() => setModal("")} title="Add Expense">
+        <InputField label="Description" value={expenseForm.description} onChange={v => setExpenseForm({ ...expenseForm, description: v })} placeholder="What was this for?" icon="📝" />
+        <InputField label="Amount (KES)" value={expenseForm.amount} onChange={v => setExpenseForm({ ...expenseForm, amount: v })} placeholder="0" icon="💰" type="number" />
+        <InputField label="Category" value={expenseForm.category} onChange={v => setExpenseForm({ ...expenseForm, category: v })} placeholder="General" />
+        <InputField label="Date" value={expenseForm.expense_date} onChange={v => setExpenseForm({ ...expenseForm, expense_date: v })} type="date" />
+        <Btn color={C.red} onClick={handleExpense} style={{ width: "100%", justifyContent: "center", marginTop: 8, padding: "10px 0" }}>Add Expense</Btn>
+      </Modal>
+      <Modal open={modal === "shop"} onClose={() => setModal("")} title="New Shop">
+        <InputField label="Shop Name" value={shopForm.name} onChange={v => setShopForm({ ...shopForm, name: v })} placeholder="Branch name" icon="🏪" />
+        <InputField label="Location" value={shopForm.location} onChange={v => setShopForm({ ...shopForm, location: v })} placeholder="e.g. Nairobi" icon="📍" />
+        <InputField label="Phone" value={shopForm.phone} onChange={v => setShopForm({ ...shopForm, phone: v })} placeholder="07XX XXX XXX" icon="📞" />
+        <Btn color={C.orange} onClick={handleShop} style={{ width: "100%", justifyContent: "center", marginTop: 8, padding: "10px 0" }}>Create Shop</Btn>
+      </Modal>
+      <Modal open={modal === "payment"} onClose={() => setModal("")} title="Record Payment">
+        <InputField label="Sale ID or Invoice #" value={paymentForm.sale_id} onChange={v => setPaymentForm({ ...paymentForm, sale_id: v })} placeholder="Sale ID" icon="🔍" />
+        <InputField label="Amount Paid (KES)" value={paymentForm.amount} onChange={v => setPaymentForm({ ...paymentForm, amount: v })} placeholder="0" icon="💰" type="number" />
+        <Btn color={C.cyan} onClick={handlePayment} style={{ width: "100%", justifyContent: "center", marginTop: 8, padding: "10px 0" }}>Record Payment</Btn>
+      </Modal>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── QUOTATIONS PAGE ────────────────────────────────────────────────────────────
 const QuotationsPage = () => {

@@ -24,9 +24,17 @@ export const authenticate = async (req, res, next) => {
   
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const userResult = await query('SELECT is_active FROM users WHERE id = $1', [decoded.id]);
+    const userResult = await query(
+      `SELECT u.is_active, b.status as business_status
+       FROM users u JOIN businesses b ON u.business_id = b.id
+       WHERE u.id = $1`,
+      [decoded.id]
+    );
     if (!userResult.rows.length || !userResult.rows[0].is_active) {
       return res.status(401).json({ error: 'Account is deactivated' });
+    }
+    if (userResult.rows[0].business_status === 'suspended') {
+      return res.status(403).json({ error: 'Business account is suspended' });
     }
     req.user = decoded;
     req.business_id = decoded.business_id;

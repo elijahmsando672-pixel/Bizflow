@@ -39,27 +39,32 @@ async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<u
   });
 
   if (response.status === 403 && isStateChanging) {
-    try {
-      const csrfResponse = await fetch(
-        `${API_BASE_URL}/auth/csrf-token`,
-        { method: 'GET', credentials: 'include' }
-      );
-      if (csrfResponse.ok) {
-        const { csrfToken } = await csrfResponse.json();
-        headers['X-Csrf-Token'] = csrfToken;
-        const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
-          ...options,
-          headers,
-          credentials: 'include',
-        });
-        if (!retryResponse.ok) {
-          const error = await retryResponse.json().catch(() => ({ error: 'Request failed' }));
-          throw new ApiError(error.error || 'Request failed', retryResponse.status);
+    let csrfRetries = 0;
+    const MAX_CSRF_RETRIES = 1;
+    while (csrfRetries < MAX_CSRF_RETRIES) {
+      try {
+        const csrfResponse = await fetch(
+          `${API_BASE_URL}/auth/csrf-token`,
+          { method: 'GET', credentials: 'include' }
+        );
+        if (csrfResponse.ok) {
+          const { csrfToken } = await csrfResponse.json();
+          headers['X-Csrf-Token'] = csrfToken;
+          const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+            ...options,
+            headers,
+            credentials: 'include',
+          });
+          if (!retryResponse.ok) {
+            const error = await retryResponse.json().catch(() => ({ error: 'Request failed' }));
+            throw new ApiError(error.error || 'Request failed', retryResponse.status);
+          }
+          return retryResponse.json();
         }
-        return retryResponse.json();
+      } catch {
+        // CSRF recovery failed, fall through to normal error handling
       }
-    } catch {
-      // CSRF recovery failed, fall through to normal error handling
+      csrfRetries++;
     }
   }
 
@@ -380,6 +385,29 @@ const api = {
     updatePermission: (id: string, data: unknown) => fetchApi(`/permissions/permissions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     updateBulkPermissions: (role: string, permissions: unknown) => fetchApi('/permissions/permissions/bulk', { method: 'POST', body: JSON.stringify({ role_name: role, permissions }) }),
     checkPermission: (role: string, resource: string) => fetchApi(`/permissions/check?role=${role}&resource=${resource}`),
+  },
+  shops: {
+    getAll: () => fetchApi('/shops'),
+    getById: (id: string) => fetchApi(`/shops/${id}`),
+    create: (data: { name: string; location?: string; phone?: string; email?: string; manager_name?: string; opening_time?: string; closing_time?: string }) => fetchApi('/shops', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: unknown) => fetchApi(`/shops/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchApi(`/shops/${id}`, { method: 'DELETE' }),
+  },
+  reviews: {
+    getAll: () => fetchApi('/reviews'),
+    getById: (id: string) => fetchApi(`/reviews/${id}`),
+    create: (data: { customer_name?: string; product_name?: string; rating: number; comment?: string }) => fetchApi('/reviews', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: unknown) => fetchApi(`/reviews/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchApi(`/reviews/${id}`, { method: 'DELETE' }),
+  },
+  messages: {
+    getAll: () => fetchApi('/messages'),
+    markAsRead: (id: string) => fetchApi(`/messages/${id}/read`, { method: 'PATCH' }),
+  },
+  quotations: {
+    getAll: () => fetchApi('/quotations'),
+    getById: (id: string) => fetchApi(`/quotations/${id}`),
+    create: (data: { customer_name?: string; items?: Array<{ product_name: string; qty: number; unit_price: number }>; valid_until?: string; notes?: string }) => fetchApi('/quotations', { method: 'POST', body: JSON.stringify(data) }),
   },
   admin: {
     getStats: () => fetchApi('/admin/stats'),

@@ -70,6 +70,7 @@ export const passwordResetRateLimiter = rateLimit({
 });
 
 // Per-user rate limiter (for authenticated routes)
+const MAX_RATE_ENTRIES = 10000;
 const userRateStore = new Map();
 export const userRateLimiter = (maxRequests = 60, windowMs = 15 * 60 * 1000) => {
   return (req, res, next) => {
@@ -78,6 +79,10 @@ export const userRateLimiter = (maxRequests = 60, windowMs = 15 * 60 * 1000) => 
     const now = Date.now();
     const record = userRateStore.get(key);
     if (!record || now - record.windowStart > windowMs) {
+      if (userRateStore.size >= MAX_RATE_ENTRIES) {
+        const oldest = userRateStore.entries().next().value;
+        if (oldest) userRateStore.delete(oldest[0]);
+      }
       userRateStore.set(key, { windowStart: now, count: 1 });
       return next();
     }
@@ -130,7 +135,7 @@ export const sanitizeInput = (req, res, next) => {
   next();
 };
 
-const XSS_PATTERNS = /<script[\s>]|javascript:\s*\(|onerror\s*=|onload\s*=|onclick\s*=|onmouseover\s*=|expression\s*\(|<embed[\s>]|<object[\s>]/i;
+const XSS_PATTERNS = /<script[\s>]|javascript\s*:|onerror\s*=|onload\s*=|onclick\s*=|onmouseover\s*=|onfocus\s*=|onblur\s*=|onsubmit\s*=|onchange\s*=|oninput\s*=|onpointerdown\s*=|onpointerup\s*=|ontouchstart\s*=|ontouchend\s*=|expression\s*\(|<embed[\s>]|<object[\s>]|<svg[\s>]|<math[\s>]|<iframe[\s>]|<link[\s>]|style\s*=/i;
 
 export const xssPrevent = (req, res, next) => {
   const checkValue = (value) => {

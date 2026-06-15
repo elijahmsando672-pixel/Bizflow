@@ -199,7 +199,7 @@ export const forgotPassword = async (req, res) => {
     if (result.rows.length === 0) return res.json({ message: 'If the email exists in our system, a password reset link will be sent.' });
 
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = await hashPassword(resetToken);
+    const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
     await query('INSERT INTO password_resets (email, token, expires_at) VALUES ($1, $2, $3)', [email, tokenHash, expiresAt]);
     sendPasswordResetEmail(email, resetToken).catch(console.error);
@@ -215,12 +215,12 @@ export const resetPassword = async (req, res) => {
     const { token, password } = req.body;
     if (!token || !password) return res.status(400).json({ error: 'Token and new password are required' });
 
-    // tokens are hashed in the DB, so we scan recent ones and verify each
-    const result = await query(`SELECT * FROM password_resets WHERE expires_at > NOW() AND used = false ORDER BY created_at DESC`, []);
-    let resetRecord = null;
-    for (const record of result.rows) {
-      if (await verifyPassword(token, record.token)) { resetRecord = record; break; }
-    }
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const result = await query(
+      `SELECT * FROM password_resets WHERE token = $1 AND expires_at > NOW() AND used = false`,
+      [tokenHash]
+    );
+    const resetRecord = result.rows[0];
     if (!resetRecord) return res.status(400).json({ error: 'Invalid or expired reset token' });
 
     const userResult = await query('SELECT id FROM users WHERE email = $1', [resetRecord.email]);

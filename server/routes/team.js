@@ -38,9 +38,12 @@ router.post('/invite', async (req, res) => {
 
     const { email, role } = value;
 
-    const existing = await query('SELECT id FROM users WHERE email = $1 AND business_id = $2', [email, req.business_id]);
+    const existing = await query('SELECT id, business_id FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0) {
-      return res.status(400).json({ error: 'User is already a member of this business' });
+      if (existing.rows[0].business_id === req.business_id) {
+        return res.status(400).json({ error: 'User is already a member of this business' });
+      }
+      return res.status(400).json({ error: 'A user with this email already exists in another business. Use a different email.' });
     }
 
     const pendingInvite = await query(

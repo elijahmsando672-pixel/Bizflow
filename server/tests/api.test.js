@@ -58,8 +58,7 @@ beforeAll(async () => {
   try { await query('DELETE FROM creditors'); } catch { /*ok*/ }
   try { await query('DELETE FROM refresh_tokens'); } catch { /*ok*/ }
   try { await query('DELETE FROM password_resets'); } catch { /*ok*/ }
-  try { await query('DELETE FROM users'); } catch { /*ok*/ }
-  try { await query('DELETE FROM businesses'); } catch { /*ok*/ }
+  try { await query('DELETE FROM users WHERE email LIKE \'test%@example.com\''); } catch { /*ok*/ }
 });
 
 describe('Auth API', () => {

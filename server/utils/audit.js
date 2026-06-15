@@ -34,7 +34,13 @@ export const logAudit = async ({
 
 // Helper to extract IP from request (considering proxy)
 export const getClientIp = (req) => {
-  return req.ip || 
-         req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
-         req.socket?.remoteAddress;
+  if (req.ip) return req.ip;
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded && typeof forwarded === 'string') {
+    const ip = forwarded.split(',')[0].trim();
+    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(ip) || /^[0-9a-f:]+$/i.test(ip)) {
+      return ip;
+    }
+  }
+  return req.socket?.remoteAddress;
 };

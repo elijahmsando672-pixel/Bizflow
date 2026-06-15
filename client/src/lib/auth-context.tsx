@@ -212,7 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user.role === 'owner' || user.role === 'admin') return true;
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "/api"}/permissions/check?role=${user.role}&resource=${resource}`,
+        `${process.env.NEXT_PUBLIC_API_URL || "/api"}/permissions/check?role=${encodeURIComponent(user.role)}&resource=${encodeURIComponent(resource)}`,
         { method: "GET", credentials: 'include' }
       );
       if (!response.ok) return false;
