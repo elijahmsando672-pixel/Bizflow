@@ -1,7 +1,31 @@
 import express from 'express';
+import Joi from 'joi';
 import { query, pool } from '../config/db.js';
 
 const router = express.Router();
+
+const creditorSchema = Joi.object({
+  name: Joi.string().min(1).max(255).required(),
+  email: Joi.string().email().allow('', null),
+  phone: Joi.string().allow('', null),
+  address: Joi.string().allow('', null),
+  opening_balance: Joi.number().min(0).allow(0, null),
+  notes: Joi.string().allow('', null),
+});
+
+const creditorPaymentSchema = Joi.object({
+  amount: Joi.number().positive().required(),
+  date: Joi.date().allow('', null),
+  reference: Joi.string().allow('', null),
+  notes: Joi.string().allow('', null),
+});
+
+const validate = (schema) => (req, res, next) => {
+  const { error, value } = schema.validate(req.body, { abortEarly: false, stripUnknown: true });
+  if (error) return res.status(400).json({ error: error.details.map(d => d.message).join(', ') });
+  req.body = value;
+  next();
+};
 
 router.get('/', async (req, res) => {
   try {
@@ -18,10 +42,9 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', validate(creditorSchema), async (req, res) => {
   try {
     const { name, email, phone, address, opening_balance, notes } = req.body;
-    if (!name) return res.status(400).json({ error: 'Name is required' });
 
     const result = await query(
       `INSERT INTO creditors (business_id, name, email, phone, address, opening_balance, notes)
@@ -35,7 +58,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', validate(creditorSchema), async (req, res) => {
   try {
     const { name, email, phone, address, opening_balance, notes } = req.body;
     const result = await query(
@@ -65,12 +88,11 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-router.post('/:id/payments', async (req, res) => {
+router.post('/:id/payments', validate(creditorPaymentSchema), async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const { amount, date, reference, notes } = req.body;
-    if (!amount) return res.status(400).json({ error: 'Amount required' });
 
     const paymentResult = await client.query(
       `INSERT INTO creditor_payments (business_id, creditor_id, amount, date, reference, notes, created_by)

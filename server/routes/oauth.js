@@ -20,8 +20,8 @@ function buildRedirectUrl(user, business) {
   const token = generateToken(user);
   const params = new URLSearchParams({
     token,
-    user: JSON.stringify(user),
-    business: JSON.stringify(business),
+    userId: user.id,
+    businessId: business.id,
   });
   return `${CLIENT_CALLBACK}?${params.toString()}`;
 }

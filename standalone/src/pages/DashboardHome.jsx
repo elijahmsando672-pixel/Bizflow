@@ -1,3 +1,7 @@
+import { useNavigate } from "react-router-dom";
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 const kpis = [
   { label: "Revenue Today", value: "KSh 45,600", trend: "+15%", up: true },
   { label: "Orders", value: "156", trend: "+8%", up: true },
@@ -6,11 +10,11 @@ const kpis = [
 ];
 
 const quickActions = [
-  { label: "New Sale", icon: "🛒", color: "#3b82f6" },
-  { label: "Add Item", icon: "📦", color: "#22c55e" },
-  { label: "Customer", icon: "👥", color: "#a855f7" },
-  { label: "Supplier", icon: "🏭", color: "#f59e0b" },
-  { label: "Report", icon: "📈", color: "#ef4444" },
+  { label: "New Sale", icon: "🛒", color: "#3b82f6", path: "/app/sales/pos" },
+  { label: "Add Item", icon: "📦", color: "#22c55e", path: "/app/inventory/products" },
+  { label: "Customer", icon: "👥", color: "#a855f7", path: "/app/customers" },
+  { label: "Supplier", icon: "🏭", color: "#f59e0b", path: "/app/suppliers" },
+  { label: "Report", icon: "📈", color: "#ef4444", path: "/app/reports/sales" },
 ];
 
 const recentOrders = [
@@ -32,6 +36,8 @@ const activities = [
 const chartData = [60, 90, 70, 100, 80, 65, 95, 75, 85, 70, 90, 80];
 
 export default function DashboardHome() {
+  const navigate = useNavigate();
+
   return (
     <>
       <div className="greeting">
@@ -59,7 +65,7 @@ export default function DashboardHome() {
         </div>
         <div className="qa-grid">
           {quickActions.map((a) => (
-            <button key={a.label} className="qa-btn" style={{ "--accent": a.color }}>
+            <button key={a.label} className="qa-btn" style={{ "--accent": a.color }} onClick={() => navigate(a.path)}>
               <span className="qa-icon">{a.icon}</span>
               <span className="qa-label">{a.label}</span>
             </button>
@@ -72,13 +78,13 @@ export default function DashboardHome() {
           <h2 className="section-title">Revenue Trend</h2>
           <div className="chart-bars">
             {chartData.map((h, i) => (
-              <div key={i} className="chart-bar-wrap">
+              <div key={`bar-${i}`} className="chart-bar-wrap">
                 <div className="chart-bar" style={{ height: `${h}%` }} />
               </div>
             ))}
           </div>
           <div className="chart-labels">
-            {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((m) => (
+            {MONTHS.map((m) => (
               <span key={m} className="chart-label">{m}</span>
             ))}
           </div>
@@ -88,7 +94,7 @@ export default function DashboardHome() {
           <h2 className="section-title">📋 Activity Feed</h2>
           <div className="activity-list">
             {activities.map((a, i) => (
-              <div key={i} className="activity-item">
+              <div key={`act-${i}`} className="activity-item">
                 <span className="activity-icon">{a.icon}</span>
                 <div className="activity-body">
                   <p className="activity-text">{a.text}</p>
@@ -103,7 +109,7 @@ export default function DashboardHome() {
       <section className="table-section">
         <div className="table-header">
           <h2 className="section-title">Recent Orders</h2>
-          <button className="view-all">View All →</button>
+          <button className="view-all" onClick={() => navigate("/app/sales/orders")}>View All →</button>
         </div>
         <table>
           <thead>

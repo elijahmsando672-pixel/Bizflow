@@ -37,6 +37,9 @@ async function findOrCreateUser(profile, provider) {
 
   if (existing.rows.length > 0) {
     const row = existing.rows[0];
+    const statusCheck = await query('SELECT is_active FROM users WHERE id = $1', [row.user_id]);
+    const businessCheck = await query('SELECT status FROM businesses WHERE id = $1', [row.business_id]);
+    if (!statusCheck.rows[0]?.is_active || businessCheck.rows[0]?.status === 'suspended') return null;
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [row.user_id]);
     return {
       user: { id: row.user_id, name: row.name, email: row.email, role: row.role },
@@ -45,13 +48,14 @@ async function findOrCreateUser(profile, provider) {
   }
 
   const userByEmail = await query(
-    `SELECT u.id, u.name, u.email, u.role, u.business_id, b.name as business_name
+    `SELECT u.id, u.name, u.email, u.role, u.business_id, u.is_active, b.name as business_name, b.status as business_status
      FROM users u JOIN businesses b ON u.business_id = b.id WHERE u.email = $1`,
     [email]
   );
 
   if (userByEmail.rows.length > 0) {
     const row = userByEmail.rows[0];
+    if (!row.is_active || row.business_status === 'suspended') return null;
     await query(
       'INSERT INTO social_accounts (user_id, provider, provider_id, email) VALUES ($1, $2, $3, $4) ON CONFLICT (provider, provider_id) DO NOTHING',
       [row.id, provider, providerId, email]

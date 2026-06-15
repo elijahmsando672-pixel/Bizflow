@@ -1,5 +1,5 @@
 import express from 'express';
-import { query } from '../config/db.js';
+import { query, pool } from '../config/db.js';
 
 const router = express.Router();
 
@@ -100,13 +100,23 @@ router.post('/purchase-orders', async (req, res) => {
     const poId = poResult.rows[0].id;
 
     if (items && items.length > 0) {
-      await Promise.all(
-        items.map(item => query(
-          `INSERT INTO po_items (business_id, po_id, product_id, product_name, qty, unit_price, total)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [req.business_id, poId, item.product_id, item.product_name, item.qty, item.unit_price, item.qty * item.unit_price]
-        ))
-      );
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await Promise.all(
+          items.map(item => client.query(
+            `INSERT INTO po_items (business_id, po_id, product_id, product_name, qty, unit_price, total)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [req.business_id, poId, item.product_id, item.product_name, item.qty, item.unit_price, item.qty * item.unit_price]
+          ))
+        );
+        await client.query('COMMIT');
+        client.release();
+      } catch (txErr) {
+        await client.query('ROLLBACK');
+        client.release();
+        throw txErr;
+      }
     }
 
     const fullResult = await query(`SELECT * FROM purchase_orders WHERE id = $1 AND business_id = $2`, [poId, req.business_id]);

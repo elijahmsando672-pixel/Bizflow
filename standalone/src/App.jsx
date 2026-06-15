@@ -1,3 +1,4 @@
+import { Component } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -18,8 +19,34 @@ import { SalesReportPage, InventoryReportPage, ProfitLossPage, TaxPage } from ".
 import { AllShopsPage, ShopTransfersPage, BranchPerformancePage } from "./pages/ShopsPages";
 import { UsersPage, SettingsPage, AuditLogPage } from "./pages/SystemPages";
 
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f172a", color: "#f8fafc", fontFamily: "sans-serif" }}>
+          <div style={{ textAlign: "center" }}>
+            <h1 style={{ fontSize: 48, marginBottom: 16 }}>⚠️</h1>
+            <h2 style={{ marginBottom: 8 }}>Something went wrong</h2>
+            <p style={{ color: "#94a3b8", marginBottom: 24 }}>An unexpected error occurred. Please try refreshing the page.</p>
+            <button className="btn btn-primary" onClick={() => window.location.reload()}>Refresh Page</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
+    <ErrorBoundary>
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
@@ -93,5 +120,6 @@ export default function App() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </ErrorBoundary>
   );
 }

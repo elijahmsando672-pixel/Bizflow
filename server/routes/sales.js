@@ -286,7 +286,6 @@ router.post('/', async (req, res) => {
     const { customer_id, sale_date, due_date, items, notes, discount_amount = 0, status = 'draft' } = req.body;
     if (!Array.isArray(items) || !items.length) {
       await client.query('ROLLBACK');
-      client.release();
       return res.status(400).json({ error: 'At least one item is required' });
     }
 
@@ -301,7 +300,7 @@ router.post('/', async (req, res) => {
       subtotal += (item.qty * item.unit_price) - (item.discount || 0);
     }
     const taxAmount = subtotal * 0.16;
-    const total = Math.max(0, subtotal - discount_amount);
+    const total = Math.max(0, subtotal + taxAmount - discount_amount);
 
     const saleResult = await client.query(
       `INSERT INTO sales (business_id, customer_id, invoice_number, sale_date, due_date, subtotal, tax_amount, discount_amount, total, notes, status, created_by)
@@ -324,7 +323,6 @@ router.post('/', async (req, res) => {
         const currentStock = productResult.rows[0]?.stock_qty || 0;
         if (currentStock < item.qty) {
           await client.query('ROLLBACK');
-          client.release();
           return res.status(400).json({ error: `Insufficient stock for ${item.product_name || 'item'}. Available: ${currentStock}, requested: ${item.qty}` });
         }
         const newQty = currentStock - item.qty;

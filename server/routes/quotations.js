@@ -47,7 +47,7 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { customer_id, customer_name, status, subtotal, tax_amount, discount_amount, total, valid_until, notes, created_by } = req.body;
+    const { customer_id, customer_name, status, subtotal, tax_amount, discount_amount, total, valid_until, notes } = req.body;
     if (!customer_name) return res.status(400).json({ error: 'Customer name is required' });
 
     const quotationNumber = await generateQuotationNumber(req.business_id);
@@ -55,7 +55,7 @@ router.post('/', async (req, res) => {
     const result = await query(
       `INSERT INTO quotations (business_id, customer_id, customer_name, quotation_number, status, subtotal, tax_amount, discount_amount, total, valid_until, notes, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
-      [req.business_id, customer_id, sanitize(customer_name), quotationNumber, status || 'draft', subtotal || 0, tax_amount || 0, discount_amount || 0, total || 0, valid_until, sanitize(notes), created_by]
+      [req.business_id, customer_id, sanitize(customer_name), quotationNumber, status || 'draft', subtotal || 0, tax_amount || 0, discount_amount || 0, total || 0, valid_until, sanitize(notes), req.user.id]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {

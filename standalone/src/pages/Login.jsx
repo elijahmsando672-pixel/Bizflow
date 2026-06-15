@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import logo from '../assets/logo.png';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -7,16 +8,27 @@ export default function Login() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
+  function createToken() {
+    const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+    const payload = btoa(JSON.stringify({ sub: '1', name: 'Elijah', email, role: 'Admin', iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 86400 }));
+    const sig = btoa(header + '.' + payload + '.secret');
+    return `${header}.${payload}.${sig}`;
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!email || !password) { setError('Please fill in all fields'); return; }
-    localStorage.setItem('token', 'demo-token');
+    localStorage.setItem('token', createToken());
     navigate('/dashboard');
   };
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f7fb', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: 'white', padding: 40, borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', width: '100%', maxWidth: 420 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 32 }}>
+          <img src={logo} alt="BizFlow" style={{ height: 80, width: 80 }} />
+          <span style={{ fontSize: 24, fontWeight: 'bold', color: '#2563eb' }}>BizFlow</span>
+        </div>
         <Link to="/" style={{ color: '#2563eb', textDecoration: 'none', fontSize: 14, display: 'block', marginBottom: 24 }}>&larr; Back to Home</Link>
         <h1 style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 8 }}>Welcome Back</h1>
         <p style={{ color: '#6b7280', marginBottom: 24, fontSize: 14 }}>Sign in to your account to continue</p>

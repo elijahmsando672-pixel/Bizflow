@@ -1,10 +1,14 @@
 import { Link } from 'react-router-dom';
+import logo from '../assets/logo.png';
 
 export default function Landing() {
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', color: '#111827', fontFamily: 'Arial, sans-serif' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 40px', background: 'white', borderBottom: '1px solid #e5e7eb' }}>
-        <Link to="/" style={{ fontSize: 24, fontWeight: 'bold', color: '#2563eb', textDecoration: 'none' }}>BizFlow</Link>
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}>
+          <img src={logo} alt="BizFlow" style={{ height: 80, width: 80 }} />
+          <span style={{ fontSize: 26, fontWeight: 'bold', color: '#2563eb' }}>BizFlow</span>
+        </Link>
         <nav style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
           <Link to="/login" style={{ color: '#374151', textDecoration: 'none', fontWeight: 500 }}>Sign In</Link>
           <Link to="/register" style={{ background: '#2563eb', color: 'white', padding: '10px 24px', borderRadius: 8, textDecoration: 'none', fontWeight: 600, fontSize: 14 }}>Get Started</Link>

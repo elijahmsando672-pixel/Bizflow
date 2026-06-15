@@ -15,6 +15,17 @@ const inviteSchema = Joi.object({
 
 router.get('/members', async (req, res) => {
   try {
+    const requesterRole = req.user?.role;
+    if (requesterRole !== 'admin' && requesterRole !== 'manager' && requesterRole !== 'owner') {
+      return res.json([{
+        id: req.user.id,
+        name: req.user.name,
+        email: req.user.email,
+        role: req.user.role,
+        is_active: true,
+      }]);
+    }
+
     const result = await query(
       `SELECT u.id, u.name, u.email, u.role, u.is_active, u.last_login, u.created_at,
               b.name as business_name

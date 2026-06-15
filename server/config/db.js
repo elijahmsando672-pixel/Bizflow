@@ -159,7 +159,7 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
     CREATE TABLE IF NOT EXISTS products (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
-      sku VARCHAR(100) UNIQUE,
+      sku VARCHAR(100),
       barcode VARCHAR(100),
       name VARCHAR(255) NOT NULL,
       description TEXT,
@@ -436,6 +436,9 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
     CREATE INDEX IF NOT EXISTS idx_cashflow_business ON cashflow_entries(business_id, date);
     CREATE INDEX IF NOT EXISTS idx_notifications_business ON notifications(business_id, is_read);
     CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON stock_movements(product_id, created_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_products_business_sku ON products(business_id, sku);
+    CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
+    CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token);
 
     -- ========================================
     -- Audit Logging: Track sensitive operations

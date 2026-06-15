@@ -1311,6 +1311,41 @@ tr:hover td {
   font-weight: 600;
 }
 
+/* ─── TOAST ─── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #22c55e;
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  z-index: 1000;
+  animation: fadeInUp 0.3s ease;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── FOCUS VISIBLE ─── */
+*:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* ─── PRINT ─── */
+@media print {
+  .sidebar, .topbar, .page-toolbar, .cell-actions, .modal-overlay { display: none !important; }
+  .main { padding: 0 !important; }
+  table { border-collapse: collapse; }
+  th, td { border: 1px solid #ccc; }
+}
+
 /* ─── RESPONSIVE ─── */
 @media (max-width: 1024px) {
   .columns {
@@ -1337,6 +1372,10 @@ tr:hover td {
 
   .kpi-section {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .settings-layout {
+    grid-template-columns: 1fr;
   }
 }
 

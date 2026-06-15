@@ -53,11 +53,21 @@ const RESOURCE_CONFIG = {
   },
 };
 
-router.post('/import/:resource', async (req, res) => {
+const VALID_COLUMN_RE = /^[a-z_]+$/;
+const validateColumnNames = (columns) => {
+  for (const col of columns) {
+    if (!VALID_COLUMN_RE.test(col)) {
+      throw new Error(`Invalid column name: ${col}`);
+    }
+  }
+};
+
+router.post('/:resource', async (req, res) => {
   try {
     const { resource } = req.params;
     const config = RESOURCE_CONFIG[resource];
     if (!config) return res.status(400).json({ error: `Unsupported resource: ${resource}` });
+    validateColumnNames(config.columns);
 
     const { data } = req.body;
     if (!data || !Array.isArray(data)) return res.status(400).json({ error: 'Invalid data: must be array' });
@@ -101,11 +111,12 @@ router.post('/import/:resource', async (req, res) => {
   }
 });
 
-router.post('/import-csv/:resource', async (req, res) => {
+router.post('/csv/:resource', async (req, res) => {
   try {
     const { resource } = req.params;
     const config = RESOURCE_CONFIG[resource];
     if (!config) return res.status(400).json({ error: `Unsupported resource: ${resource}` });
+    validateColumnNames(config.columns);
 
     const { csvContent } = req.body;
     if (!csvContent) return res.status(400).json({ error: 'csvContent required' });
@@ -169,10 +180,11 @@ router.post('/import-csv/:resource', async (req, res) => {
   }
 });
 
-router.get('/export/:resource', async (req, res) => {
+router.get('/:resource', async (req, res) => {
   const { resource } = req.params;
   const config = RESOURCE_CONFIG[resource];
   if (!config) return res.status(400).json({ error: `Unsupported resource: ${resource}` });
+  validateColumnNames(config.columns);
 
   const format = req.query.format || 'json';
   const limit = Math.min(parseInt(req.query.limit) || 10000, 10000);

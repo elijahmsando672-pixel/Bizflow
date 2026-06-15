@@ -1,20 +1,6 @@
 import { useState } from "react";
-
-/* ─── PRODUCTS DATA (shared with POS) ─── */
-const products = [
-  { id: 1, name: "Coca Cola 500ml", sku: "BVR-001", price: 60, category: "Beverages", stock: 120 },
-  { id: 2, name: "Fanta Orange 500ml", sku: "BVR-002", price: 60, category: "Beverages", stock: 90 },
-  { id: 3, name: "Sprite 500ml", sku: "BVR-003", price: 60, category: "Beverages", stock: 85 },
-  { id: 4, name: "Kentucky Fried Chicken", sku: "FOD-001", price: 450, category: "Fast Food", stock: 30 },
-  { id: 5, name: "Beef Burger", sku: "FOD-002", price: 350, category: "Fast Food", stock: 25 },
-  { id: 6, name: "Chicken Burger", sku: "FOD-003", price: 380, category: "Fast Food", stock: 20 },
-  { id: 7, name: "French Fries Large", sku: "FOD-004", price: 250, category: "Fast Food", stock: 40 },
-  { id: 8, name: "Mineral Water 1L", sku: "BVR-004", price: 80, category: "Beverages", stock: 200 },
-  { id: 9, name: "Chocolate Cake Slice", sku: "SNS-001", price: 180, category: "Snacks", stock: 15 },
-  { id: 10, name: "Samosa (4 pcs)", sku: "SNS-002", price: 120, category: "Snacks", stock: 50 },
-  { id: 11, name: "Mandazi (2 pcs)", sku: "SNS-003", price: 60, category: "Snacks", stock: 35 },
-  { id: 12, name: "Chapati & Beans", sku: "FOD-005", price: 150, category: "Fast Food", stock: 28 },
-];
+import Modal from "../components/Modal";
+import products from "../data/products";
 
 const categories = [...new Set(products.map((p) => p.category))];
 
@@ -63,6 +49,7 @@ export function PosPage() {
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState([]);
   const [customer, setCustomer] = useState("Walk-in Customer");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const filtered = products.filter(
     (p) => (category === "All" || p.category === category) &&
@@ -89,6 +76,11 @@ export function PosPage() {
 
   const removeItem = (id) => {
     setCart((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  const handleCharge = () => {
+    setShowSuccessModal(true);
+    setCart([]);
   };
 
   const subtotal = cart.reduce((sum, c) => sum + c.price * c.qty, 0);
@@ -183,32 +175,106 @@ export function PosPage() {
             </div>
           </div>
 
-          <button className="btn btn-primary" style={{ width: "100%", justifyContent: "center", padding: "12px" }} disabled={cart.length === 0}>
+          <button className="btn btn-primary" style={{ width: "100%", justifyContent: "center", padding: "12px" }} disabled={cart.length === 0} onClick={handleCharge}>
             Charge KSh {total.toLocaleString()}
           </button>
         </div>
       </div>
+
+      {showSuccessModal && (
+        <Modal title="Sale Complete" onClose={() => setShowSuccessModal(false)}>
+          <p style={{ textAlign: "center", fontSize: 18, padding: "20px 0", color: "#22c55e", fontWeight: 600 }}>Sale completed!</p>
+          <div className="modal-actions" style={{ justifyContent: "center" }}>
+            <button className="btn btn-primary" onClick={() => setShowSuccessModal(false)}>OK</button>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }
 
 /* ─── ORDERS ─── */
 export function OrdersPage() {
+  const [orders, setOrders] = useState(ordersData);
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
 
-  const statuses = ["All", ...new Set(ordersData.map((o) => o.status))];
-  const filtered = ordersData.filter(
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [viewOrder, setViewOrder] = useState(null);
+  const [editOrder, setEditOrder] = useState(null);
+  const [deleteOrderId, setDeleteOrderId] = useState(null);
+
+  const [newForm, setNewForm] = useState({ customer: "", items: "", amount: "", payment: "M-Pesa", status: "Pending" });
+  const [editForm, setEditForm] = useState({ customer: "", items: "", amount: "", payment: "", status: "" });
+
+  const statuses = ["All", ...new Set(orders.map((o) => o.status))];
+  const filtered = orders.filter(
     (o) => (filter === "All" || o.status === filter) &&
       (o.id.toLowerCase().includes(search.toLowerCase()) || o.customer.toLowerCase().includes(search.toLowerCase()))
   );
 
   const stats = [
-    { label: "Total Orders", value: ordersData.length },
-    { label: "Completed", value: ordersData.filter((o) => o.status === "Completed").length },
-    { label: "Pending", value: ordersData.filter((o) => o.status === "Pending").length },
-    { label: "Revenue", value: `KSh ${ordersData.reduce((s, o) => s + parseInt(o.amount.replace(/[^0-9]/g, "")), 0).toLocaleString()}` },
+    { label: "Total Orders", value: orders.length },
+    { label: "Completed", value: orders.filter((o) => o.status === "Completed").length },
+    { label: "Pending", value: orders.filter((o) => o.status === "Pending").length },
+    { label: "Revenue", value: `KSh ${orders.reduce((s, o) => s + parseInt(o.amount.replace(/[^0-9]/g, "")), 0).toLocaleString()}` },
   ];
+
+  const handleNewOrder = () => {
+    const nextNum = Math.max(...orders.map((o) => parseInt(o.id.replace("#", ""))), 0) + 1;
+    const newOrder = {
+      id: `#${nextNum}`,
+      customer: newForm.customer,
+      items: parseInt(newForm.items) || 0,
+      amount: newForm.amount,
+      payment: newForm.payment,
+      status: newForm.status,
+      date: new Date().toISOString().split("T")[0],
+    };
+    setOrders((prev) => [newOrder, ...prev]);
+    setShowNewModal(false);
+    setNewForm({ customer: "", items: "", amount: "", payment: "M-Pesa", status: "Pending" });
+  };
+
+  const openEditModal = (order) => {
+    setEditOrder(order);
+    setEditForm({
+      customer: order.customer,
+      items: String(order.items),
+      amount: order.amount,
+      payment: order.payment,
+      status: order.status,
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditOrder = () => {
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.id === editOrder.id
+          ? {
+              ...o,
+              customer: editForm.customer,
+              items: parseInt(editForm.items) || 0,
+              amount: editForm.amount,
+              payment: editForm.payment,
+              status: editForm.status,
+            }
+          : o
+      )
+    );
+    setShowEditModal(false);
+    setEditOrder(null);
+  };
+
+  const handleDeleteOrder = () => {
+    setOrders((prev) => prev.filter((o) => o.id !== deleteOrderId));
+    setShowDeleteConfirm(false);
+    setDeleteOrderId(null);
+  };
 
   return (
     <>
@@ -240,7 +306,7 @@ export function OrdersPage() {
           <div className="search-input-wrap">
             <input type="text" placeholder="Search orders..." value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <button className="btn btn-primary">+ New Order</button>
+          <button className="btn btn-primary" onClick={() => setShowNewModal(true)}>+ New Order</button>
         </div>
       </div>
 
@@ -270,9 +336,9 @@ export function OrdersPage() {
                 <td><span className={`badge ${o.status.toLowerCase()}`}>{o.status}</span></td>
                 <td>
                   <div className="cell-actions">
-                    <button className="btn-icon" title="View">👁</button>
-                    <button className="btn-icon" title="Edit">✏️</button>
-                    <button className="btn-icon" title="Delete">🗑</button>
+                    <button className="btn-icon" title="View" onClick={() => { setViewOrder(o); setShowViewModal(true); }}>👁</button>
+                    <button className="btn-icon" title="Edit" onClick={() => openEditModal(o)}>✏️</button>
+                    <button className="btn-icon" title="Delete" onClick={() => { setDeleteOrderId(o.id); setShowDeleteConfirm(true); }}>🗑</button>
                   </div>
                 </td>
               </tr>
@@ -280,25 +346,169 @@ export function OrdersPage() {
           </tbody>
         </table>
         <div className="pagination">
-          <span>Showing {filtered.length} of {ordersData.length} orders</span>
+          <span>Showing {filtered.length} of {orders.length} orders</span>
           <div className="pagination-btns">
-            <button>‹</button>
-            <button className="active">1</button>
-            <button>2</button>
-            <button>3</button>
-            <button>›</button>
+            <button onClick={() => {}}>‹</button>
+            <button className="active" onClick={() => {}}>1</button>
+            <button onClick={() => {}}>2</button>
+            <button onClick={() => {}}>3</button>
+            <button onClick={() => {}}>›</button>
           </div>
         </div>
       </div>
+
+      {showNewModal && (
+        <Modal title="New Order" onClose={() => { setShowNewModal(false); setNewForm({ customer: "", items: "", amount: "", payment: "M-Pesa", status: "Pending" }); }}>
+          <div className="form-group">
+            <label className="form-label">Customer</label>
+            <input className="form-input" value={newForm.customer} onChange={(e) => setNewForm({ ...newForm, customer: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Items</label>
+            <input className="form-input" type="number" value={newForm.items} onChange={(e) => setNewForm({ ...newForm, items: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Amount</label>
+            <input className="form-input" value={newForm.amount} onChange={(e) => setNewForm({ ...newForm, amount: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Payment</label>
+            <select className="form-input" value={newForm.payment} onChange={(e) => setNewForm({ ...newForm, payment: e.target.value })}>
+              <option>M-Pesa</option>
+              <option>Cash</option>
+              <option>Card</option>
+              <option>Bank Transfer</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Status</label>
+            <select className="form-input" value={newForm.status} onChange={(e) => setNewForm({ ...newForm, status: e.target.value })}>
+              <option>Completed</option>
+              <option>Pending</option>
+              <option>Processing</option>
+              <option>Cancelled</option>
+            </select>
+          </div>
+          <div className="modal-actions">
+            <button className="btn btn-ghost" onClick={() => { setShowNewModal(false); setNewForm({ customer: "", items: "", amount: "", payment: "M-Pesa", status: "Pending" }); }}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleNewOrder}>Create</button>
+          </div>
+        </Modal>
+      )}
+
+      {showViewModal && viewOrder && (
+        <Modal title={`Order ${viewOrder.id}`} onClose={() => { setShowViewModal(false); setViewOrder(null); }}>
+          <div className="form-group">
+            <label className="form-label">Customer</label>
+            <div className="form-input" style={{ background: "#1e293b", cursor: "default" }}>{viewOrder.customer}</div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Items</label>
+            <div className="form-input" style={{ background: "#1e293b", cursor: "default" }}>{viewOrder.items}</div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Amount</label>
+            <div className="form-input" style={{ background: "#1e293b", cursor: "default" }}>{viewOrder.amount}</div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Payment</label>
+            <div className="form-input" style={{ background: "#1e293b", cursor: "default" }}>{viewOrder.payment}</div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Status</label>
+            <div className="form-input" style={{ background: "#1e293b", cursor: "default" }}>{viewOrder.status}</div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Date</label>
+            <div className="form-input" style={{ background: "#1e293b", cursor: "default" }}>{viewOrder.date}</div>
+          </div>
+          <div className="modal-actions">
+            <button className="btn btn-primary" onClick={() => { setShowViewModal(false); setViewOrder(null); }}>Close</button>
+          </div>
+        </Modal>
+      )}
+
+      {showEditModal && editOrder && (
+        <Modal title={`Edit Order ${editOrder.id}`} onClose={() => { setShowEditModal(false); setEditOrder(null); }}>
+          <div className="form-group">
+            <label className="form-label">Customer</label>
+            <input className="form-input" value={editForm.customer} onChange={(e) => setEditForm({ ...editForm, customer: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Items</label>
+            <input className="form-input" type="number" value={editForm.items} onChange={(e) => setEditForm({ ...editForm, items: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Amount</label>
+            <input className="form-input" value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Payment</label>
+            <select className="form-input" value={editForm.payment} onChange={(e) => setEditForm({ ...editForm, payment: e.target.value })}>
+              <option>M-Pesa</option>
+              <option>Cash</option>
+              <option>Card</option>
+              <option>Bank Transfer</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Status</label>
+            <select className="form-input" value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}>
+              <option>Completed</option>
+              <option>Pending</option>
+              <option>Processing</option>
+              <option>Cancelled</option>
+            </select>
+          </div>
+          <div className="modal-actions">
+            <button className="btn btn-ghost" onClick={() => { setShowEditModal(false); setEditOrder(null); }}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleEditOrder}>Save</button>
+          </div>
+        </Modal>
+      )}
+
+      {showDeleteConfirm && (
+        <Modal title="Confirm Delete" onClose={() => { setShowDeleteConfirm(false); setDeleteOrderId(null); }}>
+          <p style={{ textAlign: "center", padding: "20px 0" }}>Are you sure you want to delete order {deleteOrderId}?</p>
+          <div className="modal-actions" style={{ justifyContent: "center" }}>
+            <button className="btn btn-ghost" onClick={() => { setShowDeleteConfirm(false); setDeleteOrderId(null); }}>Cancel</button>
+            <button className="btn" style={{ background: "#ef4444", color: "#fff" }} onClick={handleDeleteOrder}>Delete</button>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }
 
 /* ─── QUOTATIONS ─── */
 export function QuotationsPage() {
+  const [quotations, setQuotations] = useState(quotationsData);
   const [filter, setFilter] = useState("All");
-  const statuses = ["All", ...new Set(quotationsData.map((q) => q.status))];
-  const filtered = filter === "All" ? quotationsData : quotationsData.filter((q) => q.status === filter);
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewQuotation, setViewQuotation] = useState(null);
+
+  const [newForm, setNewForm] = useState({ customer: "", items: "", amount: "", expiry: "", status: "Draft" });
+
+  const statuses = ["All", ...new Set(quotations.map((q) => q.status))];
+  const filtered = filter === "All" ? quotations : quotations.filter((q) => q.status === filter);
+
+  const handleNewQuotation = () => {
+    const nextNum = Math.max(...quotations.map((q) => parseInt(q.id.replace("QT-", ""))), 0) + 1;
+    const id = `QT-${String(nextNum).padStart(3, "0")}`;
+    const newQuotation = {
+      id,
+      customer: newForm.customer,
+      items: parseInt(newForm.items) || 0,
+      amount: newForm.amount,
+      status: newForm.status,
+      date: new Date().toISOString().split("T")[0],
+      expiry: newForm.expiry,
+    };
+    setQuotations((prev) => [newQuotation, ...prev]);
+    setShowNewModal(false);
+    setNewForm({ customer: "", items: "", amount: "", expiry: "", status: "Draft" });
+  };
 
   return (
     <>
@@ -310,7 +520,7 @@ export function QuotationsPage() {
       </div>
 
       <div className="summary-row">
-        {[{ label: "Total Quotations", value: quotationsData.length }, { label: "Accepted", value: quotationsData.filter((q) => q.status === "Accepted").length }, { label: "Pending Response", value: quotationsData.filter((q) => q.status === "Pending").length }, { label: "Total Value", value: quotationsData.reduce((s, q) => s + parseInt(q.amount.replace(/[^0-9]/g, "")), 0).toLocaleString() }].map((s) => (
+        {[{ label: "Total Quotations", value: quotations.length }, { label: "Accepted", value: quotations.filter((q) => q.status === "Accepted").length }, { label: "Pending Response", value: quotations.filter((q) => q.status === "Pending").length }, { label: "Total Value", value: quotations.reduce((s, q) => s + parseInt(q.amount.replace(/[^0-9]/g, "")), 0).toLocaleString() }].map((s) => (
           <div key={s.label} className="summary-card">
             <div className="label">{s.label}</div>
             <div className="value">{s.label === "Total Value" ? `KSh ${s.value}` : s.value}</div>
@@ -327,7 +537,7 @@ export function QuotationsPage() {
           </div>
         </div>
         <div className="page-toolbar-right">
-          <button className="btn btn-primary">+ New Quotation</button>
+          <button className="btn btn-primary" onClick={() => setShowNewModal(true)}>+ New Quotation</button>
         </div>
       </div>
 
@@ -357,7 +567,7 @@ export function QuotationsPage() {
                 <td><span className={`badge ${q.status.toLowerCase()}`}>{q.status}</span></td>
                 <td>
                   <div className="cell-actions">
-                    <button className="btn-icon" title="View">👁</button>
+                    <button className="btn-icon" title="View" onClick={() => { setViewQuotation(q); setShowViewModal(true); }}>👁</button>
                     <button className="btn-icon" title="Convert to Order">📄</button>
                   </div>
                 </td>
@@ -366,15 +576,105 @@ export function QuotationsPage() {
           </tbody>
         </table>
       </div>
+
+      {showNewModal && (
+        <Modal title="New Quotation" onClose={() => { setShowNewModal(false); setNewForm({ customer: "", items: "", amount: "", expiry: "", status: "Draft" }); }}>
+          <div className="form-group">
+            <label className="form-label">Customer</label>
+            <input className="form-input" value={newForm.customer} onChange={(e) => setNewForm({ ...newForm, customer: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Items</label>
+            <input className="form-input" type="number" value={newForm.items} onChange={(e) => setNewForm({ ...newForm, items: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Amount</label>
+            <input className="form-input" value={newForm.amount} onChange={(e) => setNewForm({ ...newForm, amount: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Expiry Date</label>
+            <input className="form-input" type="date" value={newForm.expiry} onChange={(e) => setNewForm({ ...newForm, expiry: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Status</label>
+            <select className="form-input" value={newForm.status} onChange={(e) => setNewForm({ ...newForm, status: e.target.value })}>
+              <option>Draft</option>
+              <option>Pending</option>
+              <option>Accepted</option>
+              <option>Declined</option>
+            </select>
+          </div>
+          <div className="modal-actions">
+            <button className="btn btn-ghost" onClick={() => { setShowNewModal(false); setNewForm({ customer: "", items: "", amount: "", expiry: "", status: "Draft" }); }}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleNewQuotation}>Create</button>
+          </div>
+        </Modal>
+      )}
+
+      {showViewModal && viewQuotation && (
+        <Modal title={`Quotation ${viewQuotation.id}`} onClose={() => { setShowViewModal(false); setViewQuotation(null); }}>
+          <div className="form-group">
+            <label className="form-label">Customer</label>
+            <div className="form-input" style={{ background: "#1e293b", cursor: "default" }}>{viewQuotation.customer}</div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Items</label>
+            <div className="form-input" style={{ background: "#1e293b", cursor: "default" }}>{viewQuotation.items}</div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Amount</label>
+            <div className="form-input" style={{ background: "#1e293b", cursor: "default" }}>{viewQuotation.amount}</div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Status</label>
+            <div className="form-input" style={{ background: "#1e293b", cursor: "default" }}>{viewQuotation.status}</div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Date</label>
+            <div className="form-input" style={{ background: "#1e293b", cursor: "default" }}>{viewQuotation.date}</div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Expiry</label>
+            <div className="form-input" style={{ background: "#1e293b", cursor: "default" }}>{viewQuotation.expiry}</div>
+          </div>
+          <div className="modal-actions">
+            <button className="btn btn-primary" onClick={() => { setShowViewModal(false); setViewQuotation(null); }}>Close</button>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }
 
 /* ─── RETURNS ─── */
 export function ReturnsPage() {
+  const [returns, setReturns] = useState(returnsData);
   const [filter, setFilter] = useState("All");
-  const statuses = ["All", ...new Set(returnsData.map((r) => r.status))];
-  const filtered = filter === "All" ? returnsData : returnsData.filter((r) => r.status === filter);
+  const [showNewModal, setShowNewModal] = useState(false);
+
+  const [newForm, setNewForm] = useState({ order: "", customer: "", item: "", qty: "", amount: "", reason: "", status: "Pending" });
+
+  const statuses = ["All", ...new Set(returns.map((r) => r.status))];
+  const filtered = filter === "All" ? returns : returns.filter((r) => r.status === filter);
+
+  const handleNewReturn = () => {
+    const nextNum = Math.max(...returns.map((r) => parseInt(r.id.replace("RTN-", ""))), 0) + 1;
+    const id = `RTN-${String(nextNum).padStart(3, "0")}`;
+    const newReturn = {
+      id,
+      order: newForm.order,
+      customer: newForm.customer,
+      item: newForm.item,
+      qty: parseInt(newForm.qty) || 0,
+      amount: newForm.amount,
+      reason: newForm.reason,
+      status: newForm.status,
+      date: new Date().toISOString().split("T")[0],
+    };
+    setReturns((prev) => [newReturn, ...prev]);
+    setShowNewModal(false);
+    setNewForm({ order: "", customer: "", item: "", qty: "", amount: "", reason: "", status: "Pending" });
+  };
 
   return (
     <>
@@ -394,7 +694,7 @@ export function ReturnsPage() {
           </div>
         </div>
         <div className="page-toolbar-right">
-          <button className="btn btn-primary">+ New Return</button>
+          <button className="btn btn-primary" onClick={() => setShowNewModal(true)}>+ New Return</button>
         </div>
       </div>
 
@@ -435,6 +735,47 @@ export function ReturnsPage() {
           </tbody>
         </table>
       </div>
+
+      {showNewModal && (
+        <Modal title="New Return" onClose={() => { setShowNewModal(false); setNewForm({ order: "", customer: "", item: "", qty: "", amount: "", reason: "", status: "Pending" }); }}>
+          <div className="form-group">
+            <label className="form-label">Order</label>
+            <input className="form-input" value={newForm.order} onChange={(e) => setNewForm({ ...newForm, order: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Customer</label>
+            <input className="form-input" value={newForm.customer} onChange={(e) => setNewForm({ ...newForm, customer: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Item</label>
+            <input className="form-input" value={newForm.item} onChange={(e) => setNewForm({ ...newForm, item: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Quantity</label>
+            <input className="form-input" type="number" value={newForm.qty} onChange={(e) => setNewForm({ ...newForm, qty: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Amount</label>
+            <input className="form-input" value={newForm.amount} onChange={(e) => setNewForm({ ...newForm, amount: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Reason</label>
+            <input className="form-input" value={newForm.reason} onChange={(e) => setNewForm({ ...newForm, reason: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Status</label>
+            <select className="form-input" value={newForm.status} onChange={(e) => setNewForm({ ...newForm, status: e.target.value })}>
+              <option>Pending</option>
+              <option>Approved</option>
+              <option>Rejected</option>
+            </select>
+          </div>
+          <div className="modal-actions">
+            <button className="btn btn-ghost" onClick={() => { setShowNewModal(false); setNewForm({ order: "", customer: "", item: "", qty: "", amount: "", reason: "", status: "Pending" }); }}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleNewReturn}>Create</button>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }
@@ -446,6 +787,10 @@ export function ReceiptsPage() {
   const filtered = receiptsData.filter(
     (r) => r.id.toLowerCase().includes(search.toLowerCase()) || r.customer.toLowerCase().includes(search.toLowerCase()) || r.ref.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleExport = () => {
+    alert("Exporting receipts...");
+  };
 
   return (
     <>
@@ -463,7 +808,7 @@ export function ReceiptsPage() {
           </div>
         </div>
         <div className="page-toolbar-right">
-          <button className="btn btn-ghost">📥 Export</button>
+          <button className="btn btn-ghost" onClick={handleExport}>📥 Export</button>
         </div>
       </div>
 

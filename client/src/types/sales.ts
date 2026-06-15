@@ -54,6 +54,7 @@ export interface Receipt {
 
 export interface SaleInput {
   customer_id?: string;
+  customer_name?: string;
   sale_date?: string;
   due_date?: string;
   items: Array<{

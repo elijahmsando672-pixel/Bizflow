@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import "../pages/Dashboard.css";
+import logo from "../assets/logo.png";
 
 const menu = [
   { title: "Dashboard", icon: "📊", path: "/app" },
@@ -90,14 +91,24 @@ const menu = [
   },
 ];
 
-function isActive(path, currentPath) {
-  if (path === "/app") return currentPath === "/app";
-  return currentPath.startsWith(path);
+function isActive(item, currentPath) {
+  if (item.path) {
+    if (item.path === "/app") return currentPath === "/app";
+    return currentPath.startsWith(item.path);
+  }
+  if (item.children) {
+    return item.children.some((c) => currentPath.startsWith(c.path));
+  }
+  return false;
 }
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchQuery, setSearchQuery] = useState("");
+
   const [expanded, setExpanded] = useState(() => {
     const init = {};
     for (const item of menu) {
@@ -108,26 +119,52 @@ export default function AppLayout() {
     return init;
   });
 
+  useEffect(() => {
+    setExpanded((prev) => {
+      const next = { ...prev };
+      for (const item of menu) {
+        if (item.children && item.children.some((c) => location.pathname.startsWith(c.path))) {
+          next[item.title] = true;
+        }
+      }
+      return next;
+    });
+  }, [location.pathname]);
+
   const toggle = (title) => {
     setExpanded((prev) => ({ ...prev, [title]: !prev[title] }));
   };
 
   const handleNav = (path) => {
+    setSearchQuery("");
     navigate(path);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    navigate('/login');
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/app/sales/orders`);
+    }
   };
 
   return (
     <div className="dashboard">
       <header className="topbar">
         <div className="topbar-left">
-          <div className="topbar-logo" onClick={() => navigate("/app")} style={{ cursor: "pointer" }}>
-            BizFlow
+          <div className="topbar-logo" onClick={() => navigate("/app")} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+            <img src={logo} alt="BizFlow" style={{ height: 80, width: 80 }} />
+            <span style={{ fontWeight: 800, fontSize: 22, color: "#f1f5f9" }}>BizFlow</span>
           </div>
-          <div className="topbar-search">
+          <form className="topbar-search" onSubmit={handleSearch}>
             <span className="search-icon">🔍</span>
-            <input type="text" placeholder="Search orders, customers, products..." />
+            <input type="text" placeholder="Search orders, customers, products..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             <span className="search-hint">⌘K</span>
-          </div>
+          </form>
         </div>
         <div className="topbar-right">
           <button className="topbar-icon-btn" aria-label="Notifications">🔔</button>
@@ -135,6 +172,7 @@ export default function AppLayout() {
             <div className="topbar-avatar">E</div>
             <span className="topbar-name">Elijah</span>
           </div>
+          <button className="btn btn-sm btn-ghost" onClick={handleLogout} style={{ color: "#f87171", border: "1px solid #334155", borderRadius: 8 }}>Logout</button>
         </div>
       </header>
 
@@ -144,7 +182,7 @@ export default function AppLayout() {
             {menu.map((item) => (
               <div key={item.title} className="sidebar-group">
                 <button
-                  className={`sidebar-item ${isActive(item.path || item.children[0]?.path, location.pathname) ? "active" : ""}`}
+                  className={`sidebar-item ${isActive(item, location.pathname) ? "active" : ""}`}
                   onClick={() => {
                     if (item.path) {
                       handleNav(item.path);

@@ -14,7 +14,15 @@ export const setCsrfCookie = (req, res) => {
   res.cookie(CSRF_COOKIE_NAME, token, {
     httpOnly: false,
     secure: isProduction,
-    sameSite: isProduction ? 'none' : 'strict',
+    sameSite: isProduction ? 'lax' : 'strict',
+    maxAge: CSRF_TOKEN_EXPIRY,
+    path: '/',
+  });
+
+  res.cookie('csrf_expiry', String(Date.now() + CSRF_TOKEN_EXPIRY), {
+    httpOnly: false,
+    secure: isProduction,
+    sameSite: isProduction ? 'lax' : 'strict',
     maxAge: CSRF_TOKEN_EXPIRY,
     path: '/',
   });
@@ -26,7 +34,13 @@ export const clearCsrfCookie = (res) => {
   res.clearCookie(CSRF_COOKIE_NAME, {
     httpOnly: false,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'strict',
+    path: '/',
+  });
+  res.clearCookie('csrf_expiry', {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'strict',
     path: '/',
   });
 };
@@ -69,6 +83,10 @@ export const validateCsrf = (req, res, next) => {
     
     if (!crypto.timingSafeEqual(tokenBuf, headerBuf)) {
       return res.status(403).json({ error: 'CSRF protection: Token mismatch' });
+    }
+
+    if (!req.cookies?.csrf_expiry || Date.now() > parseInt(req.cookies.csrf_expiry)) {
+      return res.status(403).json({ error: 'CSRF protection: Token expired' });
     }
   } catch (err) {
     return res.status(400).json({ error: 'CSRF protection: Invalid token format' });

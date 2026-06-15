@@ -76,12 +76,13 @@ router.post('/', async (req, res) => {
     for (const item of (items || [])) {
       subtotal += (item.qty * item.unit_price) - (item.discount || 0);
     }
-    const total = subtotal - discount_amount;
+    const tax_amount = subtotal * 0.16;
+    const total = subtotal + tax_amount - discount_amount;
 
     const invoiceResult = await client.query(
-      `INSERT INTO invoices (business_id, customer_id, invoice_number, invoice_date, due_date, subtotal, discount_amount, total, notes, created_by, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'draft') RETURNING *`,
-      [req.business_id, customer_id, invoiceNumber, invoice_date || new Date(), due_date, subtotal, discount_amount, total, notes, req.user.id]
+      `INSERT INTO invoices (business_id, customer_id, invoice_number, invoice_date, due_date, subtotal, tax_amount, discount_amount, total, notes, created_by, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'draft') RETURNING *`,
+      [req.business_id, customer_id, invoiceNumber, invoice_date || new Date(), due_date, subtotal, tax_amount, discount_amount, total, notes, req.user.id]
     );
     const invoice = invoiceResult.rows[0];
 
@@ -150,17 +151,18 @@ router.put('/:id', async (req, res) => {
       }
     }
     
-    const total = subtotal - (discount_amount || existingInvoice.rows[0].discount_amount);
+    const tax_amount = subtotal * 0.16;
+    const total = subtotal + tax_amount - (discount_amount || existingInvoice.rows[0].discount_amount);
     const paidDate = status === 'paid' ? new Date() : existingInvoice.rows[0].paid_date;
     
     const result = await client.query(
       `UPDATE invoices 
        SET status = COALESCE($1, status), customer_id = COALESCE($2, customer_id), due_date = COALESCE($3, due_date), 
-           notes = COALESCE($4, notes), subtotal = $5, discount_amount = $6, total = $7, 
-           paid_date = $8, updated_at = NOW()
-       WHERE id = $9 AND business_id = $10
+           notes = COALESCE($4, notes), subtotal = $5, tax_amount = $6, discount_amount = $7, total = $8, 
+           paid_date = $9, updated_at = NOW()
+       WHERE id = $10 AND business_id = $11
        RETURNING *`,
-      [status, customer_id, due_date, notes, subtotal, discount_amount || existingInvoice.rows[0].discount_amount, total, paidDate, req.params.id, req.business_id]
+      [status, customer_id, due_date, notes, subtotal, tax_amount, discount_amount || existingInvoice.rows[0].discount_amount, total, paidDate, req.params.id, req.business_id]
     );
 
     await client.query('COMMIT');

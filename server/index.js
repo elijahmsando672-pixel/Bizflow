@@ -61,13 +61,22 @@ const auditCrud = (resource) => (req, res, next) => {
 
 dotenv.config();
 
+const requiredEnvVars = ['JWT_SECRET'];
 if (!process.env.DATABASE_URL) {
-  const requiredEnvVars = ['JWT_SECRET', 'DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
-  const missing = requiredEnvVars.filter(key => !process.env[key]);
-  if (missing.length > 0) {
-    console.error(`FATAL ERROR: Missing required environment variables: ${missing.join(', ')}`);
+  requiredEnvVars.push('DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD');
+}
+const missing = requiredEnvVars.filter(key => !process.env[key]);
+if (missing.length > 0) {
+  console.error(`FATAL ERROR: Missing required environment variables: ${missing.join(', ')}`);
+  process.exit(1);
+}
+
+if (process.env.JWT_SECRET === 'bizflow-secret-key-change-in-production') {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('FATAL ERROR: Change the default JWT_SECRET in production for security.');
     process.exit(1);
   }
+  console.warn('WARNING: Using default JWT_SECRET. Set a unique secret for security.');
 }
 
 const app = express();
@@ -151,12 +160,12 @@ app.use(express.urlencoded({
 
 app.use('/api', sanitizeInput, xssPrevent);
 app.use('/api/health', (req, res, next) => next());
-app.use('/api/auth/refresh-token', refreshTokenRateLimiter);
-app.use(globalRateLimiter);
 
-// login/register get hammered, limit them harder
+// Auth rate limiters must come before globalRateLimiter so they don't consume the global quota
 app.use(['/api/auth/login', '/api/auth/register'], authRateLimiter);
 app.use(['/api/auth/forgot-password', '/api/auth/reset-password'], passwordResetRateLimiter);
+app.use('/api/auth/refresh-token', refreshTokenRateLimiter);
+app.use(globalRateLimiter);
 
 // per-user rate limit — 120 req / 15min
 app.use('/api', userRateLimiter(120, 15 * 60 * 1000));
@@ -179,24 +188,24 @@ app.use('/api/products', protect, requirePermission, auditCrud('products'), prod
 app.use('/api/invoices', protect, requirePermission, auditCrud('invoices'), invoiceRoutes);
 app.use('/api/sales', protect, requirePermission, auditCrud('sales'), saleRoutes);
 app.use('/api/expenses', protect, requirePermission, auditCrud('expenses'), expenseRoutes);
-app.use('/api/dashboard', protect, auditCrud('dashboard'), dashboardRoutes);
-app.use('/api/notifications', protect, auditCrud('notifications'), notificationRoutes);
+app.use('/api/dashboard', protect, requirePermission, auditCrud('dashboard'), dashboardRoutes);
+app.use('/api/notifications', protect, requirePermission, auditCrud('notifications'), notificationRoutes);
 app.use('/api/admin', protect, requirePermission, auditCrud('admin'), adminRoutes);
 app.use('/api/team', protect, requirePermission, auditCrud('team'), teamRoutes);
 app.use('/api/employees', protect, requirePermission, auditCrud('employees'), employeeRoutes);
-app.use('/api/debtors', protect, auditCrud('debtors'), debtorRoutes);
+app.use('/api/debtors', protect, requirePermission, auditCrud('debtors'), debtorRoutes);
 app.use('/api/creditors', protect, requirePermission, auditCrud('creditors'), creditorRoutes);
 app.use('/api/reports', protect, requirePermission, auditCrud('reports'), reportRoutes);
-app.use('/api/ai', protect, auditCrud('ai'), aiRoutes);
+app.use('/api/ai', protect, requirePermission, auditCrud('ai'), aiRoutes);
 app.use('/api/crm', protect, requirePermission, auditCrud('crm'), crmRoutes);
 app.use('/api/pipeline', protect, requirePermission, auditCrud('pipeline'), pipelineRoutes);
 app.use('/api/support', protect, requirePermission, auditCrud('support'), supportRoutes);
 app.use('/api/projects', protect, requirePermission, auditCrud('projects'), projectRoutes);
 app.use('/api/procurement', protect, requirePermission, auditCrud('procurement'), procurementRoutes);
-app.use('/api/timetracking', protect, auditCrud('timetracking'), timetrackingRoutes);
-app.use('/api/permissions', protect, auditCrud('permissions'), permissionsRoutes);
-app.use('/api/import', protect, express.json({ limit: '10mb' }), auditCrud('import'), importExportRoutes);
-app.use('/api/export', protect, auditCrud('export'), importExportRoutes);
+app.use('/api/timetracking', protect, requirePermission, auditCrud('timetracking'), timetrackingRoutes);
+app.use('/api/permissions', protect, requirePermission, auditCrud('permissions'), permissionsRoutes);
+app.use('/api/import', protect, requirePermission, express.json({ limit: '10mb' }), auditCrud('import'), importExportRoutes);
+app.use('/api/export', protect, requirePermission, auditCrud('export'), importExportRoutes);
 app.use('/api/users', protect, requirePermission, auditCrud('users'), userRoutes);
 app.use('/api/shops', protect, requirePermission, auditCrud('shops'), shopRoutes);
 app.use('/api/reviews', protect, requirePermission, auditCrud('reviews'), reviewRoutes);
