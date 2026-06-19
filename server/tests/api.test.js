@@ -108,6 +108,8 @@ describe('Customers API', () => {
     company: 'Test Company',
   };
 
+  let customerId = '';
+
   it('should create a customer', async () => {
     const res = await request(app)
       .post('/api/customers')
@@ -116,6 +118,7 @@ describe('Customers API', () => {
     
     expect(res.status).toBe(201);
     expect(res.body).toHaveProperty('name', testCustomer.name);
+    customerId = res.body.id;
   });
 
   it('should get all customers', async () => {
@@ -128,13 +131,8 @@ describe('Customers API', () => {
   });
 
   it('should update a customer', async () => {
-    const createRes = await request(app)
-      .post('/api/customers')
-      .set('Authorization', `Bearer ${authToken}`)
-      .send({ ...testCustomer, name: 'Original Name' });
-    
     const res = await request(app)
-      .put(`/api/customers/${createRes.body.id}`)
+      .put(`/api/customers/${customerId}`)
       .set('Authorization', `Bearer ${authToken}`)
       .send({ name: 'Updated Name' });
     
@@ -143,13 +141,8 @@ describe('Customers API', () => {
   });
 
   it('should delete a customer', async () => {
-    const createRes = await request(app)
-      .post('/api/customers')
-      .set('Authorization', `Bearer ${authToken}`)
-      .send(testCustomer);
-    
     const res = await request(app)
-      .delete(`/api/customers/${createRes.body.id}`)
+      .delete(`/api/customers/${customerId}`)
       .set('Authorization', `Bearer ${authToken}`);
     
     expect(res.status).toBe(200);

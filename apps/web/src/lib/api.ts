@@ -164,6 +164,9 @@ export const authApi = {
     api.post<AuthResponse>('/auth/register', data),
 
   getProfile: () => api.get<User>('/auth/profile'),
+
+  updateProfile: (data: { name?: string; phone?: string }) =>
+    api.put<User>('/auth/profile', data),
 };
 
 export const dashboardApi = {

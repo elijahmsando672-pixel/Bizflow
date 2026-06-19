@@ -18,9 +18,12 @@ router.get('/', async (req, res) => {
       [businessId]
     );
     
-    // TODO: also include invoices that are due but not paid
     const pendingPayments = await query(
-      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status = 'pending'`,
+      `SELECT COALESCE(SUM(total), 0) as total FROM (
+        SELECT total FROM sales WHERE business_id = $1 AND status = 'pending'
+        UNION ALL
+        SELECT total FROM invoices WHERE business_id = $1 AND status NOT IN ('paid', 'cancelled') AND total > COALESCE(amount_paid, 0)
+      ) as pending`,
       [businessId]
     );
     

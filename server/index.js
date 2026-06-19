@@ -276,6 +276,18 @@ const startServer = async () => {
   server.keepAliveTimeout = 65000;
   server.headersTimeout = 35000;
 
+  const shutdown = async () => {
+    console.log('Shutting down gracefully...');
+    server.close(() => {
+      console.log('HTTP server closed');
+    });
+    const { shutdown: shutdownDb } = await import('./config/db.js');
+    await shutdownDb();
+    process.exit(0);
+  };
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
+
   // TODO: maybe move DB init to before listen? kept failing in CI so we retry here
   const maxRetries = 10;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {

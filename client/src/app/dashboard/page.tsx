@@ -293,18 +293,6 @@ const PAGE_ICONS: Record<string, string> = {
   notifications: "🔔", "backup-restore": "💾",
 };
 
-const PAGE_COLORS: Record<string, string> = {
-  suppliers: C.green, "purchase-orders": C.blue, "supplier-deliveries": C.teal, "supplier-payments": C.cyan,
-  dispatch: C.teal, "logistics-deliveries": C.green, tracking: C.orange, "shipping-partners": C.purple,
-  expenses: C.red, revenue: C.green, "profit-loss": C.indigo, "cash-flow": C.teal, "tax-reports": C.orange,
-  reports: C.green, "inventory-reports": C.purple, "customer-reports": C.pink,
-  "financial-reports": C.indigo, "export-center": C.cyan,
-  shops: C.orange, "branch-performance": C.green, "shop-transfers": C.blue, "staff-assignment": C.purple,
-  users: C.purple, roles: C.indigo, "activity-logs": C.teal, "security-settings": C.red,
-  settings: "#6b7a99", "payment-settings": C.cyan, integrations: C.purple,
-  notifications: C.amber, "backup-restore": C.green,
-};
-
 // ─── SIDEBAR GROUPS ───────────────────────────────────────────────────────────
 const SIDEBAR_GROUPS = [
   { label: "DASHBOARD", items: [
@@ -1503,21 +1491,24 @@ const UsersPage = () => {
 };
 
 // ─── SUPPLIERS PAGE ───────────────────────────────────────────────────────────
-const SuppliersPage = () => (
-  <div>
-    <PageHeader title="Suppliers" subtitle="Manage your suppliers">
-      <Btn color={C.purple}>+ Add Supplier</Btn>
-    </PageHeader>
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
-      <StatCard label="Total Suppliers" value="0" icon="🏭" acolsent={C.blue} />
-      <StatCard label="Active" value="0" icon="✅" acolsent={C.green} />
+const SuppliersPage = () => {
+  const [supplierSearch, setSupplierSearch] = useState("");
+  return (
+    <div>
+      <PageHeader title="Suppliers" subtitle="Manage your suppliers">
+        <Btn color={C.purple}>+ Add Supplier</Btn>
+      </PageHeader>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
+        <StatCard label="Total Suppliers" value="0" icon="🏭" acolsent={C.blue} />
+        <StatCard label="Active" value="0" icon="✅" acolsent={C.green} />
+      </div>
+      <Card style={{ marginBottom: 12 }}>
+        <SearchBar placeholder="Search suppliers..." value={supplierSearch} onChange={setSupplierSearch} />
+      </Card>
+      <Card><div style={{ textAlign: "center", padding: "50px 20px" }}><div style={{ fontSize: 40, opacity: .3, marginBottom: 12 }}>🏭</div><div style={{ color: C.muted, fontSize: 13 }}>No suppliers yet. Add your first supplier.</div></div></Card>
     </div>
-    <Card style={{ marginBottom: 12 }}>
-      <SearchBar placeholder="Search suppliers..." value="" onChange={() => { }} />
-    </Card>
-    <Card><div style={{ textAlign: "center", padding: "50px 20px" }}><div style={{ fontSize: 40, opacity: .3, marginBottom: 12 }}>🏭</div><div style={{ color: C.muted, fontSize: 13 }}>No suppliers yet. Add your first supplier.</div></div></Card>
-  </div>
-);
+  );
+};
 
 // ─── SETTINGS PAGE ────────────────────────────────────────────────────────────
 const SettingsPage = () => {
@@ -2469,7 +2460,7 @@ const BackupRestorePage = () => (
 );
 
 // ─── SIDEBAR ──────────────────────────────────────────────────────────────────
-const Sidebar = ({ page, navigate, businessName }: any) => {
+const Sidebar = ({ page, navigate }: any) => {
   const [collapsed, setCollapsed] = useState(false);
   return (
     <div className="flex h-screen shrink-0 flex-col overflow-hidden border-r sticky top-0 z-[45]"

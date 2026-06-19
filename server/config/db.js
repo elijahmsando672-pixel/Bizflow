@@ -1059,7 +1059,7 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
   }
 };
 
-const shutdown = async () => {
+export const shutdown = async () => {
   try {
     await pool.end();
     console.log('Database pool closed');
@@ -1068,7 +1068,4 @@ const shutdown = async () => {
   }
 };
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
-
-export default { pool, query, initDatabase };
+export default { pool, query, initDatabase, shutdown };

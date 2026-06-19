@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Check, Menu, X, Receipt, ChartLine, Box, ArrowLeftRight, Building2,
-  Users, Shield, TrendingUp, HeadphonesIcon, Sparkles, GitBranch,
-  Globe, Clock, CreditCard, ShoppingCart, BarChart3, MessageSquare,
-  Truck, Wallet, FileText, Settings, ChevronRight, ArrowRight, Star, Quote,
-  Play, ArrowUpRight, Zap, Layers, Lock, Smartphone
+  Check, Menu, X, Receipt, ChartLine, Box, Building2,
+  Users, HeadphonesIcon, Sparkles, GitBranch,
+  CreditCard, ShoppingCart, MessageSquare,
+  Wallet, FileText, ChevronRight, ArrowRight, Star, Quote,
+  Play, ArrowUpRight, Zap, Layers
 } from "lucide-react";
 
 const features = [

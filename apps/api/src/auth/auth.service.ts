@@ -126,6 +126,31 @@ export class AuthService {
     return user;
   }
 
+  async updateProfile(userId: string, data: { name?: string; phone?: string }) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        role: true,
+        businessId: true,
+        business: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            currency: true,
+          },
+        },
+      },
+    });
+
+    return user;
+  }
+
   private generateToken(userId: string): string {
     return this.jwtService.sign({ sub: userId });
   }

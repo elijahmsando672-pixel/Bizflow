@@ -1,6 +1,13 @@
 import { defineConfig } from 'vitest/config';
+import path from 'path';
 
 export default defineConfig({
+    resolve: {
+        alias: {
+            '@bizflow/ui': path.resolve(__dirname, '../../packages/ui/src'),
+            '@bizflow/utils': path.resolve(__dirname, '../../packages/utils/src'),
+        },
+    },
     test: {
         environment: 'jsdom',
         globals: true,
@@ -14,4 +21,3 @@ export default defineConfig({
         },
     },
 });
-//# sourceMappingURL=vitest.config.js.map

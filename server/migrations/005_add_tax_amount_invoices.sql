@@ -18,7 +18,4 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_vendors_business_email ON vendors(business
 
 -- Ensure sale_items cascade delete with sales (prevents orphaned items)
 -- (CASCADE is already defined in schema but re-verify)
-
--- Add vendor_logs index (table may not exist yet)
-CREATE INDEX IF NOT EXISTS idx_vendor_logs_business ON vendor_logs(business_id) 
-  WHERE EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'vendor_logs');
+-- vendor_logs index skipped — table removed from schema

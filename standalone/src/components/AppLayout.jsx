@@ -157,7 +157,7 @@ export default function AppLayout() {
       <header className="topbar">
         <div className="topbar-left">
           <div className="topbar-logo" onClick={() => navigate("/app")} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
-            <img src={logo} alt="BizFlow" style={{ height: 80, width: 80 }} />
+            <img src={logo} alt="BizFlow" style={{ height: 36, width: 36 }} />
             <span style={{ fontWeight: 800, fontSize: 22, color: "#f1f5f9" }}>BizFlow</span>
           </div>
           <form className="topbar-search" onSubmit={handleSearch}>

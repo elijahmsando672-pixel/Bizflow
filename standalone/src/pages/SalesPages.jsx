@@ -198,6 +198,8 @@ export function OrdersPage() {
   const [orders, setOrders] = useState(ordersData);
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 5;
 
   const [showNewModal, setShowNewModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -215,6 +217,9 @@ export function OrdersPage() {
     (o) => (filter === "All" || o.status === filter) &&
       (o.id.toLowerCase().includes(search.toLowerCase()) || o.customer.toLowerCase().includes(search.toLowerCase()))
   );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+  const safePage = Math.min(page, totalPages);
+  const paginatedItems = filtered.slice((safePage - 1) * itemsPerPage, safePage * itemsPerPage);
 
   const stats = [
     { label: "Total Orders", value: orders.length },
@@ -304,7 +309,7 @@ export function OrdersPage() {
         </div>
         <div className="page-toolbar-right">
           <div className="search-input-wrap">
-            <input type="text" placeholder="Search orders..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input type="text" placeholder="Search orders..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
           </div>
           <button className="btn btn-primary" onClick={() => setShowNewModal(true)}>+ New Order</button>
         </div>
@@ -325,7 +330,7 @@ export function OrdersPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((o) => (
+            {paginatedItems.map((o) => (
               <tr key={o.id}>
                 <td className="cell-id cell-mono">{o.id}</td>
                 <td>{o.customer}</td>
@@ -346,13 +351,13 @@ export function OrdersPage() {
           </tbody>
         </table>
         <div className="pagination">
-          <span>Showing {filtered.length} of {orders.length} orders</span>
+          <span>Showing {paginatedItems.length} of {filtered.length} orders</span>
           <div className="pagination-btns">
-            <button onClick={() => {}}>‹</button>
-            <button className="active" onClick={() => {}}>1</button>
-            <button onClick={() => {}}>2</button>
-            <button onClick={() => {}}>3</button>
-            <button onClick={() => {}}>›</button>
+            <button onClick={() => setPage(Math.max(1, safePage - 1))} disabled={safePage <= 1}>‹</button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <button key={p} className={p === safePage ? "active" : ""} onClick={() => setPage(p)}>{p}</button>
+            ))}
+            <button onClick={() => setPage(Math.min(totalPages, safePage + 1))} disabled={safePage >= totalPages}>›</button>
           </div>
         </div>
       </div>

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import Link from "next/link";
 import { Sun, Moon, Eye, EyeOff, Mail, Lock, ArrowRight, Loader2, ArrowLeft, Building2 } from "lucide-react";
 import { useTheme } from "@/lib/theme-provider";
 
@@ -91,17 +92,17 @@ export default function LoginPage() {
       </button>
 
       <div className="w-full max-w-md relative z-10">
-        <a href="/" className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors mb-6 group">
+        <Link href="/" className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors mb-6 group">
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           Back to Home
-        </a>
+        </Link>
 
         <div className="text-center mb-8 animate-slide-up">
-          <a href="/">
+          <Link href="/">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg shadow-blue-500/50 hover:scale-105 transition-transform cursor-pointer">
               <Building2 className="w-8 h-8 text-white" />
             </div>
-          </a>
+          </Link>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-600 bg-clip-text text-transparent mb-2">BizFlow</h1>
           <p className="text-gray-600 dark:text-gray-400">Modern Business Management Software</p>
         </div>

@@ -43,6 +43,18 @@ export class LoginDto {
   password: string;
 }
 
+export class UpdateProfileDto {
+  @ApiPropertyOptional({ example: 'John Doe' })
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @ApiPropertyOptional({ example: '+1234567890' })
+  @IsString()
+  @IsOptional()
+  phone?: string;
+}
+
 export class AuthResponseDto {
   user: {
     id: string;

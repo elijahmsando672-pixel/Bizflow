@@ -374,14 +374,23 @@ export function SettingsPage() {
 
 export function AuditLogPage() {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [showExportNotif, setShowExportNotif] = useState(false);
+  const itemsPerPage = 5;
   const filtered = auditLogData.filter(
     (a) => a.user.toLowerCase().includes(search.toLowerCase()) || a.action.toLowerCase().includes(search.toLowerCase()) || a.target.toLowerCase().includes(search.toLowerCase())
   );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+  const safePage = Math.min(page, totalPages);
+  const paginatedItems = filtered.slice((safePage - 1) * itemsPerPage, safePage * itemsPerPage);
 
   const handleExport = () => {
     setShowExportNotif(true);
     setTimeout(() => setShowExportNotif(false), 3000);
+  };
+
+  const goToPage = (p) => {
+    if (p >= 1 && p <= totalPages) setPage(p);
   };
 
   return (
@@ -389,7 +398,7 @@ export function AuditLogPage() {
       <div className="greeting"><div><h1>Audit Log</h1><p className="greeting-sub">System activity log</p></div></div>
       <div className="page-toolbar">
         <div className="page-toolbar-left">
-          <div className="search-input-wrap"><input type="text" placeholder="Search activity..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+          <div className="search-input-wrap"><input type="text" placeholder="Search activity..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} /></div>
         </div>
         <div className="page-toolbar-right">
           <button className="btn btn-ghost" onClick={handleExport}>📥 Export</button>
@@ -398,7 +407,7 @@ export function AuditLogPage() {
       <div className="table-wrap">
         <table>
           <thead><tr><th>User</th><th>Action</th><th>Target</th><th>Details</th><th>Date & Time</th></tr></thead>
-          <tbody>{filtered.map((a) => (<tr key={a.id}>
+          <tbody>{paginatedItems.map((a) => (<tr key={a.id}>
             <td style={{ fontWeight: 600 }}>{a.user}</td>
             <td><span className="badge processing">{a.action}</span></td>
             <td>{a.target}</td>
@@ -407,13 +416,13 @@ export function AuditLogPage() {
           </tr>))}</tbody>
         </table>
         <div className="pagination">
-          <span>Showing {filtered.length} of {auditLogData.length} entries</span>
+          <span>Showing {paginatedItems.length} of {filtered.length} entries</span>
           <div className="pagination-btns">
-            <button onClick={() => {}}>‹</button>
-            <button className="active" onClick={() => {}}>1</button>
-            <button onClick={() => {}}>2</button>
-            <button onClick={() => {}}>3</button>
-            <button onClick={() => {}}>›</button>
+            <button onClick={() => goToPage(safePage - 1)} disabled={safePage <= 1}>‹</button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <button key={p} className={p === safePage ? "active" : ""} onClick={() => goToPage(p)}>{p}</button>
+            ))}
+            <button onClick={() => goToPage(safePage + 1)} disabled={safePage >= totalPages}>›</button>
           </div>
         </div>
       </div>
