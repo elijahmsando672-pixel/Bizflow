@@ -288,6 +288,18 @@ describe('Dashboard API', () => {
   });
 });
 
+describe('Health API', () => {
+  it('should return health status', async () => {
+    const res = await request(app)
+      .get('/api/health');
+    
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('status', 'ok');
+    expect(res.body).toHaveProperty('timestamp');
+    expect(res.body).toHaveProperty('uptime');
+  });
+});
+
 describe('Protected Routes', () => {
   it('should reject unauthenticated requests', async () => {
     const res = await request(app)

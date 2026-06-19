@@ -159,7 +159,9 @@ app.use(express.urlencoded({
 }));
 
 app.use('/api', sanitizeInput, xssPrevent);
-app.use('/api/health', (req, res, next) => next());
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
+});
 
 // Auth rate limiters must come before globalRateLimiter so they don't consume the global quota
 app.use(['/api/auth/login', '/api/auth/register'], authRateLimiter);

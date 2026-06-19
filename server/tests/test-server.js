@@ -20,4 +20,6 @@ app.use('/api/products', authenticate, productRoutes);
 app.use('/api/invoices', authenticate, invoiceRoutes);
 app.use('/api/expenses', authenticate, expenseRoutes);
 app.use('/api/dashboard', authenticate, dashboardRoutes);
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
+});
