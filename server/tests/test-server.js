@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { initDatabase } from '../config/db.js';
 import { authenticate } from '../middleware/auth.js';
 
 export const app = express();
@@ -23,3 +24,5 @@ app.use('/api/dashboard', authenticate, dashboardRoutes);
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
+
+export const setupDB = () => initDatabase(3, 500);

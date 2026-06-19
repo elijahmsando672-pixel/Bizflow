@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
-import { app } from './test-server.js';
+import { app, setupDB } from './test-server.js';
 import { query } from '../config/db.js';
 
 const testUser = {
@@ -13,6 +13,7 @@ const testUser = {
 let authToken = '';
 
 beforeAll(async () => {
+  await setupDB();
   try { await query('DELETE FROM login_attempts'); } catch { /*ok*/ }
   try { await query('DELETE FROM audit_logs'); } catch { /*ok*/ }
   try { await query('DELETE FROM cashflow_entries'); } catch { /*ok*/ }
