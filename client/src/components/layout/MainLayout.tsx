@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 
-const SKIP_PATHS = ["/login", "/signup", "/reset-password", "/accept-invite", "/auth", "/auth/callback", "/dashboard"];
+const SKIP_PATHS = ["/", "/login", "/signup", "/register", "/reset-password", "/accept-invite", "/auth", "/auth/callback", "/dashboard", "/select-shop", "/features", "/about", "/pricing", "/contact"];
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);

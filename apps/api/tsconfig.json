@@ -16,6 +16,7 @@
     "strictPropertyInitialization": false,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
+    "types": ["jest"],
     "paths": {
       "@/*": ["src/*"],
       "@bizflow/database": ["../../packages/database/src"]

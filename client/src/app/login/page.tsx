@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import Image from "next/image";
 import { Sun, Moon, Eye, EyeOff, Mail, Lock, ArrowRight, Loader2, ArrowLeft, Building2 } from "lucide-react";
 import { useTheme } from "@/lib/theme-provider";
 
@@ -19,8 +21,13 @@ export default function LoginPage() {
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const { login } = useAuth();
+  const { login, token } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (token) router.replace("/select-shop");
+  }, [token, router]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -99,8 +106,8 @@ export default function LoginPage() {
 
         <div className="text-center mb-8 animate-slide-up">
           <Link href="/">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg shadow-blue-500/50 hover:scale-105 transition-transform cursor-pointer">
-              <Building2 className="w-8 h-8 text-white" />
+            <div className="w-16 h-16 relative mb-4 mx-auto rounded-2xl overflow-hidden shadow-lg shadow-blue-500/50 hover:scale-105 transition-transform cursor-pointer">
+              <Image src="/logo.png" alt="BizFlow" fill sizes="64px" className="object-contain" />
             </div>
           </Link>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-600 bg-clip-text text-transparent mb-2">BizFlow</h1>

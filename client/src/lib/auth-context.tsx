@@ -3,6 +3,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
+export interface Shop {
+  id: string;
+  name: string;
+  location?: string;
+}
+
 interface User {
   id: string;
   name: string;
@@ -18,15 +24,27 @@ interface Business {
 interface AuthContextType {
   user: User | null;
   business: Business | null;
+  shops: Shop[];
+  selectedShop: Shop | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string, businessName: string, phone?: string) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
+  setSelectedShop: (shop: Shop) => void;
+  fetchShops: () => Promise<void>;
   hasPermission: (resource: string, action: 'create' | 'read' | 'update' | 'delete') => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function setTokenCookie(token: string) {
+  document.cookie = `token=${token}; path=/; max-age=${7 * 86400}; SameSite=Lax`;
+}
+
+function removeTokenCookie() {
+  document.cookie = "token=; path=/; max-age=0; SameSite=Lax";
+}
 
 function decodeJWT(token: string): { exp: number } | null {
   try {
@@ -42,9 +60,26 @@ function decodeJWT(token: string): { exp: number } | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
+  const [shops, setShops] = useState<Shop[]>([]);
+  const [selectedShop, setSelectedShopState] = useState<Shop | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+
+  const fetchShops = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "/api"}/shops`,
+        { credentials: 'include' }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setShops(data);
+        return data;
+      }
+    } catch {}
+    return [];
+  }, []);
 
   const refreshAccessToken = useCallback(async () => {
     try {
@@ -63,11 +98,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         localStorage.removeItem("business");
+        removeTokenCookie();
         return false;
       }
       const data = await response.json();
       setToken(data.token);
       localStorage.setItem("token", data.token);
+      setTokenCookie(data.token);
       return true;
     } catch {
       setUser(null);
@@ -76,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       localStorage.removeItem("business");
+      removeTokenCookie();
       return false;
     }
   }, []);
@@ -87,8 +125,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (savedToken && savedUser && savedBusiness) {
       setToken(savedToken);
+      setTokenCookie(savedToken);
       setUser(JSON.parse(savedUser));
       setBusiness(JSON.parse(savedBusiness));
+      const savedShop = localStorage.getItem("selectedShop");
+      if (savedShop) setSelectedShopState(JSON.parse(savedShop));
+      fetchShops();
       fetch(
         `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/csrf-token`,
         { method: "GET", credentials: 'include' }
@@ -123,8 +165,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && !token && router) {
-      const authPages = ["/login", "/signup", "/reset-password", "/accept-invite"];
-      if (!authPages.includes(window.location.pathname)) {
+      const publicPages = ["/", "/login", "/signup", "/register", "/reset-password", "/accept-invite", "/pricing", "/features", "/about", "/contact", "/select-shop"];
+      if (!publicPages.includes(window.location.pathname)) {
         router.push("/login");
       }
     }
@@ -150,12 +192,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(data.token);
     setUser(data.user);
     setBusiness(data.business);
+    if (data.shops) setShops(data.shops);
 
     localStorage.setItem("token", data.token);
+    setTokenCookie(data.token);
     localStorage.setItem("user", JSON.stringify(data.user));
     localStorage.setItem("business", JSON.stringify(data.business));
 
-    router.push("/dashboard");
+    if (data.shops && data.shops.length === 1) {
+      setSelectedShopState(data.shops[0]);
+      localStorage.setItem("selectedShop", JSON.stringify(data.shops[0]));
+      router.push("/dashboard");
+    } else {
+      router.push("/select-shop");
+    }
   };
 
   const register = async (name: string, email: string, password: string, businessName: string, phone?: string) => {
@@ -177,12 +227,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(data.token);
     setUser(data.user);
     setBusiness(data.business);
+    if (data.shops) setShops(data.shops);
 
     localStorage.setItem("token", data.token);
+    setTokenCookie(data.token);
     localStorage.setItem("user", JSON.stringify(data.user));
     localStorage.setItem("business", JSON.stringify(data.business));
 
-    router.push("/dashboard");
+    if (data.shops && data.shops.length === 1) {
+      setSelectedShopState(data.shops[0]);
+      localStorage.setItem("selectedShop", JSON.stringify(data.shops[0]));
+      router.push("/dashboard");
+    } else {
+      router.push("/select-shop");
+    }
   };
 
   const logout = async () => {
@@ -200,10 +258,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null);
     setBusiness(null);
+    setShops([]);
+    setSelectedShopState(null);
     setToken(null);
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("business");
+    localStorage.removeItem("selectedShop");
+    removeTokenCookie();
     router.push("/login");
   };
 
@@ -223,8 +285,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  const setSelectedShop = (shop: Shop) => {
+    setSelectedShopState(shop);
+    localStorage.setItem("selectedShop", JSON.stringify(shop));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, business, token, login, register, logout, isLoading, hasPermission }}>
+    <AuthContext.Provider value={{ user, business, shops, selectedShop, token, login, register, logout, isLoading, setSelectedShop, fetchShops, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

@@ -259,7 +259,8 @@ ${profit >= 0 ? '✅' : '❌'} Net Profit: $${profit.toFixed(2)}`;
       return await response.json();
     } catch (error) {
       console.error('WhatsApp send error:', error);
-      return { success: false, error: error.message };
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, error: message };
     }
   }
 

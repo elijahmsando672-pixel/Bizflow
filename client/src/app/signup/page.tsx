@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import Image from "next/image";
 import { Eye, EyeOff, Mail, Lock, User, Building2, Phone, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 
 export default function SignupPage() {
@@ -18,7 +20,12 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const { register } = useAuth();
+  const { register, token } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (token) router.replace("/select-shop");
+  }, [token, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,8 +63,8 @@ export default function SignupPage() {
 
         <div className="text-center mb-8 animate-slide-up">
           <Link href="/">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg shadow-blue-500/50 hover:scale-105 transition-transform cursor-pointer">
-              <Building2 className="w-8 h-8 text-white" />
+            <div className="w-16 h-16 relative mb-4 mx-auto rounded-2xl overflow-hidden shadow-lg shadow-blue-500/50 hover:scale-105 transition-transform cursor-pointer">
+              <Image src="/logo.png" alt="BizFlow" fill sizes="64px" className="object-contain" />
             </div>
           </Link>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-600 bg-clip-text text-transparent mb-2">BizFlow</h1>

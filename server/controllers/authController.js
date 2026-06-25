@@ -88,15 +88,21 @@ export const register = async (req, res) => {
     await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [user.id, refreshToken, refreshExpiresAt]);
 
     await query(`INSERT INTO expense_categories (business_id, name) VALUES ($1, 'Rent'), ($1, 'Utilities'), ($1, 'Salaries'), ($1, 'Supplies'), ($1, 'Marketing'), ($1, 'Transport'), ($1, 'Other')`, [business_id]);
+    const shopResult = await query(
+      `INSERT INTO shops (business_id, name) VALUES ($1, 'Main Shop') RETURNING id`,
+      [business_id]
+    );
     await recordLoginAttempt(email, req.ip, true);
 
     sendWelcomeEmail(email, { name: user.name, business_name }).catch(console.error);
+    const shopsResult = await query('SELECT id, name, location FROM shops WHERE business_id = $1 ORDER BY name', [business_id]);
     setRefreshCookie(res, refreshToken);
     setCsrfCookie(req, res);
 
     res.status(201).json({
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
       business: { id: business_id, name: business_name },
+      shops: shopsResult.rows,
       token,
     });
   } catch (err) {
@@ -147,12 +153,14 @@ export const login = async (req, res) => {
     await recordLoginAttempt(email, ip, true);
 
     const { password: _, ...userData } = user;
+    const shopsResult = await query('SELECT id, name, location FROM shops WHERE business_id = $1 ORDER BY name', [userData.business_id]);
     setRefreshCookie(res, refreshToken);
     setCsrfCookie(req, res);
 
     res.json({
       user: { id: userData.id, name: userData.name, email: userData.email, role: userData.role },
       business: { id: userData.business_id, name: userData.business_name },
+      shops: shopsResult.rows,
       token,
     });
   } catch (err) {
