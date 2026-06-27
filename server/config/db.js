@@ -1195,6 +1195,23 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
 
     CREATE INDEX IF NOT EXISTS idx_api_keys_business ON api_keys(business_id);
     CREATE INDEX IF NOT EXISTS idx_api_keys_prefix ON api_keys(key_prefix);
+
+    -- ========================================
+    -- System: Push Notification Subscriptions
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh_key TEXT NOT NULL,
+      auth_key TEXT NOT NULL,
+      device_name VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id);
   `;
 
       await pool.query(schema);

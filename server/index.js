@@ -14,6 +14,8 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { authenticateApiKey } from './middleware/apiKey.js';
 import { trackRequest, getMetrics } from './utils/metrics.js';
 import { pool } from './config/db.js';
+import { swaggerSpec } from './docs/swagger.js';
+import { getQueueStats } from './utils/jobQueue.js';
 import authRoutes from './routes/auth.js';
 import apiKeyRoutes from './routes/apiKeys.js';
 import customerRoutes from './routes/customers.js';
@@ -46,6 +48,8 @@ import quotationRoutes from './routes/quotations.js';
 import paymentRoutes from './routes/payments.js';
 import webhookRoutes from './routes/webhooks.js';
 import sessionRoutes from './routes/sessions.js';
+import pushRoutes from './routes/push.js';
+import docRoutes from './routes/docs.js';
 import oauthRoutes from './routes/oauth.js';
 
 const auditCrud = (resource) => (req, res, next) => {
@@ -197,45 +201,56 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// all protected routes need auth + permission checks + audit logging
-app.use('/api/customers', protect, requirePermission, auditCrud('customers'), customerRoutes);
-app.use('/api/products', protect, requirePermission, auditCrud('products'), productRoutes);
-app.use('/api/invoices', protect, requirePermission, auditCrud('invoices'), invoiceRoutes);
-app.use('/api/sales', protect, requirePermission, auditCrud('sales'), saleRoutes);
-app.use('/api/expenses', protect, requirePermission, auditCrud('expenses'), expenseRoutes);
-app.use('/api/dashboard', protect, requirePermission, auditCrud('dashboard'), dashboardRoutes);
-app.use('/api/notifications', protect, requirePermission, auditCrud('notifications'), notificationRoutes);
-app.use('/api/admin', protect, requirePermission, auditCrud('admin'), adminRoutes);
-app.use('/api/team', protect, requirePermission, auditCrud('team'), teamRoutes);
-app.use('/api/employees', protect, requirePermission, auditCrud('employees'), employeeRoutes);
-app.use('/api/debtors', protect, requirePermission, auditCrud('debtors'), debtorRoutes);
-app.use('/api/creditors', protect, requirePermission, auditCrud('creditors'), creditorRoutes);
-app.use('/api/reports', protect, requirePermission, auditCrud('reports'), reportRoutes);
-app.use('/api/ai', protect, requirePermission, auditCrud('ai'), aiRoutes);
-app.use('/api/crm', protect, requirePermission, auditCrud('crm'), crmRoutes);
-app.use('/api/pipeline', protect, requirePermission, auditCrud('pipeline'), pipelineRoutes);
-app.use('/api/support', protect, requirePermission, auditCrud('support'), supportRoutes);
-app.use('/api/projects', protect, requirePermission, auditCrud('projects'), projectRoutes);
-app.use('/api/procurement', protect, requirePermission, auditCrud('procurement'), procurementRoutes);
-app.use('/api/timetracking', protect, requirePermission, auditCrud('timetracking'), timetrackingRoutes);
-app.use('/api/permissions', protect, requirePermission, auditCrud('permissions'), permissionsRoutes);
-app.use('/api/import', protect, requirePermission, express.json({ limit: '10mb' }), auditCrud('import'), importExportRoutes);
-app.use('/api/export', protect, requirePermission, auditCrud('export'), importExportRoutes);
-app.use('/api/users', protect, requirePermission, auditCrud('users'), userRoutes);
-app.use('/api/shops', protect, requirePermission, auditCrud('shops'), shopRoutes);
-app.use('/api/reviews', protect, requirePermission, auditCrud('reviews'), reviewRoutes);
-app.use('/api/messages', protect, requirePermission, auditCrud('messages'), messageRoutes);
-app.use('/api/quotations', protect, requirePermission, auditCrud('quotations'), quotationRoutes);
-app.use('/api/payments', protect, requirePermission, auditCrud('payments'), paymentRoutes);
+// API versioning helper — registers routes on both /api and /api/v1
+const mountRoutes = (base) => {
+  app.use(`${base}/customers`, protect, requirePermission, auditCrud('customers'), customerRoutes);
+  app.use(`${base}/products`, protect, requirePermission, auditCrud('products'), productRoutes);
+  app.use(`${base}/invoices`, protect, requirePermission, auditCrud('invoices'), invoiceRoutes);
+  app.use(`${base}/sales`, protect, requirePermission, auditCrud('sales'), saleRoutes);
+  app.use(`${base}/expenses`, protect, requirePermission, auditCrud('expenses'), expenseRoutes);
+  app.use(`${base}/dashboard`, protect, requirePermission, auditCrud('dashboard'), dashboardRoutes);
+  app.use(`${base}/notifications`, protect, requirePermission, auditCrud('notifications'), notificationRoutes);
+  app.use(`${base}/admin`, protect, requirePermission, auditCrud('admin'), adminRoutes);
+  app.use(`${base}/team`, protect, requirePermission, auditCrud('team'), teamRoutes);
+  app.use(`${base}/employees`, protect, requirePermission, auditCrud('employees'), employeeRoutes);
+  app.use(`${base}/debtors`, protect, requirePermission, auditCrud('debtors'), debtorRoutes);
+  app.use(`${base}/creditors`, protect, requirePermission, auditCrud('creditors'), creditorRoutes);
+  app.use(`${base}/reports`, protect, requirePermission, auditCrud('reports'), reportRoutes);
+  app.use(`${base}/ai`, protect, requirePermission, auditCrud('ai'), aiRoutes);
+  app.use(`${base}/crm`, protect, requirePermission, auditCrud('crm'), crmRoutes);
+  app.use(`${base}/pipeline`, protect, requirePermission, auditCrud('pipeline'), pipelineRoutes);
+  app.use(`${base}/support`, protect, requirePermission, auditCrud('support'), supportRoutes);
+  app.use(`${base}/projects`, protect, requirePermission, auditCrud('projects'), projectRoutes);
+  app.use(`${base}/procurement`, protect, requirePermission, auditCrud('procurement'), procurementRoutes);
+  app.use(`${base}/timetracking`, protect, requirePermission, auditCrud('timetracking'), timetrackingRoutes);
+  app.use(`${base}/permissions`, protect, requirePermission, auditCrud('permissions'), permissionsRoutes);
+  app.use(`${base}/import`, protect, requirePermission, express.json({ limit: '10mb' }), auditCrud('import'), importExportRoutes);
+  app.use(`${base}/export`, protect, requirePermission, auditCrud('export'), importExportRoutes);
+  app.use(`${base}/users`, protect, requirePermission, auditCrud('users'), userRoutes);
+  app.use(`${base}/shops`, protect, requirePermission, auditCrud('shops'), shopRoutes);
+  app.use(`${base}/reviews`, protect, requirePermission, auditCrud('reviews'), reviewRoutes);
+  app.use(`${base}/messages`, protect, requirePermission, auditCrud('messages'), messageRoutes);
+  app.use(`${base}/quotations`, protect, requirePermission, auditCrud('quotations'), quotationRoutes);
+  app.use(`${base}/payments`, protect, requirePermission, auditCrud('payments'), paymentRoutes);
+  app.use(`${base}/api-keys`, protect, auditCrud('api_keys'), apiKeyRoutes);
+  app.use(`${base}/webhooks`, protect, requirePermission, auditCrud('webhooks'), webhookRoutes);
+  app.use(`${base}/sessions`, protect, auditCrud('sessions'), sessionRoutes);
+  app.use(`${base}/push`, protect, pushRoutes);
 
-// API keys — self-service management (authenticated users manage their own keys)
-app.use('/api/api-keys', protect, auditCrud('api_keys'), apiKeyRoutes);
+  app.get(`${base}/queue`, protect, (req, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+      return res.status(403).json({ success: false, message: 'Admin access required', code: 403 });
+    }
+    res.json({ success: true, data: getQueueStats() });
+  });
+};
 
-// Webhooks — self-service management
-app.use('/api/webhooks', protect, requirePermission, auditCrud('webhooks'), webhookRoutes);
+mountRoutes('/api');
+mountRoutes('/api/v1');
 
-// Sessions — user session management
-app.use('/api/sessions', protect, auditCrud('sessions'), sessionRoutes);
+// API docs — Swagger UI (not versioned)
+app.use('/api/docs', docRoutes);
+app.use('/api/swagger.json', (req, res) => { res.json(swaggerSpec); });
 
 // OAuth routes (no auth middleware — passport handles it)
 app.use(passport.initialize());

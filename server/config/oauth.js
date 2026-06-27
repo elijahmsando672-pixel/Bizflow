@@ -1,6 +1,7 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as AppleStrategy } from 'passport-apple';
+import { Strategy as MicrosoftStrategy } from 'passport-microsoft';
 import { query } from './db.js';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -121,6 +122,26 @@ if (process.env.APPLE_CLIENT_ID && process.env.APPLE_TEAM_ID && process.env.APPL
     try {
       const result = await findOrCreateUser(profile || { id: idToken.sub, email: idToken.email }, 'apple');
       if (!result) return done(null, false, { message: 'No email returned from Apple' });
+      done(null, result);
+    } catch (err) {
+      done(err);
+    }
+  }));
+}
+
+if (process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET) {
+  passport.use(new MicrosoftStrategy({
+    clientID: process.env.MICROSOFT_CLIENT_ID,
+    clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
+    callbackURL: `${API_URL.replace(/\/api$/, '')}/auth/microsoft/callback`,
+    scope: ['user.read', 'email', 'openid', 'profile'],
+    tenant: process.env.MICROSOFT_TENANT || 'common',
+    authorizationURL: `https://login.microsoftonline.com/${process.env.MICROSOFT_TENANT || 'common'}/oauth2/v2.0/authorize`,
+    tokenURL: `https://login.microsoftonline.com/${process.env.MICROSOFT_TENANT || 'common'}/oauth2/v2.0/token`,
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      const result = await findOrCreateUser(profile, 'microsoft');
+      if (!result) return done(null, false, { message: 'No email returned from Microsoft' });
       done(null, result);
     } catch (err) {
       done(err);

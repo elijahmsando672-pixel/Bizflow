@@ -74,4 +74,28 @@ router.post('/apple/callback',
   }
 );
 
+router.get('/microsoft', passport.authenticate('microsoft', { session: false }));
+
+router.get('/microsoft/callback',
+  passport.authenticate('microsoft', { session: false, failureRedirect: `${APP_URL}/login?error=microsoft_auth_failed` }),
+  async (req, res) => {
+    try {
+      const { user, business } = req.user;
+
+      const refreshToken = generateRefreshToken();
+      const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await query('DELETE FROM refresh_tokens WHERE user_id = $1', [user.id]);
+      await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [user.id, refreshToken, refreshExpiresAt]);
+
+      setRefreshCookie(res, refreshToken);
+      setCsrfCookie(req, res);
+
+      res.redirect(buildRedirectUrl(user, business));
+    } catch (err) {
+      console.error('Microsoft callback error:', err);
+      res.redirect(`${APP_URL}/login?error=server_error`);
+    }
+  }
+);
+
 export default router;
