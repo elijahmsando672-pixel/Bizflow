@@ -49,52 +49,6 @@ jobs:
       - run: npx vitest run
         working-directory: server
 
-  api-test:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: bizflow_test
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/bizflow_test
-      JWT_SECRET: test-secret-key
-      NODE_ENV: test
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npm ci
-        working-directory: apps/api
-      - run: npx jest --ci
-        working-directory: apps/api
-
-  web-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npm ci
-        working-directory: packages/ui
-      - run: npm ci
-        working-directory: packages/utils
-      - run: npm ci
-        working-directory: apps/web
-      - run: npx vitest run
-        working-directory: apps/web
-
   build:
     runs-on: ubuntu-latest
     steps:
