@@ -12,7 +12,7 @@ export const setCsrfCookie = (req, res) => {
   const isProduction = process.env.NODE_ENV === 'production';
   
   res.cookie(CSRF_COOKIE_NAME, token, {
-    httpOnly: false,
+    httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'lax' : 'strict',
     maxAge: CSRF_TOKEN_EXPIRY,
@@ -20,7 +20,7 @@ export const setCsrfCookie = (req, res) => {
   });
 
   res.cookie('csrf_expiry', String(Date.now() + CSRF_TOKEN_EXPIRY), {
-    httpOnly: false,
+    httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'lax' : 'strict',
     maxAge: CSRF_TOKEN_EXPIRY,

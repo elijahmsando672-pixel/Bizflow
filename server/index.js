@@ -252,7 +252,8 @@ mountRoutes('/api/v1');
 app.use('/api/docs', docRoutes);
 app.use('/api/swagger.json', (req, res) => { res.json(swaggerSpec); });
 
-// OAuth routes (no auth middleware — passport handles it)
+// OAuth routes — rate limited, passport handles auth
+app.use('/auth', authRateLimiter);
 app.use(passport.initialize());
 app.use('/auth', oauthRoutes);
 
@@ -268,25 +269,13 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check — detailed system status
+// Health check — minimal response, no sensitive info
 app.get('/api/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({
-      status: 'ok',
-      version: process.env.npm_package_version || '1.0.0',
-      timestamp: new Date().toISOString(),
-      uptime: Math.floor(process.uptime()),
-      database: 'connected',
-      environment: process.env.NODE_ENV || 'development',
-      memory: `${Math.round(process.memoryUsage().rss / 1024 / 1024)}MB`,
-    });
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
   } catch {
-    res.status(503).json({
-      success: false,
-      message: 'Database connection unavailable',
-      code: 503,
-    });
+    res.status(503).json({ success: false, message: 'Service unavailable', code: 503 });
   }
 });
 

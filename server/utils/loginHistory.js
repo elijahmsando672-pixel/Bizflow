@@ -31,7 +31,7 @@ export const getLoginHistory = async (userId, limit = 50) => {
 export const getActiveSessions = async (userId) => {
   const r = await query(
     `SELECT lh.* FROM login_history lh
-     JOIN refresh_tokens rt ON lh.session_id = rt.token
+     JOIN refresh_tokens rt ON lh.session_id = encode(digest(rt.token, 'sha256'), 'hex')
      WHERE lh.user_id = $1 AND rt.expires_at > NOW() AND lh.success = true
      ORDER BY lh.created_at DESC`,
     [userId]

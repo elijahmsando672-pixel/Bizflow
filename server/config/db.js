@@ -1212,6 +1212,23 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
     );
 
     CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id);
+
+    -- ========================================
+    -- Security: Temp Tokens (opaque short-lived, e.g. TOTP pre-auth)
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS temp_tokens (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      token_hash VARCHAR(255) NOT NULL UNIQUE,
+      purpose VARCHAR(50) NOT NULL DEFAULT 'totp_preauth',
+      expires_at TIMESTAMP NOT NULL,
+      used BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_temp_tokens_hash ON temp_tokens(token_hash);
+    CREATE INDEX IF NOT EXISTS idx_temp_tokens_user ON temp_tokens(user_id);
   `;
 
       await pool.query(schema);

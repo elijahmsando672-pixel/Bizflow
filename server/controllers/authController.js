@@ -10,6 +10,7 @@ import { recordLoginHistory } from '../utils/loginHistory.js';
 import { reportAccountLockout } from '../utils/securityMonitor.js';
 import { JWT_SECRET_KEY as JWT_SECRET } from '../middleware/auth.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
+import { createTempToken, consumeTempToken } from '../utils/tempToken.js';
 import https from 'https';
 
 const APP_NAME = 'BizFlow';
@@ -140,6 +141,14 @@ export const register = async (req, res) => {
     const { error, value } = registerSchema.validate(req.body);
     if (error) return res.status(400).json({ error: error.details[0].message });
 
+    // Require CAPTCHA for registration (only if configured)
+    if (CAPTCHA_SECRET) {
+      const { captcha_token } = req.body;
+      if (!captcha_token) return res.status(400).json({ error: 'CAPTCHA_REQUIRED', message: 'Please complete the security check.' });
+      const captchaValid = await verifyCaptcha(captcha_token);
+      if (!captchaValid) return res.status(400).json({ error: 'Invalid CAPTCHA. Please try again.' });
+    }
+
     const { name, email, password, business_name, phone } = value;
     // don't reveal if email exists — just say "invalid"
     const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
@@ -182,13 +191,14 @@ export const register = async (req, res) => {
     sendWelcomeEmail(email, { name: user.name, business_name }).catch(console.error);
     const shopsResult = await query('SELECT id, name, location FROM shops WHERE business_id = $1 ORDER BY name', [business_id]);
     setRefreshCookie(res, refreshToken);
-    setCsrfCookie(req, res);
+    const csrfToken = setCsrfCookie(req, res);
 
     res.status(201).json({
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
       business: { id: business_id, name: business_name },
       shops: shopsResult.rows,
       token,
+      csrf_token: csrfToken,
     });
   } catch (err) {
     console.error('Register error:', err);
@@ -255,10 +265,19 @@ export const login = async (req, res) => {
 
     // ── TOTP check: if enabled, require TOTP token ──
     if (user.totp_enabled) {
-      const { totp_token } = req.body;
+      const { totp_token, temp_token: clientTempToken } = req.body;
       if (!totp_token) {
-        return res.json({ require_totp: true, temp_token: generateToken(user) });
+        const newTempToken = await createTempToken(user.id);
+        return res.json({ require_totp: true, temp_token: newTempToken });
       }
+
+      // Require a valid temp_token to proceed (proves first step was completed)
+      const tokenUser = await consumeTempToken(clientTempToken);
+      if (!tokenUser || tokenUser.user_id !== user.id) {
+        await recordLoginAttempt(email, ip, false);
+        return res.status(401).json({ error: 'Invalid verification code.' });
+      }
+
       const totpValid = authenticator.check(totp_token, user.totp_secret);
       if (!totpValid) {
         // Check backup codes
@@ -279,28 +298,31 @@ export const login = async (req, res) => {
       }
     }
 
-    await query('DELETE FROM refresh_tokens WHERE user_id = $1', [user.id]);
     await query('DELETE FROM login_attempts WHERE email = $1 AND success = false', [email]);
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
 
     const token = generateToken(user);
     const refreshToken = generateRefreshToken();
     const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    // Insert new refresh token FIRST, then delete old ones (avoid race)
+    const sessionHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
     await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [user.id, refreshToken, refreshExpiresAt]);
+    await query('DELETE FROM refresh_tokens WHERE user_id = $1 AND token != $2', [user.id, refreshToken]);
     await recordLoginAttempt(email, ip, true);
-    recordLoginHistory({ userId: user.id, businessId: user.business_id, ip, userAgent: req.get('User-Agent'), success: true, sessionId: refreshToken }).catch(() => {});
+    recordLoginHistory({ userId: user.id, businessId: user.business_id, ip, userAgent: req.get('User-Agent'), success: true, sessionId: sessionHash }).catch(() => {});
     recordDevice(user.id, req).catch(() => {});
 
     const { password: _, totp_secret, ...userData } = user;
     const shopsResult = await query('SELECT id, name, location FROM shops WHERE business_id = $1 ORDER BY name', [userData.business_id]);
     setRefreshCookie(res, refreshToken);
-    setCsrfCookie(req, res);
+    const csrfToken = setCsrfCookie(req, res);
 
     res.json({
       user: { id: userData.id, name: userData.name, email: userData.email, role: userData.role },
       business: { id: userData.business_id, name: userData.business_name },
       shops: shopsResult.rows,
       token,
+      csrf_token: csrfToken,
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -338,7 +360,13 @@ export const logout = async (req, res) => {
 
 export const forgotPassword = async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, captcha_token } = req.body;
+    if (CAPTCHA_SECRET) {
+      if (!captcha_token) return res.status(400).json({ error: 'CAPTCHA_REQUIRED', message: 'Please complete the security check.' });
+      const captchaValid = await verifyCaptcha(captcha_token);
+      if (!captchaValid) return res.status(400).json({ error: 'Invalid CAPTCHA. Please try again.' });
+    }
+
     if (!email || Joi.string().email().validate(email).error) {
       return res.json({ message: 'If the email exists in our system, a password reset link will be sent.' });
     }
@@ -424,7 +452,9 @@ export const sendOTP = async (req, res) => {
     if (email) {
       sendOTPEmail(email, otp, purpose).catch(console.error);
     }
-    console.log(`OTP for ${email || phone}: ${otp}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`OTP for ${email || phone}: ${otp}`);
+    }
 
     res.json({ message: 'OTP sent successfully', expires_in: 600 });
   } catch (err) {
