@@ -2,12 +2,11 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
-import { useAuth, type Shop } from "@/lib/auth-context";
+import { useAuth } from "@/lib/auth-context";
 import { Building2, ArrowRight, Store } from "lucide-react";
 
 export default function SelectShopPage() {
-  const { shops, selectedShop, setSelectedShop, business, isLoading, token } = useAuth();
+  const { shops, setSelectedShop, business, isLoading, token } = useAuth();
   const router = useRouter();
 
   useEffect(() => {

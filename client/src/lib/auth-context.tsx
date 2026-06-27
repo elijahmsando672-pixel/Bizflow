@@ -155,7 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       });
     }
-  }, [refreshAccessToken]);
+  }, [refreshAccessToken, fetchShops]);
 
   useEffect(() => {
     if (!isLoading && token) {

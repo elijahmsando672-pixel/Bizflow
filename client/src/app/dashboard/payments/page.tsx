@@ -130,7 +130,7 @@ export default function PaymentsPage() {
             <div className="flex items-center justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
           ) : (
             <Table cols={["Date", "Description", "Type", "Amount", "Category", "Reference"]}
-              rows={mpesaTx.slice(0, 20).map((t: any, i: number) => [
+              rows={mpesaTx.slice(0, 20).map((t: any) => [
                 <span key="d" className="text-muted-foreground text-xs">{t.date ? new Date(t.date).toLocaleDateString("en-GB") : "-"}</span>,
                 <span key="desc" className="font-medium">{t.description || "N/A"}</span>,
                 <Badge key="ty" label={t.entry_type === "inflow" ? "INFLOW" : "OUTFLOW"} color={t.entry_type === "inflow" ? "var(--color-success)" : "var(--color-destructive)"} />,

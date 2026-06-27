@@ -20,8 +20,8 @@ export default function DashboardLoading() {
         <div className="col-span-2 bg-gray-800/50 rounded-xl p-5 border border-gray-700/60">
           <div className="h-5 w-40 bg-gray-700 rounded mb-5" />
           <div className="flex gap-2 h-40 items-end">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className="flex-1 bg-gray-700 rounded-t-lg" style={{ height: `${30 + Math.random() * 50}%` }} />
+            {[45, 65, 35, 80, 55, 40, 70].map((h, i) => (
+              <div key={i} className="flex-1 bg-gray-700 rounded-t-lg" style={{ height: `${h}%` }} />
             ))}
           </div>
         </div>

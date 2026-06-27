@@ -6,7 +6,8 @@ export function useInView(options?: IntersectionObserverInit) {
   const ref = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(false);
   const optsRef = useRef(options);
-  optsRef.current = options;
+
+  useEffect(() => { optsRef.current = options; }, [options]);
 
   useEffect(() => {
     const el = ref.current;

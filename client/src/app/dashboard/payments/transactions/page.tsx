@@ -6,7 +6,7 @@ import { formatCurrency } from "@/lib/data";
 import {
   PageHeader, Card, SearchBar, Select, Table, Btn, Badge
 } from "@/components/ui/dashboard-ui";
-import { ArrowRightLeft, RefreshCw, Loader2, TrendingUp, TrendingDown } from "lucide-react";
+import { RefreshCw, Loader2 } from "lucide-react";
 
 interface MpesaTransaction {
   id: string;

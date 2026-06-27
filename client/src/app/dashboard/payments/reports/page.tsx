@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api";
 import { formatCurrency } from "@/lib/data";
 import {
-  PageHeader, Card, Select, Btn, Badge
+  PageHeader, Card, Btn, Badge
 } from "@/components/ui/dashboard-ui";
 import { BarChart3, TrendingUp, TrendingDown, RefreshCw, Loader2, PieChart } from "lucide-react";
 
