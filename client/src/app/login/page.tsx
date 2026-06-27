@@ -7,8 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import Image from "next/image";
-import { Sun, Moon, Eye, EyeOff, Mail, Lock, ArrowRight, Loader2, ArrowLeft, Smartphone, KeyRound } from "lucide-react";
+import { Sun, Moon, Eye, EyeOff, Mail, Lock, ArrowRight, Loader2, ArrowLeft, Smartphone, KeyRound, ShieldAlert } from "lucide-react";
 import { useTheme } from "@/lib/theme-provider";
+import dynamic from "next/dynamic";
+
+const Turnstile = dynamic(() => import("@/components/auth/Turnstile"), { ssr: false });
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 const BASE_URL = API_URL.replace(/\/api$/, "").replace(/\/$/, "");
@@ -30,6 +33,7 @@ export default function LoginPage() {
   const [resetToken, setResetToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [otpTimer, setOtpTimer] = useState(0);
+  const [requireCaptcha, setRequireCaptcha] = useState(false);
   const { login, loginWithOTP, token } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
@@ -58,11 +62,47 @@ export default function LoginPage() {
       await login(email, password);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Login failed";
-      if (msg === "Failed to fetch" || msg.includes("fetch") || msg.includes("NetworkError") || msg.includes("Network")) {
+      if (msg === "CAPTCHA_REQUIRED") {
+        setRequireCaptcha(true);
+        setError("Please complete the security check.");
+      } else if (msg === "Failed to fetch" || msg.includes("fetch") || msg.includes("NetworkError") || msg.includes("Network")) {
         setError("Unable to reach server. Check your internet connection or the API URL may be misconfigured.");
       } else {
         setError(msg);
       }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCaptchaLogin = async (captchaToken: string) => {
+    setError("");
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password, captcha_token: captchaToken }),
+          credentials: 'include',
+        }
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Login failed");
+      }
+      const data = await response.json();
+      // Set auth state via context
+      localStorage.setItem("token", data.token);
+      document.cookie = `token=${data.token}; path=/; max-age=${7 * 86400}; SameSite=Lax`;
+      localStorage.setItem("user", JSON.stringify(data.user));
+      localStorage.setItem("business", JSON.stringify(data.business));
+      if (data.shops) localStorage.setItem("shops", JSON.stringify(data.shops));
+      window.location.href = data.shops?.length === 1 ? "/dashboard" : "/select-shop";
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
+      setRequireCaptcha(false);
     } finally {
       setIsLoading(false);
     }
@@ -317,15 +357,25 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400 flex items-center gap-2">
+                  {error.includes("security check") && <ShieldAlert className="h-4 w-4 flex-shrink-0" />}
                   {error}
                 </div>
               )}
 
-              <Button type="submit" disabled={isLoading} className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
-                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
-                {isLoading ? "Signing in..." : "Sign In"}
-              </Button>
+              {requireCaptcha && (
+                <div className="space-y-3">
+                  <Turnstile onVerify={handleCaptchaLogin} />
+                  <p className="text-xs text-muted-foreground text-center">Complete the security check to continue</p>
+                </div>
+              )}
+
+              {!requireCaptcha && (
+                <Button type="submit" disabled={isLoading} className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
+                  {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
+                  {isLoading ? "Signing in..." : "Sign In"}
+                </Button>
+              )}
             </form>
           )}
 

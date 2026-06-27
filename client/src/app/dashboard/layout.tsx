@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import AuthGuard from "@/components/auth/AuthGuard";
+import IdleWarning from "@/components/auth/IdleWarning";
 import Image from "next/image";
 import {
   LayoutGrid, Users, User, Tag, Package, ShoppingCart, TrendingDown,
@@ -179,6 +180,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <AuthGuard>
+      <IdleWarning />
       <div className="flex h-screen bg-background">
         {/* Sidebar */}
         <div

@@ -1,15 +1,84 @@
 import jwt from 'jsonwebtoken';
 import Joi from 'joi';
 import crypto from 'crypto';
+import { authenticator } from 'otplib';
+import QRCode from 'qrcode';
 import { query, pool } from '../config/db.js';
-import { sendWelcomeEmail, sendPasswordResetEmail, sendOTPEmail } from '../utils/email.js';
+import { sendWelcomeEmail, sendPasswordResetEmail, sendOTPEmail, sendVerificationEmail } from '../utils/email.js';
 import { setCsrfCookie, clearCsrfCookie } from '../middleware/csrf.js';
 import { reportAccountLockout } from '../utils/securityMonitor.js';
 import { JWT_SECRET_KEY as JWT_SECRET } from '../middleware/auth.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
+import https from 'https';
 
+const APP_NAME = 'BizFlow';
+const CAPTCHA_SECRET = process.env.TURNSTILE_SECRET_KEY || '';
 const MAX_LOGIN_ATTEMPTS = 5;
 const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+const TOTP_WINDOW = 1; // ±30s window for clock drift
+
+// ── CAPTCHA verification (Cloudflare Turnstile) ──────────────
+const verifyCaptcha = (token) => {
+  return new Promise((resolve) => {
+    if (!CAPTCHA_SECRET || !token) return resolve(false);
+    const data = `secret=${encodeURIComponent(CAPTCHA_SECRET)}&response=${encodeURIComponent(token)}`;
+    const req = https.request({
+      hostname: 'challenges.cloudflare.com',
+      path: '/turnstile/v0/siteverify',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(data) },
+    }, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        try { resolve(JSON.parse(body).success === true); }
+        catch { resolve(false); }
+      });
+    });
+    req.on('error', () => resolve(false));
+    req.write(data);
+    req.end();
+  });
+};
+
+// ── Device tracking ──────────────────────────────────────────
+const recordDevice = async (userId, req) => {
+  const ua = req.get('User-Agent') || '';
+  const ip = req.ip || req.socket.remoteAddress;
+  const browser = ua.match(/(Chrome|Firefox|Safari|Edge|Opera)\/\S+/)?.[0] || 'Unknown';
+  const os = ua.match(/\(([^)]+)\)/)?.[1] || 'Unknown';
+  const deviceName = `${browser} on ${os}`;
+
+  // Deactivate existing current flag
+  await query('UPDATE user_devices SET is_current = false WHERE user_id = $1', [userId]);
+  // Upsert device (match by user + device name to avoid duplicates)
+  const existing = await query(
+    'SELECT id FROM user_devices WHERE user_id = $1 AND device_name = $2',
+    [userId, deviceName]
+  );
+  if (existing.rows.length > 0) {
+    await query(
+      'UPDATE user_devices SET last_login = NOW(), ip_address = $1, is_current = true WHERE id = $2',
+      [ip, existing.rows[0].id]
+    );
+  } else {
+    await query(
+      `INSERT INTO user_devices (user_id, device_name, device_type, browser, os, ip_address, is_current)
+       VALUES ($1, $2, $3, $4, $5, $6, true)`,
+      [userId, deviceName, ua.includes('Mobile') ? 'mobile' : 'desktop', browser, os, ip]
+    );
+  }
+};
+
+// ── IP whitelist check ───────────────────────────────────────
+const checkIpWhitelist = async (businessId, ip) => {
+  if (!businessId || !ip) return true;
+  const result = await query(
+    'SELECT id FROM ip_whitelist WHERE business_id = $1 AND ip_address = $2 AND is_active = true',
+    [businessId, ip]
+  );
+  return result.rows.length > 0;
+};
 
 const registerSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
@@ -94,6 +163,15 @@ export const register = async (req, res) => {
     );
     await recordLoginAttempt(email, req.ip, true);
 
+    // Send verification email
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const vTokenHash = crypto.createHash('sha256').update(verificationToken).digest('hex');
+    const vExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await query(
+      'INSERT INTO verification_tokens (email, token, type, expires_at) VALUES ($1, $2, $3, $4)',
+      [email, vTokenHash, 'email_verification', vExpiresAt]
+    );
+    sendVerificationEmail(email, verificationToken).catch(console.error);
     sendWelcomeEmail(email, { name: user.name, business_name }).catch(console.error);
     const shopsResult = await query('SELECT id, name, location FROM shops WHERE business_id = $1 ORDER BY name', [business_id]);
     setRefreshCookie(res, refreshToken);
@@ -124,6 +202,23 @@ export const login = async (req, res) => {
       return res.status(429).json({ error: 'Too many failed attempts. Please try again later.' });
     }
 
+    // ── CAPTCHA check: require after 3 failed attempts ──
+    const recentFails = await query(
+      'SELECT COUNT(*) as cnt FROM login_attempts WHERE email = $1 AND success = false AND attempted_at > NOW() - INTERVAL \'15 minutes\'',
+      [email]
+    );
+    const failCount = parseInt(recentFails.rows[0].cnt);
+    if (failCount >= 3) {
+      const { captcha_token } = req.body;
+      if (!captcha_token) {
+        return res.status(400).json({ error: 'CAPTCHA_REQUIRED', message: 'Please complete the security check.' });
+      }
+      const captchaValid = await verifyCaptcha(captcha_token);
+      if (!captchaValid) {
+        return res.status(400).json({ error: 'Invalid CAPTCHA. Please try again.' });
+      }
+    }
+
     const result = await query('SELECT u.*, b.name as business_name FROM users u JOIN businesses b ON u.business_id = b.id WHERE u.email = $1', [email]);
     if (result.rows.length === 0) { await recordLoginAttempt(email, ip, false); return res.status(401).json({ error: 'Invalid credentials' }); }
 
@@ -142,6 +237,41 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // ── IP whitelist check ──
+    if (user.business_id) {
+      const whitelistOk = await checkIpWhitelist(user.business_id, ip);
+      if (!whitelistOk) {
+        await recordLoginAttempt(email, ip, false);
+        return res.status(403).json({ error: 'Access denied from this IP address.' });
+      }
+    }
+
+    // ── TOTP check: if enabled, require TOTP token ──
+    if (user.totp_enabled) {
+      const { totp_token } = req.body;
+      if (!totp_token) {
+        return res.json({ require_totp: true, temp_token: generateToken(user) });
+      }
+      const totpValid = authenticator.check(totp_token, user.totp_secret);
+      if (!totpValid) {
+        // Check backup codes
+        if (totp_token.length <= 10) {
+          const backup = await query(
+            'SELECT id FROM totp_backup_codes WHERE user_id = $1 AND code = $2 AND used = false',
+            [user.id, totp_token]
+          );
+          if (backup.rows.length === 0) {
+            await recordLoginAttempt(email, ip, false);
+            return res.status(401).json({ error: 'Invalid verification code.' });
+          }
+          await query('UPDATE totp_backup_codes SET used = true WHERE id = $1', [backup.rows[0].id]);
+        } else {
+          await recordLoginAttempt(email, ip, false);
+          return res.status(401).json({ error: 'Invalid verification code.' });
+        }
+      }
+    }
+
     await query('DELETE FROM refresh_tokens WHERE user_id = $1', [user.id]);
     await query('DELETE FROM login_attempts WHERE email = $1 AND success = false', [email]);
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
@@ -151,8 +281,9 @@ export const login = async (req, res) => {
     const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [user.id, refreshToken, refreshExpiresAt]);
     await recordLoginAttempt(email, ip, true);
+    recordDevice(user.id, req).catch(() => {});
 
-    const { password: _, ...userData } = user;
+    const { password: _, totp_secret, ...userData } = user;
     const shopsResult = await query('SELECT id, name, location FROM shops WHERE business_id = $1 ORDER BY name', [userData.business_id]);
     setRefreshCookie(res, refreshToken);
     setCsrfCookie(req, res);
@@ -393,6 +524,189 @@ export const verifyOTPReset = async (req, res) => {
     res.json({ message: 'OTP verified', reset_token: resetToken, email: otpRecord.email });
   } catch (err) {
     console.error('Verify OTP reset error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// ── Email Verification ───────────────────────────────────────
+export const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'Verification token is required' });
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const result = await query(
+      `SELECT * FROM verification_tokens WHERE token = $1 AND type = 'email_verification' AND used = false AND expires_at > NOW()`,
+      [tokenHash]
+    );
+    if (result.rows.length === 0) return res.status(400).json({ error: 'Invalid or expired verification token' });
+
+    const record = result.rows[0];
+    await query('UPDATE verification_tokens SET used = true WHERE id = $1', [record.id]);
+    await query('UPDATE users SET email_verified = true WHERE email = $1', [record.email]);
+
+    res.json({ message: 'Email verified successfully' });
+  } catch (err) {
+    console.error('Verify email error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+
+    const userResult = await query('SELECT id, email_verified FROM users WHERE email = $1', [email]);
+    if (userResult.rows.length === 0) return res.json({ message: 'If the account exists, a verification email will be sent.' });
+    if (userResult.rows[0].email_verified) return res.json({ message: 'Email is already verified.' });
+
+    // Invalidate old tokens
+    await query('UPDATE verification_tokens SET used = true WHERE email = $1 AND type = $2', [email, 'email_verification']);
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(verificationToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await query(
+      'INSERT INTO verification_tokens (email, token, type, expires_at) VALUES ($1, $2, $3, $4)',
+      [email, tokenHash, 'email_verification', expiresAt]
+    );
+
+    sendVerificationEmail(email, verificationToken).catch(console.error);
+    res.json({ message: 'Verification email sent' });
+  } catch (err) {
+    console.error('Resend verification error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// ── TOTP / 2FA ──────────────────────────────────────────────
+export const setupTOTP = async (req, res) => {
+  try {
+    const secret = authenticator.generateSecret();
+    const otpauth = authenticator.keyuri(req.user.email, APP_NAME, secret);
+
+    await query('UPDATE users SET totp_secret = $1 WHERE id = $2', [secret, req.user.id]);
+
+    const qrCode = await QRCode.toDataURL(otpauth);
+
+    // Generate 8 backup codes
+    const codes = [];
+    for (let i = 0; i < 8; i++) {
+      const code = crypto.randomInt(1000000000, 9999999999).toString();
+      codes.push(code);
+      await query(
+        'INSERT INTO totp_backup_codes (user_id, code) VALUES ($1, $2)',
+        [req.user.id, code]
+      );
+    }
+
+    res.json({ secret, qr_code: qrCode, backup_codes: codes });
+  } catch (err) {
+    console.error('TOTP setup error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const verifyTOTPSetup = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'Verification code is required' });
+
+    const user = await query('SELECT totp_secret FROM users WHERE id = $1', [req.user.id]);
+    if (!user.rows[0]?.totp_secret) return res.status(400).json({ error: 'TOTP not set up yet' });
+
+    const valid = authenticator.check(token, user.rows[0].totp_secret);
+    if (!valid) return res.status(400).json({ error: 'Invalid verification code' });
+
+    await query('UPDATE users SET totp_enabled = true WHERE id = $1', [req.user.id]);
+    res.json({ message: 'Two-factor authentication enabled.' });
+  } catch (err) {
+    console.error('TOTP verify error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const disableTOTP = async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ error: 'Password is required to disable 2FA' });
+
+    const user = await query('SELECT password FROM users WHERE id = $1', [req.user.id]);
+    const valid = await verifyPassword(password, user.rows[0].password);
+    if (!valid) return res.status(401).json({ error: 'Invalid password' });
+
+    await query('UPDATE users SET totp_secret = NULL, totp_enabled = false WHERE id = $1', [req.user.id]);
+    await query('DELETE FROM totp_backup_codes WHERE user_id = $1', [req.user.id]);
+    res.json({ message: 'Two-factor authentication disabled.' });
+  } catch (err) {
+    console.error('TOTP disable error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// ── Device Management ───────────────────────────────────────
+export const getDevices = async (req, res) => {
+  try {
+    const result = await query(
+      'SELECT id, device_name, device_type, browser, os, ip_address, last_login, is_current, is_trusted, created_at FROM user_devices WHERE user_id = $1 ORDER BY last_login DESC',
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get devices error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const revokeDevice = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await query('DELETE FROM user_devices WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    res.json({ message: 'Device revoked' });
+  } catch (err) {
+    console.error('Revoke device error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// ── IP Whitelist ────────────────────────────────────────────
+export const getIpWhitelist = async (req, res) => {
+  try {
+    const result = await query(
+      'SELECT id, ip_address, label, is_active, created_at FROM ip_whitelist WHERE business_id = $1 ORDER BY created_at DESC',
+      [req.business_id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get IP whitelist error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const addIpWhitelist = async (req, res) => {
+  try {
+    const { ip_address, label } = req.body;
+    if (!ip_address) return res.status(400).json({ error: 'IP address is required' });
+
+    const result = await query(
+      'INSERT INTO ip_whitelist (business_id, ip_address, label, created_by) VALUES ($1, $2, $3, $4) ON CONFLICT (business_id, ip_address) DO UPDATE SET label = $3, is_active = true RETURNING id, ip_address, label',
+      [req.business_id, ip_address, label || '', req.user.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Add IP whitelist error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const removeIpWhitelist = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await query('DELETE FROM ip_whitelist WHERE id = $1 AND business_id = $2', [id, req.business_id]);
+    res.json({ message: 'IP removed from whitelist' });
+  } catch (err) {
+    console.error('Remove IP whitelist error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };

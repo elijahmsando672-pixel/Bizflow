@@ -111,6 +111,9 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
       password VARCHAR(255),
       role VARCHAR(20) DEFAULT 'staff',
       is_active BOOLEAN DEFAULT true,
+      email_verified BOOLEAN DEFAULT false,
+      totp_secret VARCHAR(255),
+      totp_enabled BOOLEAN DEFAULT false,
       last_login TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -491,8 +494,79 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE INDEX IF NOT EXISTS idx_team_invitations_business ON team_invitations(business_id);
+      CREATE INDEX IF NOT EXISTS idx_team_invitations_business ON team_invitations(business_id);
     CREATE INDEX IF NOT EXISTS idx_team_invitations_token ON team_invitations(token);
+
+    -- ========================================
+    -- FEATURE: Email Verification
+    -- ========================================
+
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT false;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret VARCHAR(255);
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN DEFAULT false;
+
+    CREATE TABLE IF NOT EXISTS verification_tokens (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      email VARCHAR(255) NOT NULL,
+      token VARCHAR(255) NOT NULL,
+      type VARCHAR(50) NOT NULL DEFAULT 'email_verification',
+      expires_at TIMESTAMP NOT NULL,
+      used BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_verification_tokens_email ON verification_tokens(email, type);
+
+    -- ========================================
+    -- FEATURE: TOTP Backup Codes
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS totp_backup_codes (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      code VARCHAR(10) NOT NULL,
+      used BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_totp_backup_codes_user ON totp_backup_codes(user_id);
+
+    -- ========================================
+    -- FEATURE: IP Whitelist
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS ip_whitelist (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      ip_address INET NOT NULL,
+      label VARCHAR(100),
+      is_active BOOLEAN DEFAULT true,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(business_id, ip_address)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ip_whitelist_business ON ip_whitelist(business_id);
+
+    -- ========================================
+    -- FEATURE: Device Management
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS user_devices (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      device_name VARCHAR(255),
+      device_type VARCHAR(50),
+      browser VARCHAR(100),
+      os VARCHAR(100),
+      ip_address INET,
+      last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      is_current BOOLEAN DEFAULT false,
+      is_trusted BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_user_devices_user ON user_devices(user_id);
 
     -- ========================================
     -- FEATURE 4: Employee / Payroll Management

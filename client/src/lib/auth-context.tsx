@@ -3,6 +3,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 min idle
+const WARNING_BEFORE_MS = 60 * 1000; // warn 1 min before
+
 export interface Shop {
   id: string;
   name: string;
@@ -35,6 +38,8 @@ interface AuthContextType {
   setSelectedShop: (shop: Shop) => void;
   fetchShops: () => Promise<void>;
   hasPermission: (resource: string, action: 'create' | 'read' | 'update' | 'delete') => Promise<boolean>;
+  showIdleWarning: boolean;
+  resetIdleTimer: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -65,6 +70,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [selectedShop, setSelectedShopState] = useState<Shop | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showIdleWarning, setShowIdleWarning] = useState(false);
+  const idleTimer = useRef<NodeJS.Timeout | null>(null);
+  const warningTimer = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
   const refreshCooldown = useRef(false);
 
@@ -290,7 +298,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = async () => {
+  // ── Session idle timeout ──
+  const clearIdleTimers = useCallback(() => {
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    if (warningTimer.current) clearTimeout(warningTimer.current);
+  }, []);
+
+  const logout = useCallback(async () => {
     try {
       await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/logout`,
@@ -308,13 +322,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setShops([]);
     setSelectedShopState(null);
     setToken(null);
+    setShowIdleWarning(false);
+    clearIdleTimers();
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("business");
     localStorage.removeItem("selectedShop");
     removeTokenCookie();
     router.push("/login");
-  };
+  }, [router, clearIdleTimers]);
+
+  const startIdleTimer = useCallback(() => {
+    clearIdleTimers();
+    if (!token) return;
+    idleTimer.current = setTimeout(() => {
+      setShowIdleWarning(true);
+      warningTimer.current = setTimeout(() => {
+        logout();
+      }, WARNING_BEFORE_MS);
+    }, SESSION_TIMEOUT_MS);
+  }, [token, logout, clearIdleTimers]);
+
+  const resetIdleTimer = useCallback(() => {
+    setShowIdleWarning(false);
+    clearIdleTimers();
+    startIdleTimer();
+  }, [startIdleTimer, clearIdleTimers]);
+
+  useEffect(() => {
+    if (!token) { clearIdleTimers(); setShowIdleWarning(false); return; }
+    startIdleTimer();
+    const events = ['mousedown', 'keydown', 'touchstart', 'scroll', 'mousemove'];
+    events.forEach(e => window.addEventListener(e, resetIdleTimer));
+    return () => {
+      clearIdleTimers();
+      events.forEach(e => window.removeEventListener(e, resetIdleTimer));
+    };
+  }, [token, startIdleTimer, resetIdleTimer, clearIdleTimers]);
 
   const hasPermission = useCallback(async (resource: string, action: 'create' | 'read' | 'update' | 'delete'): Promise<boolean> => {
     if (!user) return false;
@@ -338,7 +382,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, business, shops, selectedShop, token, login, loginWithOTP, register, logout, isLoading, setSelectedShop, fetchShops, hasPermission }}>
+    <AuthContext.Provider value={{ user, business, shops, selectedShop, token, login, loginWithOTP, register, logout, isLoading, setSelectedShop, fetchShops, hasPermission, showIdleWarning, resetIdleTimer }}>
       {children}
     </AuthContext.Provider>
   );

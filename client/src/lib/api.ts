@@ -203,6 +203,18 @@ const api = {
     sendOTP: (data: SendOTPData) => fetchApi('/auth/send-otp', { method: 'POST', body: JSON.stringify(data) }),
     verifyOTPLogin: (data: { email?: string; phone?: string; otp: string }) => fetchApi('/auth/verify-otp-login', { method: 'POST', body: JSON.stringify(data) }),
     verifyOTPReset: (data: { email?: string; phone?: string; otp: string }) => fetchApi('/auth/verify-otp-reset', { method: 'POST', body: JSON.stringify(data) }),
+    verifyEmail: (token: string) => fetchApi('/auth/verify-email', { method: 'POST', body: JSON.stringify({ token }) }),
+    resendVerification: (email: string) => fetchApi('/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email }) }),
+    totp: {
+      setup: () => fetchApi('/auth/totp/setup', { method: 'POST' }),
+      verifySetup: (token: string) => fetchApi('/auth/totp/verify-setup', { method: 'POST', body: JSON.stringify({ token }) }),
+      disable: (password: string) => fetchApi('/auth/totp/disable', { method: 'POST', body: JSON.stringify({ password }) }),
+    },
+    getDevices: () => fetchApi('/auth/devices'),
+    revokeDevice: (id: string) => fetchApi(`/auth/devices/${id}`, { method: 'DELETE' }),
+    getIpWhitelist: () => fetchApi('/auth/ip-whitelist'),
+    addIpWhitelist: (data: { ip_address: string; label?: string }) => fetchApi('/auth/ip-whitelist', { method: 'POST', body: JSON.stringify(data) }),
+    removeIpWhitelist: (id: string) => fetchApi(`/auth/ip-whitelist/${id}`, { method: 'DELETE' }),
   },
   sales: {
     getAll: (status?: string) => fetchApi(`/sales${status ? `?status=${status}` : ''}`),
