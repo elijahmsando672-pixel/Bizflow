@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken';
 import Joi from 'joi';
 import crypto from 'crypto';
-import { authenticator } from 'otplib';
+import { TOTP, NobleCryptoPlugin, ScureBase32Plugin } from 'otplib';
+const totp = new TOTP({ crypto: new NobleCryptoPlugin(), base32: new ScureBase32Plugin() });
 import QRCode from 'qrcode';
 import { query, pool } from '../config/db.js';
 import { sendWelcomeEmail, sendPasswordResetEmail, sendOTPEmail, sendVerificationEmail } from '../utils/email.js';
@@ -127,11 +128,11 @@ const generateToken = (user) => {
 
 const generateRefreshToken = () => crypto.randomBytes(64).toString('hex');
 
-const setRefreshCookie = (res, token) => {
-  const isProduction = process.env.NODE_ENV === 'production';
+const setRefreshCookie = (req, res, token) => {
+  const isSecure = process.env.NODE_ENV === 'production' || req?.secure || req?.headers?.['x-forwarded-proto'] === 'https';
   res.cookie('refreshToken', token, {
-    httpOnly: true, secure: isProduction,
-    sameSite: isProduction ? 'none' : 'strict',
+    httpOnly: true, secure: isSecure,
+    sameSite: isSecure ? 'none' : 'strict',
     maxAge: 7 * 24 * 60 * 60 * 1000, path: '/api/auth',
   });
 };
@@ -190,7 +191,7 @@ export const register = async (req, res) => {
     sendVerificationEmail(email, verificationToken).catch(console.error);
     sendWelcomeEmail(email, { name: user.name, business_name }).catch(console.error);
     const shopsResult = await query('SELECT id, name, location FROM shops WHERE business_id = $1 ORDER BY name', [business_id]);
-    setRefreshCookie(res, refreshToken);
+    setRefreshCookie(req, res, refreshToken);
     const csrfToken = setCsrfCookie(req, res);
 
     res.status(201).json({
@@ -278,7 +279,7 @@ export const login = async (req, res) => {
         return res.status(401).json({ error: 'Invalid verification code.' });
       }
 
-      const totpValid = authenticator.check(totp_token, user.totp_secret);
+      const totpValid = await totp.verify({ secret: user.totp_secret, token: totp_token });
       if (!totpValid) {
         // Check backup codes
         if (totp_token.length <= 10) {
@@ -314,7 +315,7 @@ export const login = async (req, res) => {
 
     const { password: _, totp_secret, ...userData } = user;
     const shopsResult = await query('SELECT id, name, location FROM shops WHERE business_id = $1 ORDER BY name', [userData.business_id]);
-    setRefreshCookie(res, refreshToken);
+    setRefreshCookie(req, res, refreshToken);
     const csrfToken = setCsrfCookie(req, res);
 
     res.json({
@@ -349,8 +350,9 @@ export const logout = async (req, res) => {
   try {
     const refreshToken = req.cookies?.refreshToken;
     if (refreshToken) await query('DELETE FROM refresh_tokens WHERE token = $1', [refreshToken]);
-    res.clearCookie('refreshToken', { path: '/api/auth', httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production' });
-    clearCsrfCookie(res);
+    const isSecure = process.env.NODE_ENV === 'production' || req?.secure || req?.headers?.['x-forwarded-proto'] === 'https';
+    res.clearCookie('refreshToken', { path: '/api/auth', httpOnly: true, sameSite: isSecure ? 'none' : 'strict', secure: isSecure });
+    clearCsrfCookie(req, res);
     res.json({ message: 'Logged out successfully' });
   } catch (err) {
     console.error('Logout error:', err);
@@ -509,7 +511,7 @@ export const verifyOTPLogin = async (req, res) => {
 
     const { password: _, ...userData } = user;
     const shopsResult = await query('SELECT id, name, location FROM shops WHERE business_id = $1 ORDER BY name', [userData.business_id]);
-    setRefreshCookie(res, refreshToken);
+    setRefreshCookie(req, res, refreshToken);
     setCsrfCookie(req, res);
 
     res.json({
@@ -621,8 +623,8 @@ export const resendVerification = async (req, res) => {
 // ── TOTP / 2FA ──────────────────────────────────────────────
 export const setupTOTP = async (req, res) => {
   try {
-    const secret = authenticator.generateSecret();
-    const otpauth = authenticator.keyuri(req.user.email, APP_NAME, secret);
+    const secret = totp.generateSecret();
+    const otpauth = totp.toURI({ accountName: req.user.email, issuer: APP_NAME, secret });
 
     await query('UPDATE users SET totp_secret = $1 WHERE id = $2', [secret, req.user.id]);
 
@@ -654,7 +656,7 @@ export const verifyTOTPSetup = async (req, res) => {
     const user = await query('SELECT totp_secret FROM users WHERE id = $1', [req.user.id]);
     if (!user.rows[0]?.totp_secret) return res.status(400).json({ error: 'TOTP not set up yet' });
 
-    const valid = authenticator.check(token, user.rows[0].totp_secret);
+    const valid = await totp.verify({ secret: user.rows[0].totp_secret, token });
     if (!valid) return res.status(400).json({ error: 'Invalid verification code' });
 
     await query('UPDATE users SET totp_enabled = true WHERE id = $1', [req.user.id]);
@@ -773,7 +775,7 @@ export const refreshToken = async (req, res) => {
     const userForToken = { id: oldTokenRecord.user_id, email: oldTokenRecord.email, business_id: oldTokenRecord.business_id, role: oldTokenRecord.role };
     const accessToken = generateToken(userForToken);
 
-    setRefreshCookie(res, newRefreshToken);
+    setRefreshCookie(req, res, newRefreshToken);
     res.json({ token: accessToken });
   } catch (err) {
     console.error('Refresh token error:', err);

@@ -8,7 +8,7 @@ import crypto from 'crypto';
 import { JWT_SECRET_KEY as JWT_SECRET } from '../middleware/auth.js';
 
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const OAUTH_CALLBACK_URL = process.env.APP_URL ? process.env.APP_URL.replace(/\/+$/, '') : 'http://localhost:3001';
 
 const generateToken = (user) => {
   return jwt.sign(
@@ -97,7 +97,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: `${API_URL.replace(/\/api$/, '')}/auth/google/callback`,
+    callbackURL: `${OAUTH_CALLBACK_URL}/auth/google/callback`,
     scope: ['profile', 'email'],
   }, async (accessToken, refreshToken, profile, done) => {
     try {
@@ -116,7 +116,7 @@ if (process.env.APPLE_CLIENT_ID && process.env.APPLE_TEAM_ID && process.env.APPL
     teamID: process.env.APPLE_TEAM_ID,
     keyID: process.env.APPLE_KEY_ID,
     privateKeyString: process.env.APPLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    callbackURL: `${API_URL.replace(/\/api$/, '')}/auth/apple/callback`,
+    callbackURL: `${OAUTH_CALLBACK_URL}/auth/apple/callback`,
     scope: ['name', 'email'],
   }, async (req, accessToken, refreshToken, idToken, profile, done) => {
     try {
@@ -133,7 +133,7 @@ if (process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET) {
   passport.use(new MicrosoftStrategy({
     clientID: process.env.MICROSOFT_CLIENT_ID,
     clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
-    callbackURL: `${API_URL.replace(/\/api$/, '')}/auth/microsoft/callback`,
+    callbackURL: `${OAUTH_CALLBACK_URL}/auth/microsoft/callback`,
     scope: ['user.read', 'email', 'openid', 'profile'],
     tenant: process.env.MICROSOFT_TENANT || 'common',
     authorizationURL: `https://login.microsoftonline.com/${process.env.MICROSOFT_TENANT || 'common'}/oauth2/v2.0/authorize`,

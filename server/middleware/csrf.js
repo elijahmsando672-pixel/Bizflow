@@ -7,22 +7,24 @@ export const generateCsrfToken = () => {
   return crypto.randomBytes(32).toString('hex');
 };
 
+const isSecure = (req) => process.env.NODE_ENV === 'production' || req?.secure || req?.headers?.['x-forwarded-proto'] === 'https';
+
 export const setCsrfCookie = (req, res) => {
   const token = generateCsrfToken();
-  const isProduction = process.env.NODE_ENV === 'production';
+  const secure = isSecure(req);
   
   res.cookie(CSRF_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'lax' : 'strict',
+    secure,
+    sameSite: secure ? 'lax' : 'strict',
     maxAge: CSRF_TOKEN_EXPIRY,
     path: '/',
   });
 
   res.cookie('csrf_expiry', String(Date.now() + CSRF_TOKEN_EXPIRY), {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'lax' : 'strict',
+    secure,
+    sameSite: secure ? 'lax' : 'strict',
     maxAge: CSRF_TOKEN_EXPIRY,
     path: '/',
   });
@@ -30,17 +32,18 @@ export const setCsrfCookie = (req, res) => {
   return token;
 };
 
-export const clearCsrfCookie = (res) => {
+export const clearCsrfCookie = (req, res) => {
+  const secure = isSecure(req);
   res.clearCookie(CSRF_COOKIE_NAME, {
     httpOnly: false,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'strict',
+    secure,
+    sameSite: secure ? 'lax' : 'strict',
     path: '/',
   });
   res.clearCookie('csrf_expiry', {
     httpOnly: false,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'strict',
+    secure,
+    sameSite: secure ? 'lax' : 'strict',
     path: '/',
   });
 };

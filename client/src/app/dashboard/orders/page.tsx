@@ -4,15 +4,17 @@ import { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api";
 import { formatCurrency } from "@/lib/data";
 import {
-  PageHeader, StatCard, Card, SearchBar, Select, Table, Btn, Badge
+  PageHeader, StatCard, Card, SearchBar, Select, Table, Btn, Badge, Modal, InputField
 } from "@/components/ui/dashboard-ui";
-import { FileText, ShoppingCart, Clock, RefreshCw, Loader2 } from "lucide-react";
+import { FileText, ShoppingCart, Clock, Plus, RefreshCw, User, DollarSign, Loader2 } from "lucide-react";
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState({ customer_name: "", total: "", status: "pending", sale_date: new Date().toISOString().split("T")[0] });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -24,6 +26,16 @@ export default function OrdersPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const handleSubmit = async () => {
+    try {
+      const payload = { customer_name: form.customer_name || undefined, total: parseFloat(form.total) || 0, status: form.status, sale_date: form.sale_date };
+      await api.sales.create({ ...payload, items: [{ product_name: "Order", qty: 1, unit_price: parseFloat(form.total) || 0 }] });
+      setModal(false);
+      setForm({ customer_name: "", total: "", status: "pending", sale_date: new Date().toISOString().split("T")[0] });
+      load();
+    } catch { alert("Failed to create order"); }
+  };
+
   const filtered = orders.filter((o: any) =>
     (o.customer_name || o.customer || "").toLowerCase().includes(search.toLowerCase()) &&
     (statusFilter === "ALL" || o.status === statusFilter)
@@ -32,6 +44,9 @@ export default function OrdersPage() {
   return (
     <div>
       <PageHeader title="Orders" subtitle="View and manage all customer orders">
+        <Btn color="var(--color-primary)" onClick={() => { setForm({ customer_name: "", total: "", status: "pending", sale_date: new Date().toISOString().split("T")[0] }); setModal(true); }}>
+          <Plus className="h-3.5 w-3.5" /> New Order
+        </Btn>
         <Btn outline color="var(--color-muted-foreground)" onClick={load}><RefreshCw className="h-3 w-3" /> Refresh</Btn>
       </PageHeader>
       <div className="flex flex-wrap gap-3 mb-4">
@@ -59,6 +74,19 @@ export default function OrdersPage() {
           ])}
           empty="No orders yet." />
       )}
+      <Modal open={modal} onClose={() => setModal(false)} title="New Order">
+        <InputField label="Customer Name" value={form.customer_name} onChange={v => setForm({ ...form, customer_name: v })} placeholder="Walk-in Customer" icon={<User className="h-3.5 w-3.5" />} />
+        <InputField label="Total Amount (KES)" value={form.total} onChange={v => setForm({ ...form, total: v })} placeholder="0" icon={<DollarSign className="h-3.5 w-3.5" />} type="number" />
+        <InputField label="Date" value={form.sale_date} onChange={v => setForm({ ...form, sale_date: v })} type="date" />
+        <div className="mb-3.5">
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Status</label>
+          <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
+            className="w-full rounded-lg border border-border bg-muted px-3 py-[9px] text-[13px] text-foreground outline-none">
+            <option value="pending">Pending</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        <Btn color="var(--color-primary)" onClick={handleSubmit} className="w-full justify-center mt-2 py-[10px]">Create Order</Btn>
+      </Modal>
     </div>
   );
 }

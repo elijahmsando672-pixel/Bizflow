@@ -95,9 +95,7 @@ const PORT = process.env.PORT || 5000;
 
 app.disable('x-powered-by');
 
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1);
-}
+app.set('trust proxy', 1);
 
 // https redirect for prod — trust proxy needs to be on for this
 if (process.env.NODE_ENV === 'production') {

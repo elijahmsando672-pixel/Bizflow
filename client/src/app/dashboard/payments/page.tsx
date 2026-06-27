@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api";
 import { formatCurrency } from "@/lib/data";
 import {
-  PageHeader, StatCard, Card, SearchBar, Select, Table, Btn, Badge
+  PageHeader, StatCard, Card, SearchBar, Select, Table, Btn, Badge, Modal, InputField
 } from "@/components/ui/dashboard-ui";
-import { Clock, CheckCircle, TrendingUp, TrendingDown, RefreshCw, Loader2, Smartphone, ArrowRightLeft, BarChart3 } from "lucide-react";
+import { Clock, CheckCircle, TrendingUp, TrendingDown, Plus, RefreshCw, Loader2, Smartphone, ArrowRightLeft, BarChart3 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function PaymentsPage() {
@@ -16,7 +16,23 @@ export default function PaymentsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [tab, setTab] = useState<"invoices" | "mpesa">("invoices");
+  const [invModal, setInvModal] = useState(false);
+  const [invForm, setInvForm] = useState({ customer: "", total: "", due_date: "" });
   const router = useRouter();
+
+  const handleCreateInvoice = async () => {
+    try {
+      await api.invoices.create({
+        customer_id: "new",
+        items: [{ product_name: "Invoice Item", qty: 1, unit_price: parseFloat(invForm.total) || 0 }],
+        total: parseFloat(invForm.total) || 0,
+        due_date: invForm.due_date || undefined,
+      });
+      setInvModal(false);
+      setInvForm({ customer: "", total: "", due_date: "" });
+      load();
+    } catch { alert("Failed to create invoice"); }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,6 +63,9 @@ export default function PaymentsPage() {
   return (
     <div>
       <PageHeader title="Payments" subtitle="Invoices & M-Pesa transactions">
+        <Btn color="var(--color-primary)" onClick={() => { setInvForm({ customer: "", total: "", due_date: "" }); setInvModal(true); }}>
+          <Plus className="h-3.5 w-3.5" /> New Invoice
+        </Btn>
         <Btn outline color="var(--color-muted-foreground)" onClick={load}><RefreshCw className="h-3 w-3" /> Refresh</Btn>
       </PageHeader>
       <div className="flex items-center gap-1.5 mb-4 text-xs">
@@ -142,6 +161,12 @@ export default function PaymentsPage() {
           )}
         </>
       )}
+      <Modal open={invModal} onClose={() => setInvModal(false)} title="New Invoice">
+        <InputField label="Customer" value={invForm.customer} onChange={v => setInvForm({ ...invForm, customer: v })} placeholder="Customer name" />
+        <InputField label="Total Amount (KES)" value={invForm.total} onChange={v => setInvForm({ ...invForm, total: v })} placeholder="0" type="number" />
+        <InputField label="Due Date" value={invForm.due_date} onChange={v => setInvForm({ ...invForm, due_date: v })} type="date" />
+        <Btn color="var(--color-primary)" onClick={handleCreateInvoice} className="w-full justify-center mt-2 py-[10px]">Create Invoice</Btn>
+      </Modal>
     </div>
   );
 }
