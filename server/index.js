@@ -11,7 +11,11 @@ import { securityHeaders, sanitizeInput, xssPrevent, globalRateLimiter, userRate
 import { reportSuspiciousAccess } from './utils/securityMonitor.js';
 import { passport } from './config/oauth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { authenticateApiKey } from './middleware/apiKey.js';
+import { trackRequest, getMetrics } from './utils/metrics.js';
+import { pool } from './config/db.js';
 import authRoutes from './routes/auth.js';
+import apiKeyRoutes from './routes/apiKeys.js';
 import customerRoutes from './routes/customers.js';
 import productRoutes from './routes/products.js';
 import invoiceRoutes from './routes/invoices.js';
@@ -40,6 +44,8 @@ import reviewRoutes from './routes/reviews.js';
 import messageRoutes from './routes/messages.js';
 import quotationRoutes from './routes/quotations.js';
 import paymentRoutes from './routes/payments.js';
+import webhookRoutes from './routes/webhooks.js';
+import sessionRoutes from './routes/sessions.js';
 import oauthRoutes from './routes/oauth.js';
 
 const auditCrud = (resource) => (req, res, next) => {
@@ -159,9 +165,15 @@ app.use(express.urlencoded({
   parameterLimit: 500,
 }));
 
-app.use('/api', sanitizeInput, xssPrevent);
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
+app.use('/api', sanitizeInput, xssPrevent, authenticateApiKey);
+
+// Metrics tracking — wraps res.end to capture response time
+app.use('/api', (req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    trackRequest(req, res, Date.now() - start);
+  });
+  next();
 });
 
 // Auth rate limiters must come before globalRateLimiter so they don't consume the global quota
@@ -216,6 +228,15 @@ app.use('/api/messages', protect, requirePermission, auditCrud('messages'), mess
 app.use('/api/quotations', protect, requirePermission, auditCrud('quotations'), quotationRoutes);
 app.use('/api/payments', protect, requirePermission, auditCrud('payments'), paymentRoutes);
 
+// API keys — self-service management (authenticated users manage their own keys)
+app.use('/api/api-keys', protect, auditCrud('api_keys'), apiKeyRoutes);
+
+// Webhooks — self-service management
+app.use('/api/webhooks', protect, requirePermission, auditCrud('webhooks'), webhookRoutes);
+
+// Sessions — user session management
+app.use('/api/sessions', protect, auditCrud('sessions'), sessionRoutes);
+
 // OAuth routes (no auth middleware — passport handles it)
 app.use(passport.initialize());
 app.use('/auth', oauthRoutes);
@@ -232,9 +253,37 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check — detailed system status
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({
+      status: 'ok',
+      version: process.env.npm_package_version || '1.0.0',
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(process.uptime()),
+      database: 'connected',
+      environment: process.env.NODE_ENV || 'development',
+      memory: `${Math.round(process.memoryUsage().rss / 1024 / 1024)}MB`,
+    });
+  } catch {
+    res.status(503).json({
+      success: false,
+      message: 'Database connection unavailable',
+      code: 503,
+    });
+  }
+});
+
+// System metrics — requires authentication (admin only)
+app.get('/api/metrics', protect, async (req, res, next) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+      return res.status(403).json({ success: false, message: 'Admin access required', code: 403 });
+    }
+    const metrics = await getMetrics(pool);
+    res.json({ success: true, data: metrics });
+  } catch (err) { next(err); }
 });
 
 // Version info - used by frontend to detect deployment mismatches

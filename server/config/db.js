@@ -1106,6 +1106,95 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(business_id, quotation_number)
     );
+
+    -- ========================================
+    -- System: Action Logs (audit trail for user actions)
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS action_logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+      action VARCHAR(100) NOT NULL,
+      result VARCHAR(20) NOT NULL DEFAULT 'success',
+      resource_type VARCHAR(50),
+      resource_id UUID,
+      details JSONB,
+      ip_address INET,
+      browser VARCHAR(200),
+      device VARCHAR(200),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_action_logs_business ON action_logs(business_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_action_logs_user ON action_logs(user_id);
+
+    -- ========================================
+    -- System: Login History (user access tracking)
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS login_history (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      ip_address INET NOT NULL,
+      user_agent TEXT,
+      browser VARCHAR(200),
+      os VARCHAR(200),
+      device VARCHAR(200),
+      location VARCHAR(255),
+      success BOOLEAN NOT NULL DEFAULT true,
+      failure_reason VARCHAR(100),
+      session_id VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_login_history_user ON login_history(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_login_history_business ON login_history(business_id, created_at DESC);
+
+    -- ========================================
+    -- System: Webhooks
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS webhooks (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      url VARCHAR(500) NOT NULL,
+      secret VARCHAR(255),
+      event VARCHAR(100) NOT NULL,
+      is_active BOOLEAN DEFAULT true,
+      last_triggered_at TIMESTAMP,
+      failure_count INTEGER DEFAULT 0,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_webhooks_business ON webhooks(business_id, event);
+
+    -- ========================================
+    -- System: API Keys
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      key_hash VARCHAR(255) NOT NULL UNIQUE,
+      key_prefix VARCHAR(10) NOT NULL,
+      scopes JSONB DEFAULT '["read"]',
+      permissions JSONB DEFAULT '{}',
+      ip_whitelist INET[],
+      rate_limit INTEGER DEFAULT 100,
+      is_active BOOLEAN DEFAULT true,
+      last_used_at TIMESTAMP,
+      expires_at TIMESTAMP,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_api_keys_business ON api_keys(business_id);
+    CREATE INDEX IF NOT EXISTS idx_api_keys_prefix ON api_keys(key_prefix);
   `;
 
       await pool.query(schema);

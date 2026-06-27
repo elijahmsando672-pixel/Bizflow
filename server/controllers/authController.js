@@ -6,6 +6,7 @@ import QRCode from 'qrcode';
 import { query, pool } from '../config/db.js';
 import { sendWelcomeEmail, sendPasswordResetEmail, sendOTPEmail, sendVerificationEmail } from '../utils/email.js';
 import { setCsrfCookie, clearCsrfCookie } from '../middleware/csrf.js';
+import { recordLoginHistory } from '../utils/loginHistory.js';
 import { reportAccountLockout } from '../utils/securityMonitor.js';
 import { JWT_SECRET_KEY as JWT_SECRET } from '../middleware/auth.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
@@ -287,6 +288,7 @@ export const login = async (req, res) => {
     const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [user.id, refreshToken, refreshExpiresAt]);
     await recordLoginAttempt(email, ip, true);
+    recordLoginHistory({ userId: user.id, businessId: user.business_id, ip, userAgent: req.get('User-Agent'), success: true, sessionId: refreshToken }).catch(() => {});
     recordDevice(user.id, req).catch(() => {});
 
     const { password: _, totp_secret, ...userData } = user;

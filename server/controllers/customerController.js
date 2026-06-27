@@ -1,73 +1,64 @@
 import { query } from '../config/db.js';
+import { AppError } from '../utils/AppError.js';
+import { customerSchema, customerUpdateSchema } from '../utils/schemas.js';
+import { logAction } from '../utils/actionLogger.js';
 
-export const getAll = async (req, res) => {
-  try {
-    const result = await query(
-      'SELECT * FROM customers WHERE business_id = $1 ORDER BY created_at DESC',
-      [req.business_id]
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Customer list error:', err);
-    res.status(500).json({ error: 'Server error' });
-  }
+const log = (req, action, result, resourceId) => {
+  logAction({
+    businessId: req.business_id, userId: req.user?.id, action, result,
+    resourceType: 'customers', resourceId, ip: req.ip, userAgent: req.get('User-Agent'),
+  }).catch(() => {});
 };
 
-export const getById = async (req, res) => {
+export const getAll = async (req, res, next) => {
   try {
-    const result = await query(
-      'SELECT * FROM customers WHERE id = $1 AND business_id = $2',
-      [req.params.id, req.business_id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error('Customer get error:', err);
-    res.status(500).json({ error: 'Server error' });
-  }
+    const result = await query('SELECT * FROM customers WHERE business_id = $1 ORDER BY created_at DESC', [req.business_id]);
+    res.json({ success: true, data: result.rows });
+  } catch (err) { next(new AppError('Server error', 500)); }
 };
 
-export const create = async (req, res) => {
+export const getById = async (req, res, next) => {
   try {
-    const { name, email, phone, address, company, notes, credit_limit } = req.body;
-    const result = await query(
+    const result = await query('SELECT * FROM customers WHERE id = $1 AND business_id = $2', [req.params.id, req.business_id]);
+    if (!result.rows.length) throw new AppError('Customer not found', 404);
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) { if (err.status) return next(err); next(new AppError('Server error', 500)); }
+};
+
+export const create = async (req, res, next) => {
+  try {
+    const { error, value } = customerSchema.validate(req.body, { abortEarly: false, stripUnknown: true });
+    if (error) throw Object.assign(error, { status: 422 });
+    const r = await query(
       `INSERT INTO customers (business_id, name, email, phone, address, company, notes, credit_limit)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [req.business_id, name, email, phone, address, company, notes, credit_limit || 0]
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [req.business_id, value.name, value.email, value.phone, value.address, value.company, value.notes, value.credit_limit || 0]
     );
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error('Customer create error:', err);
-    res.status(500).json({ error: 'Server error' });
-  }
+    log(req, 'Customer Created', 'success', r.rows[0].id);
+    res.status(201).json({ success: true, data: r.rows[0] });
+  } catch (err) { if (err.isJoi || err.status) return next(err); next(new AppError('Server error', 500)); }
 };
 
-export const update = async (req, res) => {
+export const update = async (req, res, next) => {
   try {
-    const { name, email, phone, address, company, notes, credit_limit } = req.body;
-    const result = await query(
-      `UPDATE customers SET name=$1, email=$2, phone=$3, address=$4, company=$5, notes=$6, credit_limit=$7, updated_at=NOW()
-       WHERE id=$8 AND business_id=$9 RETURNING *`,
-      [name, email, phone, address, company, notes, credit_limit, req.params.id, req.business_id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error('Customer update error:', err);
-    res.status(500).json({ error: 'Server error' });
-  }
+    const { error, value } = customerUpdateSchema.validate(req.body, { abortEarly: false, stripUnknown: true });
+    if (error) throw Object.assign(error, { status: 422 });
+    const fields = []; const vals = []; let i = 1;
+    for (const [k, v] of Object.entries(value)) { if (v !== undefined) { fields.push(`${k}=$${i++}`); vals.push(v); } }
+    if (!fields.length) throw new AppError('No fields to update', 400);
+    vals.push(req.params.id, req.business_id);
+    const r = await query(`UPDATE customers SET ${fields.join(', ')}, updated_at=NOW() WHERE id=$${i++} AND business_id=$${i} RETURNING *`, vals);
+    if (!r.rows.length) throw new AppError('Customer not found', 404);
+    log(req, 'Customer Updated', 'success', req.params.id);
+    res.json({ success: true, data: r.rows[0] });
+  } catch (err) { if (err.isJoi || err.status) return next(err); next(new AppError('Server error', 500)); }
 };
 
-export const remove = async (req, res) => {
+export const remove = async (req, res, next) => {
   try {
-    const result = await query(
-      'DELETE FROM customers WHERE id=$1 AND business_id=$2 RETURNING id',
-      [req.params.id, req.business_id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
-    res.json({ message: 'Deleted' });
-  } catch (err) {
-    console.error('Customer delete error:', err);
-    res.status(500).json({ error: 'Server error' });
-  }
+    const r = await query('DELETE FROM customers WHERE id=$1 AND business_id=$2 RETURNING id', [req.params.id, req.business_id]);
+    if (!r.rows.length) throw new AppError('Customer not found', 404);
+    log(req, 'Customer Deleted', 'success', req.params.id);
+    res.json({ success: true, message: 'Customer deleted' });
+  } catch (err) { if (err.status) return next(err); next(new AppError('Server error', 500)); }
 };

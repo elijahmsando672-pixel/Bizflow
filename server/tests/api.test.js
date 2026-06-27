@@ -118,8 +118,9 @@ describe('Customers API', () => {
       .send(testCustomer);
     
     expect(res.status).toBe(201);
-    expect(res.body).toHaveProperty('name', testCustomer.name);
-    customerId = res.body.id;
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toHaveProperty('name', testCustomer.name);
+    customerId = res.body.data.id;
   });
 
   it('should get all customers', async () => {
@@ -128,7 +129,8 @@ describe('Customers API', () => {
       .set('Authorization', `Bearer ${authToken}`);
     
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
   });
 
   it('should update a customer', async () => {
@@ -138,7 +140,8 @@ describe('Customers API', () => {
       .send({ name: 'Updated Name' });
     
     expect(res.status).toBe(200);
-    expect(res.body.name).toBe('Updated Name');
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.name).toBe('Updated Name');
   });
 
   it('should delete a customer', async () => {
@@ -147,6 +150,7 @@ describe('Customers API', () => {
       .set('Authorization', `Bearer ${authToken}`);
     
     expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
   });
 });
 
