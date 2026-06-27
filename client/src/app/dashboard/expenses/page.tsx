@@ -5,16 +5,25 @@ import api from "@/lib/api";
 import { formatCurrency } from "@/lib/data";
 import {
   PageHeader, StatCard, Card, SearchBar, Table, Btn, Badge, Modal, InputField
-} from "@/components/dashboard/ui";
+} from "@/components/ui/dashboard-ui";
 import { TrendingDown, DollarSign, BarChart3, Layers, Plus, Edit3, Trash2, FileText, Loader2 } from "lucide-react";
 
+interface Expense {
+  id: string;
+  description: string;
+  amount: number | string;
+  category: string;
+  expense_date: string;
+  created_at?: string;
+}
+
 export default function ExpensesPage() {
-  const [expenses, setExpenses] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState(false);
-  const [editItem, setEditItem] = useState<any>(null);
+  const [editItem, setEditItem] = useState<Expense | null>(null);
   const [catModal, setCatModal] = useState(false);
   const [newCat, setNewCat] = useState("");
   const [form, setForm] = useState({ description: "", amount: "", category: "General", expense_date: new Date().toISOString().split("T")[0] });
@@ -27,7 +36,7 @@ export default function ExpensesPage() {
         api.expenses.getCategories().catch(() => []),
       ]);
       setExpenses(Array.isArray(data) ? data : []);
-      setCategories(Array.isArray(cats) ? cats.map((c: any) => c.name || c) : []);
+      setCategories(Array.isArray(cats) ? cats.map((c) => (typeof c === "string" ? c : (c as { name?: string }).name || "").toString()) : []);
     } catch { setExpenses([]); } finally { setLoading(false); }
   }, []);
 
@@ -55,11 +64,11 @@ export default function ExpensesPage() {
     catch { alert("Failed to create category"); }
   };
 
-  const filtered = expenses.filter((e: any) =>
+  const filtered = expenses.filter((e) =>
     (e.description || "").toLowerCase().includes(search.toLowerCase()) ||
     (e.category || "").toLowerCase().includes(search.toLowerCase())
   );
-  const total = filtered.reduce((s: number, e: any) => s + (parseFloat(e.amount) || 0), 0);
+  const total = filtered.reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
   return (
     <div>
@@ -82,10 +91,10 @@ export default function ExpensesPage() {
         <div className="flex items-center justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
       ) : (
         <Table cols={["Description", "Category", "Amount", "Date", "Actions"]}
-          rows={filtered.map((e: any) => [
+          rows={filtered.map((e) => [
             <span key="d" className="font-medium">{e.description || "N/A"}</span>,
             <Badge key="c" label={e.category || "General"} color="var(--color-primary)" />,
-            <span key="a" className="font-bold text-destructive">{formatCurrency(parseFloat(e.amount) || 0)}</span>,
+            <span key="a" className="font-bold text-destructive">{formatCurrency(Number(e.amount) || 0)}</span>,
             <span key="dt" className="text-muted-foreground">{e.expense_date ? new Date(e.expense_date).toLocaleDateString("en-GB") : "-"}</span>,
             <div key="ac" className="flex gap-1.5">
               <Btn small outline color="var(--color-accent-foreground)" onClick={() => { setEditItem(e); setForm({ description: e.description || "", amount: String(e.amount || ""), category: e.category || "General", expense_date: e.expense_date?.split("T")[0] || "" }); setModal(true); }}>

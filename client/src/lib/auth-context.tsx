@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 export interface Shop {
@@ -28,6 +28,7 @@ interface AuthContextType {
   selectedShop: Shop | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
+  loginWithOTP: (data: { email?: string; phone?: string; otp: string }) => Promise<void>;
   register: (name: string, email: string, password: string, businessName: string, phone?: string) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
@@ -65,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const refreshCooldown = useRef(false);
 
   const fetchShops = useCallback(async () => {
     try {
@@ -82,6 +84,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshAccessToken = useCallback(async () => {
+    if (refreshCooldown.current) return false;
+    refreshCooldown.current = true;
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/refresh-token`,
@@ -115,6 +119,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem("business");
       removeTokenCookie();
       return false;
+    } finally {
+      setTimeout(() => { refreshCooldown.current = false; }, 10000);
     }
   }, []);
 
@@ -126,10 +132,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (savedToken && savedUser && savedBusiness) {
       setToken(savedToken);
       setTokenCookie(savedToken);
-      setUser(JSON.parse(savedUser));
-      setBusiness(JSON.parse(savedBusiness));
+      try { setUser(JSON.parse(savedUser)); } catch { setUser(null); }
+      try { setBusiness(JSON.parse(savedBusiness)); } catch { setBusiness(null); }
       const savedShop = localStorage.getItem("selectedShop");
-      if (savedShop) setSelectedShopState(JSON.parse(savedShop));
+      if (savedShop) { try { setSelectedShopState(JSON.parse(savedShop)); } catch {} }
       fetchShops();
       fetch(
         `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/csrf-token`,
@@ -184,11 +190,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Login failed");
+      let msg = "Login failed";
+      try { const err = await response.json(); msg = err.error || msg; } catch {}
+      throw new Error(msg);
     }
 
-    const data = await response.json();
+    let data: any;
+    try { data = await response.json(); } catch { throw new Error("Invalid server response"); }
     setToken(data.token);
     setUser(data.user);
     setBusiness(data.business);
@@ -208,6 +216,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const loginWithOTP = async (data: { email?: string; phone?: string; otp: string }) => {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/verify-otp-login`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: 'include',
+      }
+    );
+
+    if (!response.ok) {
+      let msg = "Invalid OTP";
+      try { const err = await response.json(); msg = err.error || msg; } catch {}
+      throw new Error(msg);
+    }
+
+    let result: any;
+    try { result = await response.json(); } catch { throw new Error("Invalid server response"); }
+    setToken(result.token);
+    setUser(result.user);
+    setBusiness(result.business);
+    if (result.shops) setShops(result.shops);
+
+    localStorage.setItem("token", result.token);
+    setTokenCookie(result.token);
+    localStorage.setItem("user", JSON.stringify(result.user));
+    localStorage.setItem("business", JSON.stringify(result.business));
+
+    if (result.shops && result.shops.length === 1) {
+      setSelectedShopState(result.shops[0]);
+      localStorage.setItem("selectedShop", JSON.stringify(result.shops[0]));
+      router.push("/dashboard");
+    } else {
+      router.push("/select-shop");
+    }
+  };
+
   const register = async (name: string, email: string, password: string, businessName: string, phone?: string) => {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/register`,
@@ -219,7 +265,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    const data = await response.json();
+    let data: any;
+    try { data = await response.json(); } catch { throw new Error("Invalid server response"); }
     if (!response.ok) {
       throw new Error(data.error || "Registration failed");
     }
@@ -291,7 +338,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, business, shops, selectedShop, token, login, register, logout, isLoading, setSelectedShop, fetchShops, hasPermission }}>
+    <AuthContext.Provider value={{ user, business, shops, selectedShop, token, login, loginWithOTP, register, logout, isLoading, setSelectedShop, fetchShops, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

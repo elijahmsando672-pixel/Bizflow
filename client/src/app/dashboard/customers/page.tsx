@@ -4,11 +4,18 @@ import { useState, useEffect, useCallback } from "react";
 import { fetchFrequentCustomers, formatCurrency } from "@/lib/data";
 import {
   PageHeader, StatCard, Card, SearchBar, Table, Btn, Avatar, Badge
-} from "@/components/dashboard/ui";
+} from "@/components/ui/dashboard-ui";
 import { Users as UsersIcon, RefreshCw, Loader2 } from "lucide-react";
 
+interface Customer {
+  name?: string;
+  customer_name?: string;
+  total_orders?: number;
+  total_spent?: number;
+}
+
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
@@ -22,7 +29,7 @@ export default function CustomersPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const filtered = customers.filter((c: any) =>
+  const filtered = customers.filter((c) =>
     (c.name || c.customer_name || "").toLowerCase().includes(search.toLowerCase())
   );
 
@@ -41,15 +48,15 @@ export default function CustomersPage() {
         <div className="flex items-center justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
       ) : (
         <Table cols={["Customer", "Orders", "Total Spent", "Loyalty"]}
-          rows={filtered.map((c: any) => [
+          rows={filtered.map((c) => [
             <div key="n" className="flex items-center gap-2">
               <Avatar name={c.name || c.customer_name} size={28} />
               <span className="font-medium">{c.name || c.customer_name || "Unknown"}</span>
             </div>,
             <span key="o" className="font-bold">{c.total_orders || 0}</span>,
             <span key="s" className="font-bold text-success">{formatCurrency(c.total_spent || 0)}</span>,
-            <Badge key="l" label={c.total_orders > 10 ? "Gold" : c.total_orders > 5 ? "Silver" : "Bronze"}
-              color={c.total_orders > 10 ? "var(--color-warning)" : c.total_orders > 5 ? "var(--color-accent-foreground)" : "var(--color-primary)"} />,
+            <Badge key="l" label={(c.total_orders ?? 0) > 10 ? "Gold" : (c.total_orders ?? 0) > 5 ? "Silver" : "Bronze"}
+              color={(c.total_orders ?? 0) > 10 ? "var(--color-warning)" : (c.total_orders ?? 0) > 5 ? "var(--color-accent-foreground)" : "var(--color-primary)"} />,
           ])}
           empty="No customer data yet." />
       )}

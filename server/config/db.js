@@ -405,6 +405,20 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS otp_codes (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      email VARCHAR(255),
+      phone VARCHAR(50),
+      otp VARCHAR(6) NOT NULL,
+      purpose VARCHAR(50) NOT NULL DEFAULT 'login',
+      attempts INT DEFAULT 0,
+      used BOOLEAN DEFAULT false,
+      expires_at TIMESTAMP NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_otp_codes_email_purpose ON otp_codes(email, purpose);
+
     -- ========================================
     -- Security: Failed Login Tracking & Account Lockout
     -- ========================================
@@ -577,6 +591,17 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
     );
 
     CREATE INDEX IF NOT EXISTS idx_payment_history ON payment_history(business_id);
+
+    CREATE TABLE IF NOT EXISTS mpesa_agents (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      phone VARCHAR(20) NOT NULL,
+      mpesa_number VARCHAR(20) NOT NULL,
+      commission_rate DECIMAL(5,2) DEFAULT 0,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
 
     -- ========================================
     -- FEATURE 2: Invoice PDF / Templates

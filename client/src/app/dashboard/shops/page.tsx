@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api";
 import {
   Card, SearchBar, Table, Btn, Modal, InputField, StatCard
-} from "@/components/dashboard/ui";
+} from "@/components/ui/dashboard-ui";
 import { Building2, Plus, Edit3, Trash2, User, Truck, Loader2 } from "lucide-react";
 
 export default function ShopsPage() {

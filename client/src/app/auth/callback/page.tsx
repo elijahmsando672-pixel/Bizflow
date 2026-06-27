@@ -28,7 +28,7 @@ function CallbackContent() {
         localStorage.setItem("user", JSON.stringify(user));
         localStorage.setItem("business", JSON.stringify(business));
 
-        router.push("/");
+        window.location.href = "/";
       } catch {
         router.push("/login?error=invalid_callback_data");
       }

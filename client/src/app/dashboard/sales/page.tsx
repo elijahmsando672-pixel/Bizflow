@@ -5,23 +5,33 @@ import api from "@/lib/api";
 import { formatCurrency } from "@/lib/data";
 import {
   PageHeader, StatCard, Card, SearchBar, Select, Table, Btn, Badge, Modal, InputField
-} from "@/components/dashboard/ui";
+} from "@/components/ui/dashboard-ui";
 import { ShoppingCart, DollarSign, Clock, BarChart3, Plus, RefreshCw, Edit3, Trash2, User, Loader2 } from "lucide-react";
+import type { Sale } from "@/types/sales";
+
+interface SaleForm {
+  customer_name: string;
+  total: string;
+  status: string;
+  sale_date: string;
+  [key: string]: string;
+}
 
 export default function SalesPage() {
   const [search, setSearch] = useState("");
-  const [sales, setSales] = useState<any[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
-  const [editItem, setEditItem] = useState<any>(null);
+  const [editItem, setEditItem] = useState<Sale | null>(null);
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [form, setForm] = useState({ customer_name: "", total: "", status: "completed", sale_date: new Date().toISOString().split("T")[0] });
+  const [form, setForm] = useState<SaleForm>({ customer_name: "", total: "", status: "completed", sale_date: new Date().toISOString().split("T")[0] });
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.sales.getAll(statusFilter !== "ALL" ? statusFilter : undefined) as any[];
-      setSales(Array.isArray(data) ? data : []);
+      const data = await api.sales.getAll(statusFilter !== "ALL" ? statusFilter : undefined);
+      const list: Sale[] = Array.isArray(data) ? data : ((data as { sales?: Sale[] })?.sales ?? []);
+      setSales(list);
     } catch { setSales([]); } finally { setLoading(false); }
   }, [statusFilter]);
 
@@ -46,10 +56,10 @@ export default function SalesPage() {
     try { await api.sales.delete(id); load(); } catch { alert("Delete failed"); }
   };
 
-  const filtered = sales.filter((s: any) =>
-    (s.customer_name || s.customer || "").toLowerCase().includes(search.toLowerCase())
+  const filtered = sales.filter((s: Sale) =>
+    (s.customer_name || "").toLowerCase().includes(search.toLowerCase())
   );
-  const totalRevenue = filtered.reduce((sum: number, s: any) => sum + (parseFloat(s.total) || 0), 0);
+  const totalRevenue = filtered.reduce((sum: number, s: Sale) => sum + (Number(s.total) || 0), 0);
 
   return (
     <div>
@@ -63,7 +73,7 @@ export default function SalesPage() {
         <StatCard label="Total Sales" value={String(filtered.length)} icon={<ShoppingCart className="h-4 w-4" />} />
         <StatCard label="Revenue" value={formatCurrency(totalRevenue)} icon={<DollarSign className="h-4 w-4" />} />
         <StatCard label="Avg Sale" value={filtered.length ? formatCurrency(Math.round(totalRevenue / filtered.length)) : "Ksh 0"} icon={<BarChart3 className="h-4 w-4" />} accent="var(--color-success)" />
-        <StatCard label="Today" value={String(filtered.filter((s: any) => { const d = s.sale_date || s.createdAt; return d && new Date(d).toDateString() === new Date().toDateString(); }).length)} icon={<Clock className="h-4 w-4" />} accent="var(--color-warning)" />
+        <StatCard label="Today" value={String(filtered.filter((s: Sale) => { const d = s.sale_date || s.created_at; return d && new Date(d).toDateString() === new Date().toDateString(); }).length)} icon={<Clock className="h-4 w-4" />} accent="var(--color-warning)" />
       </div>
       <Card className="mb-3">
         <div className="flex gap-3 flex-wrap items-center">
@@ -75,11 +85,11 @@ export default function SalesPage() {
         <div className="flex items-center justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
       ) : (
         <Table cols={["#", "Customer", "Date", "Total", "Status", "Actions"]}
-          rows={filtered.map((s: any, i: number) => [
+          rows={filtered.map((s: Sale, i: number) => [
             <span key="id" className="font-bold font-mono text-primary" style={{ color: "var(--color-accent-foreground)" }}>#{s.id?.slice?.(0, 7) || (i + 1).toString().padStart(3, "0")}</span>,
-            <span key="n" className="font-medium">{s.customer_name || s.customer || "Walk-in"}</span>,
+            <span key="n" className="font-medium">{s.customer_name || "Walk-in"}</span>,
             <span key="d" className="text-muted-foreground">{s.sale_date ? new Date(s.sale_date).toLocaleDateString("en-GB") : "-"}</span>,
-            <span key="t" className="font-bold text-success">{formatCurrency(parseFloat(s.total) || 0)}</span>,
+            <span key="t" className="font-bold text-success">{formatCurrency(s.total || 0)}</span>,
             <Badge key="st" label={(s.status || "completed").toUpperCase()} color={s.status === "cancelled" ? "var(--color-destructive)" : s.status === "pending" ? "var(--color-warning)" : "var(--color-success)"} />,
             <div key="ac" className="flex gap-1.5">
               <Btn small outline color="var(--color-accent-foreground)" onClick={() => { setEditItem(s); setForm({ customer_name: s.customer_name || "", total: String(s.total || ""), status: s.status || "completed", sale_date: s.sale_date?.split("T")[0] || "" }); setModal(true); }}>

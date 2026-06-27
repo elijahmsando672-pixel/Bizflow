@@ -7,21 +7,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import Image from "next/image";
-import { Sun, Moon, Eye, EyeOff, Mail, Lock, ArrowRight, Loader2, ArrowLeft, Building2 } from "lucide-react";
+import { Sun, Moon, Eye, EyeOff, Mail, Lock, ArrowRight, Loader2, ArrowLeft, Smartphone, KeyRound } from "lucide-react";
 import { useTheme } from "@/lib/theme-provider";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 const BASE_URL = API_URL.replace(/\/api$/, "").replace(/\/$/, "");
 
+type LoginMode = "password" | "otp";
+type ResetStep = "email" | "otp" | "password";
+
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("admin@bizflow.com");
+  const [password, setPassword] = useState("Bizflow@2026");
+  const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { login, token } = useAuth();
+  const [loginMode, setLoginMode] = useState<LoginMode>("password");
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [resetStep, setResetStep] = useState<ResetStep>("email");
+  const [resetToken, setResetToken] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [otpTimer, setOtpTimer] = useState(0);
+  const { login, loginWithOTP, token } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
 
@@ -35,10 +44,15 @@ export default function LoginPage() {
     if (err) setError({ google_auth_failed: "Google sign-in failed. Please try again.", apple_auth_failed: "Apple sign-in failed. Please try again.", server_error: "Something went wrong. Please try again.", invalid_callback_data: "Invalid sign-in data received.", missing_params: "Missing sign-in parameters." }[err] || "Sign-in failed. Please try again.");
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (otpTimer <= 0) return;
+    const id = setInterval(() => setOtpTimer(t => t - 1), 1000);
+    return () => clearInterval(id);
+  }, [otpTimer]);
+
+  const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setMessage("");
     setIsLoading(true);
     try {
       await login(email, password);
@@ -54,26 +68,25 @@ export default function LoginPage() {
     }
   };
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendOTP = async () => {
     setError("");
     setMessage("");
     setIsLoading(true);
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/forgot-password`,
+        `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/send-otp`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ email, purpose: "login" }),
         }
       );
       const data = await response.json();
       if (!response.ok) {
-        setError(data.error || "Failed to send reset email");
+        setError(data.error || "Failed to send OTP");
       } else {
-        setMessage(data.message);
-        setIsForgotPassword(false);
+        setMessage("OTP sent to your email");
+        setOtpTimer(600);
       }
     } catch {
       setError("Something went wrong");
@@ -81,6 +94,108 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsLoading(true);
+    try {
+      await loginWithOTP({ email, otp });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Invalid OTP");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSendResetOTP = async () => {
+    setError("");
+    setMessage("");
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/send-otp`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, purpose: "password_reset" }),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error || "Failed to send OTP");
+      } else {
+        setMessage("OTP sent to your email");
+        setOtpTimer(600);
+        setResetStep("otp");
+      }
+    } catch {
+      setError("Something went wrong");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyResetOTP = async () => {
+    setError("");
+    setMessage("");
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/verify-otp-reset`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, otp }),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error || "Invalid OTP");
+      } else {
+        setResetToken(data.reset_token);
+        setResetStep("password");
+      }
+    } catch {
+      setError("Something went wrong");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/reset-password`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: resetToken, password: newPassword }),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error || "Failed to reset password");
+      } else {
+        setMessage("Password reset successfully! Redirecting to login...");
+        setIsForgotPassword(false);
+        setResetStep("email");
+        setOtp("");
+        setNewPassword("");
+        setResetToken("");
+        setTimeout(() => router.push("/login"), 2000);
+      }
+    } catch {
+      setError("Something went wrong");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const otpExpiry = otpTimer > 0 ? `${Math.floor(otpTimer / 60)}:${String(otpTimer % 60).padStart(2, "0")}` : "";
 
   return (
     <main className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
@@ -117,37 +232,64 @@ export default function LoginPage() {
         <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-gray-200/50 dark:border-gray-700/50 animate-slide-up" style={{ animationDelay: "0.1s" }}>
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-              {isForgotPassword ? "Reset password" : "Welcome Back"}
+              {isForgotPassword
+                ? resetStep === "password" ? "Set New Password" : "Reset Password"
+                : "Welcome Back"}
             </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              {isForgotPassword ? "Enter your email and we'll send you a reset link" : "Sign in to your account to continue"}
+              {isForgotPassword
+                ? resetStep === "email" ? "Enter your email to receive a reset code"
+                  : resetStep === "otp" ? "Enter the code sent to your email"
+                  : "Choose a new password"
+                : "Sign in to your account to continue"}
             </p>
           </div>
 
-          <form onSubmit={isForgotPassword ? handleForgotPassword : handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
-                <Input
-                  type="email"
-                  placeholder="you@example.com"
-                  className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-auto"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
+          {!isForgotPassword && (
+            <div className="flex mb-6 bg-gray-100 dark:bg-gray-700 rounded-xl p-1">
+              <button
+                type="button"
+                onClick={() => { setLoginMode("password"); setError(""); setMessage(""); }}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${loginMode === "password" ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"}`}
+              >
+                <Lock className="h-3.5 w-3.5 inline mr-1.5" />
+                Password
+              </button>
+              <button
+                type="button"
+                onClick={() => { setLoginMode("otp"); setError(""); setMessage(""); setOtp(""); }}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${loginMode === "otp" ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"}`}
+              >
+                <Smartphone className="h-3.5 w-3.5 inline mr-1.5" />
+                Send Code
+              </button>
             </div>
+          )}
 
-            {!isForgotPassword && (
+          {/* Password Login */}
+          {!isForgotPassword && loginMode === "password" && (
+            <form onSubmit={handlePasswordLogin} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                  <Input
+                    type="email"
+                    placeholder="you@example.com"
+                    className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-auto"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                </div>
+              </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
                   <button
                     type="button"
-                    onClick={() => setIsForgotPassword(true)}
+                    onClick={() => { setIsForgotPassword(true); setResetStep("email"); setOtp(""); setError(""); setMessage(""); }}
                     className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors"
                   >
                     Forgot password?
@@ -173,30 +315,228 @@ export default function LoginPage() {
                   </button>
                 </div>
               </div>
-            )}
 
-            {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
-                {error}
-              </div>
-            )}
-            {message && (
-              <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
-                {message}
-              </div>
-            )}
-
-            <Button type="submit" disabled={isLoading} className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
-              {isLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <ArrowRight className="h-5 w-5" />
+              {error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                  {error}
+                </div>
               )}
-              {isLoading
-                ? (isForgotPassword ? "Sending..." : "Signing in...")
-                : (isForgotPassword ? "Send Reset Link" : "Sign In")}
-            </Button>
-          </form>
+
+              <Button type="submit" disabled={isLoading} className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
+                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
+                {isLoading ? "Signing in..." : "Sign In"}
+              </Button>
+            </form>
+          )}
+
+          {/* OTP Login */}
+          {!isForgotPassword && loginMode === "otp" && (
+            <form onSubmit={handleVerifyOTP} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                  <Input
+                    type="email"
+                    placeholder="you@example.com"
+                    className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-auto"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {!message && !otpTimer ? (
+                <Button type="button" onClick={handleSendOTP} disabled={isLoading || !email} className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
+                  {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Smartphone className="h-5 w-5" />}
+                  {isLoading ? "Sending..." : "Send OTP"}
+                </Button>
+              ) : (
+                <>
+                  {message && !error && (
+                    <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400 flex items-center justify-between">
+                      <span>{message}</span>
+                      {otpExpiry && <span className="font-mono text-xs">{otpExpiry}</span>}
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">One-Time Code</label>
+                    <div className="relative">
+                      <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="000000"
+                        maxLength={6}
+                        className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-auto text-center text-2xl tracking-widest"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        required
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+
+                  {error && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                      {error}
+                    </div>
+                  )}
+
+                  <Button type="submit" disabled={isLoading || otp.length !== 6} className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
+                    {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <KeyRound className="h-5 w-5" />}
+                    {isLoading ? "Verifying..." : "Verify & Sign In"}
+                  </Button>
+
+                  {otpTimer === 0 && (
+                    <button type="button" onClick={handleSendOTP} className="w-full text-center text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 bg-transparent border-none cursor-pointer">
+                      Resend OTP
+                    </button>
+                  )}
+                </>
+              )}
+            </form>
+          )}
+
+          {/* Forgot Password - Step 1: Email */}
+          {isForgotPassword && resetStep === "email" && (
+            <div className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                  <Input
+                    type="email"
+                    placeholder="you@example.com"
+                    className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-auto"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                  {error}
+                </div>
+              )}
+              {message && (
+                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
+                  {message}
+                </div>
+              )}
+
+              <Button type="button" onClick={handleSendResetOTP} disabled={isLoading || !email} className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
+                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
+                {isLoading ? "Sending..." : "Send Reset Code"}
+              </Button>
+            </div>
+          )}
+
+          {/* Forgot Password - Step 2: OTP */}
+          {isForgotPassword && resetStep === "otp" && (
+            <div className="space-y-5">
+              {message && (
+                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400 flex items-center justify-between">
+                  <span>{message}</span>
+                  {otpExpiry && <span className="font-mono text-xs">{otpExpiry}</span>}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">One-Time Code</label>
+                <div className="relative">
+                  <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="000000"
+                    maxLength={6}
+                    className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-auto text-center text-2xl tracking-widest"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    required
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                  {error}
+                </div>
+              )}
+
+              <Button type="button" onClick={handleVerifyResetOTP} disabled={isLoading || otp.length !== 6} className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
+                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <KeyRound className="h-5 w-5" />}
+                {isLoading ? "Verifying..." : "Verify Code"}
+              </Button>
+
+              <button type="button" onClick={handleSendResetOTP} className="w-full text-center text-sm text-blue-600 dark:text-blue-400 hover:underline bg-transparent border-none cursor-pointer">
+                Resend code
+              </button>
+            </div>
+          )}
+
+          {/* Forgot Password - Step 3: New Password */}
+          {isForgotPassword && resetStep === "password" && (
+            <form onSubmit={handleResetPassword} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">New Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="At least 10 characters"
+                    className="w-full pl-12 pr-12 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-auto"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                  {error}
+                </div>
+              )}
+              {message && (
+                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
+                  {message}
+                </div>
+              )}
+
+              <Button type="submit" disabled={isLoading || !newPassword} className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
+                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
+                {isLoading ? "Resetting..." : "Reset Password"}
+              </Button>
+            </form>
+          )}
+
+          {/* Footer links */}
+          {isForgotPassword && (
+            <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+              <button
+                type="button"
+                onClick={() => { setIsForgotPassword(false); setResetStep("email"); setOtp(""); setNewPassword(""); setError(""); setMessage(""); }}
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors bg-transparent border-none cursor-pointer"
+              >
+                Back to login
+              </button>
+            </p>
+          )}
 
           {!isForgotPassword && (
             <>
@@ -245,18 +585,6 @@ export default function LoginPage() {
                 </a>
               </p>
             </>
-          )}
-
-          {isForgotPassword && (
-            <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-              <button
-                type="button"
-                onClick={() => setIsForgotPassword(false)}
-                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors"
-              >
-                Back to login
-              </button>
-            </p>
           )}
         </div>
 

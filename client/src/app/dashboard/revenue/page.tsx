@@ -1,7 +1,6 @@
 "use client";
 
-import { PageHeader } from "@/components/dashboard/ui";
-import { Card } from "@/components/dashboard/ui";
+import { PageHeader, Card } from "@/components/ui/dashboard-ui";
 import { TrendingUp } from "lucide-react";
 
 export default function RevenuePage() {

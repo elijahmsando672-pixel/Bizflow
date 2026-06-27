@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader, StatCard, Card } from "@/components/dashboard/ui";
+import { PageHeader, StatCard, Card } from "@/components/ui/dashboard-ui";
 import { BarChart3, TrendingUp, Users as UsersIcon, ShoppingCart } from "lucide-react";
 
 export default function AnalyticsPage() {

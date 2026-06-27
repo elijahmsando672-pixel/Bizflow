@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 
 const emptySubscribe = () => () => {};
 const emptyGetSnapshot = () => true;
-const emptyServerSnapshot = () => true;
+const emptyServerSnapshot = () => false;
 
 export function LoginContent({ children }: { children: React.ReactNode }) {
   const { isLoading, user, token } = useAuth();

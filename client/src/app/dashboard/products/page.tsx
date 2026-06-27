@@ -5,28 +5,39 @@ import api from "@/lib/api";
 import { formatCurrency } from "@/lib/data";
 import {
   PageHeader, StatCard, Card, SearchBar, Table, Btn
-} from "@/components/dashboard/ui";
+} from "@/components/ui/dashboard-ui";
 import { Package, DollarSign, RefreshCw, Loader2 } from "lucide-react";
+import type { Product as SaleProduct } from "@/types/sales";
+
+interface ProductItem extends SaleProduct {
+  selling_price?: number;
+  cost_price?: number;
+  quantity?: number;
+  sku?: string;
+  category_name?: string;
+  description?: string;
+}
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<ProductItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.products.getAll() as any[];
-      setProducts(Array.isArray(data) ? data : []);
+      const data = await api.products.getAll();
+      const list: ProductItem[] = Array.isArray(data) ? data : ((data as { products?: ProductItem[] })?.products ?? []);
+      setProducts(list);
     } catch { setProducts([]); } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const filtered = products.filter((p: any) =>
+  const filtered = products.filter((p) =>
     (p.name || "").toLowerCase().includes(search.toLowerCase())
   );
-  const totalValue = filtered.reduce((s: number, p: any) => s + (parseFloat(p.price) || 0) * (p.quantity ?? 0), 0);
+  const totalValue = filtered.reduce((s, p) => s + (p.selling_price ?? p.price ?? 0) * (p.quantity ?? p.stock_qty ?? 0), 0);
 
   return (
     <div>
@@ -44,7 +55,7 @@ export default function ProductsPage() {
         <div className="flex items-center justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
       ) : (
         <Table cols={["Name", "Price", "Stock", "SKU"]}
-          rows={filtered.map((p: any) => [
+          rows={filtered.map((p: ProductItem) => [
             <span key="n" className="font-medium">{p.name || "N/A"}</span>,
             <span key="p" className="font-bold text-success">{p.price ? `Ksh ${Number(p.price).toLocaleString()}` : "-"}</span>,
             <span key="q" className="font-bold">{p.quantity ?? 0}</span>,

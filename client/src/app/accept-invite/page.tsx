@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,6 @@ interface AcceptInviteResponse {
 
 function AcceptInviteContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const token = searchParams.get("token");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -38,7 +37,7 @@ function AcceptInviteContent() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       setSuccess(true);
-      setTimeout(() => router.push("/"), 2000);
+      setTimeout(() => { window.location.href = "/"; }, 2000);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to accept invitation";
       setError(message);

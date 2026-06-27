@@ -7,27 +7,11 @@ import { useAuth } from "@/lib/auth-context";
 import AuthGuard from "@/components/auth/AuthGuard";
 import Image from "next/image";
 import {
-  LayoutGrid,
-  Users,
-  User,
-  Tag,
-  Package,
-  ShoppingCart,
-  TrendingDown,
-  Boxes,
-  DollarSign,
-  BarChart3,
-  Lightbulb,
-  Building2,
-  Smartphone,
-  Bell,
-  FileText,
-  CreditCard,
-  Settings,
-  ChevronDown,
-  Menu,
-  LogOut,
+  LayoutGrid, Users, User, Tag, Package, ShoppingCart, TrendingDown,
+  Boxes, DollarSign, BarChart3, Lightbulb, Building2, Smartphone,
+  Bell, FileText, CreditCard, Settings, ChevronDown, Menu, LogOut, Moon, Sun,
 } from "lucide-react";
+import { useTheme } from "@/lib/theme-provider";
 
 const menuItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutGrid, href: "/dashboard" },
@@ -179,11 +163,11 @@ function getExpandedDefaults(pathname: string): Record<string, boolean> {
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, logout, selectedShop } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>(getExpandedDefaults(pathname));
-
   const activeId = getActiveId(pathname);
 
   const toggleSubmenu = (menuId: string) => {
@@ -195,23 +179,23 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <AuthGuard>
-      <div className="flex h-screen bg-gray-950">
+      <div className="flex h-screen bg-background">
         {/* Sidebar */}
         <div
           className={`${
             sidebarOpen ? "w-64" : "w-20"
-          } bg-gray-900 border-r border-gray-800 transition-all duration-300 flex flex-col flex-shrink-0`}
+          } bg-sidebar border-r border-border transition-all duration-300 flex flex-col flex-shrink-0`}
         >
           {/* Logo */}
           <div
-            className="p-4 border-b border-gray-800 cursor-pointer flex items-center gap-2.5"
+            className="p-4 border-b border-border cursor-pointer flex items-center gap-2.5"
             onClick={() => router.push("/dashboard")}
           >
             <div className="w-8 h-8 relative flex-shrink-0">
               <Image src="/logo.png" alt="BizFlow" fill sizes="32px" className="object-contain" />
             </div>
             {sidebarOpen && (
-              <span className="text-lg font-bold text-white">BizFlow</span>
+              <span className="text-lg font-bold text-foreground">BizFlow</span>
             )}
           </div>
 
@@ -238,8 +222,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     }}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors group ${
                       isActive
-                        ? "bg-gray-800 text-white"
-                        : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                        ? "bg-accent text-accent-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     }`}
                   >
                     <Icon size={20} className="flex-shrink-0" />
@@ -256,7 +240,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     )}
                   </button>
                   {sidebarOpen && item.hasSubmenu && isExpanded && item.children && (
-                    <div className="ml-3 mt-1 space-y-1 border-l border-gray-700 pl-0">
+                    <div className="ml-3 mt-1 space-y-1 border-l border-border pl-0">
                       {item.children.map((child) => (
                         <button
                           key={child.href}
@@ -264,8 +248,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                           onClick={() => router.push(child.href)}
                           className={`w-full text-left px-4 py-2 text-xs transition-colors ${
                             pathname === child.href
-                              ? "text-cyan-400"
-                              : "text-gray-400 hover:text-gray-300"
+                              ? "text-primary"
+                              : "text-muted-foreground hover:text-foreground"
                           }`}
                         >
                           {child.label}
@@ -279,7 +263,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </nav>
 
           {/* Footer */}
-          <div className="p-4 border-t border-gray-800 text-center text-xs text-gray-500">
+          <div className="p-4 border-t border-border text-center text-xs text-muted-foreground">
             {sidebarOpen && <p>BizFlow &copy; 2026</p>}
           </div>
         </div>
@@ -287,31 +271,38 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top Bar */}
-          <div className="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center justify-between flex-shrink-0">
+          <div className="bg-sidebar border-b border-border px-6 py-3 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="text-gray-300 hover:text-white transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Menu size={22} />
               </button>
-              <span className="text-gray-100 font-semibold text-base">
+              <span className="text-foreground font-semibold text-base">
                 {pageLabels[activeId] || activeId}
               </span>
             </div>
             <div className="flex items-center gap-4">
-              <div className="text-sm text-gray-400 hidden sm:block">
+              <div className="text-sm text-muted-foreground hidden sm:block">
                 {selectedShop?.name?.toUpperCase() || "MAIN SHOP"}
               </div>
               <button
+                onClick={toggleTheme}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+              >
+                {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+              </button>
+              <button
                 onClick={() => router.push("/dashboard/settings")}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Settings size={18} />
               </button>
               <button
                 onClick={() => router.push("/notifications")}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Bell size={18} />
               </button>
@@ -323,7 +314,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </div>
                 <button
                   onClick={logout}
-                  className="text-gray-400 hover:text-white transition-colors"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                   title="Logout"
                 >
                   <LogOut size={16} />
@@ -333,7 +324,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
 
           {/* Page Content */}
-          <div className="flex-1 overflow-auto p-6 bg-gray-950">
+          <div className="flex-1 overflow-auto p-6 bg-background">
             {children}
           </div>
         </div>

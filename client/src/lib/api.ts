@@ -1,5 +1,7 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
+let refreshPromise: Promise<boolean> | null = null;
+
 class ApiError extends Error {
   status: number;
   constructor(message: string, status = 500) {
@@ -70,43 +72,36 @@ async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<u
 
   if (response.status === 401) {
     try {
-      const refreshResponse = await fetch(
-        `${API_BASE_URL}/auth/refresh-token`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-        }
-      );
-      
-      if (!refreshResponse.ok) {
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          localStorage.removeItem('business');
-          window.location.href = '/login';
-        }
-        throw new ApiError('Session expired', 401);
+      if (!refreshPromise) {
+        refreshPromise = (async () => {
+          const resp = await fetch(
+            `${API_BASE_URL}/auth/refresh-token`,
+            { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include' }
+          );
+          if (!resp.ok) throw new Error('Refresh failed');
+          const { token: newToken } = await resp.json();
+          localStorage.setItem('token', newToken);
+          return true;
+        })().finally(() => { refreshPromise = null; });
       }
-      
-      const { token: newToken } = await refreshResponse.json();
-      localStorage.setItem('token', newToken);
-      
-      const newHeaders = {
-        ...headers,
-        Authorization: `Bearer ${newToken}`,
-      };
+
+      const refreshed = await refreshPromise;
+      if (!refreshed) throw new Error('Refresh failed');
+
+      const savedToken = localStorage.getItem('token');
+      const newHeaders = { ...headers, Authorization: `Bearer ${savedToken}` };
+
       const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
         headers: newHeaders,
         credentials: 'include',
       });
-      
+
       if (!retryResponse.ok) {
-        const error = await retryResponse.json().catch(() => ({ error: 'Request failed' }));
-        throw new ApiError(error.error || 'Request failed', retryResponse.status);
+        const err = await retryResponse.json().catch(() => ({ error: 'Request failed' }));
+        throw new ApiError(err.error || 'Request failed', retryResponse.status);
       }
-      
+
       return retryResponse.json();
     } catch {
       if (typeof window !== 'undefined') {
@@ -194,11 +189,20 @@ interface ExpenseCategoryData {
   description?: string;
 }
 
+interface SendOTPData {
+  email?: string;
+  phone?: string;
+  purpose: 'login' | 'password_reset';
+}
+
 const api = {
   auth: {
     login: (email: string, password: string) => fetchApi('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
     register: (data: RegisterData) => fetchApi('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
     me: () => fetchApi('/auth/me'),
+    sendOTP: (data: SendOTPData) => fetchApi('/auth/send-otp', { method: 'POST', body: JSON.stringify(data) }),
+    verifyOTPLogin: (data: { email?: string; phone?: string; otp: string }) => fetchApi('/auth/verify-otp-login', { method: 'POST', body: JSON.stringify(data) }),
+    verifyOTPReset: (data: { email?: string; phone?: string; otp: string }) => fetchApi('/auth/verify-otp-reset', { method: 'POST', body: JSON.stringify(data) }),
   },
   sales: {
     getAll: (status?: string) => fetchApi(`/sales${status ? `?status=${status}` : ''}`),
@@ -415,6 +419,16 @@ const api = {
     getStats: () => fetchApi('/admin/stats'),
     getBusinesses: () => fetchApi('/admin/businesses'),
     updateBusinessStatus: (id: string, status: string) => fetchApi(`/admin/businesses/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  },
+  payments: {
+    mpesa: {
+      getAgents: () => fetchApi('/payments/mpesa/agents'),
+      createAgent: (data: { name: string; phone: string; mpesa_number: string; commission_rate?: number }) => fetchApi('/payments/mpesa/agents', { method: 'POST', body: JSON.stringify(data) }),
+      updateAgent: (id: string, data: { name?: string; phone?: string; mpesa_number?: string; commission_rate?: number; is_active?: boolean }) => fetchApi(`/payments/mpesa/agents/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      deleteAgent: (id: string) => fetchApi(`/payments/mpesa/agents/${id}`, { method: 'DELETE' }),
+      getTransactions: (params?: string) => fetchApi(`/payments/mpesa/transactions${params ? `?${params}` : ''}`),
+      getReports: (period?: string) => fetchApi(`/payments/mpesa/reports${period ? `?period=${period}` : ''}`),
+    },
   },
   importExport: {
     importData: (resource: string, data: unknown[]) => fetchApi(`/import/import/${resource}`, { method: 'POST', body: JSON.stringify({ data, format: 'json' }) }),

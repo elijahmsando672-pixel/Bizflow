@@ -5,7 +5,7 @@ import api from "@/lib/api";
 import { formatCurrency } from "@/lib/data";
 import {
   PageHeader, StatCard, Card, SearchBar, Select, Table, Btn, Badge
-} from "@/components/dashboard/ui";
+} from "@/components/ui/dashboard-ui";
 import { FileText, ShoppingCart, Clock, RefreshCw, Loader2 } from "lucide-react";
 
 export default function OrdersPage() {

@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import Joi from 'joi';
 import crypto from 'crypto';
 import { query, pool } from '../config/db.js';
-import { sendWelcomeEmail, sendPasswordResetEmail } from '../utils/email.js';
+import { sendWelcomeEmail, sendPasswordResetEmail, sendOTPEmail } from '../utils/email.js';
 import { setCsrfCookie, clearCsrfCookie } from '../middleware/csrf.js';
 import { reportAccountLockout } from '../utils/securityMonitor.js';
 import { JWT_SECRET_KEY as JWT_SECRET } from '../middleware/auth.js';
@@ -254,6 +254,145 @@ export const resetPassword = async (req, res) => {
     res.json({ message: 'Password reset successfully' });
   } catch (err) {
     console.error('Reset password error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const sendOTP = async (req, res) => {
+  try {
+    const { email, phone, purpose } = req.body;
+    if (!email && !phone) return res.status(400).json({ error: 'Email or phone is required' });
+    if (!purpose || !['login', 'password_reset'].includes(purpose)) {
+      return res.status(400).json({ error: 'Purpose must be "login" or "password_reset"' });
+    }
+
+    if (email) {
+      const userExists = await query('SELECT id FROM users WHERE email = $1', [email]);
+      if (userExists.rows.length === 0) {
+        return res.json({ message: 'If the account exists, an OTP will be sent.' });
+      }
+    }
+
+    await query('DELETE FROM otp_codes WHERE (email = $1 OR phone = $1) AND purpose = $2 AND used = false', [email || phone, purpose]);
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await query(
+      'INSERT INTO otp_codes (email, phone, otp, purpose, expires_at) VALUES ($1, $2, $3, $4, $5)',
+      [email || null, phone || null, otp, purpose, expiresAt]
+    );
+
+    if (email) {
+      sendOTPEmail(email, otp, purpose).catch(console.error);
+    }
+    console.log(`OTP for ${email || phone}: ${otp}`);
+
+    res.json({ message: 'OTP sent successfully', expires_in: 600 });
+  } catch (err) {
+    console.error('Send OTP error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const verifyOTPLogin = async (req, res) => {
+  try {
+    const { email, phone, otp } = req.body;
+    if ((!email && !phone) || !otp) return res.status(400).json({ error: 'Email/phone and OTP are required' });
+
+    const result = await query(
+      `SELECT * FROM otp_codes WHERE (email = $1 OR phone = $1) AND otp = $2 AND purpose = 'login' AND used = false AND expires_at > NOW()`,
+      [email || phone, otp]
+    );
+
+    if (result.rows.length === 0) {
+      const attemptResult = await query(
+        `SELECT * FROM otp_codes WHERE (email = $1 OR phone = $1) AND purpose = 'login' AND used = false`,
+        [email || phone]
+      );
+      if (attemptResult.rows.length > 0) {
+        const record = attemptResult.rows[0];
+        const newAttempts = (record.attempts || 0) + 1;
+        if (newAttempts >= 3) {
+          await query('UPDATE otp_codes SET used = true WHERE id = $1', [record.id]);
+          return res.status(429).json({ error: 'Too many attempts. Request a new OTP.' });
+        }
+        await query('UPDATE otp_codes SET attempts = $1 WHERE id = $2', [newAttempts, record.id]);
+      }
+      return res.status(401).json({ error: 'Invalid or expired OTP' });
+    }
+
+    const otpRecord = result.rows[0];
+    await query('UPDATE otp_codes SET used = true WHERE id = $1', [otpRecord.id]);
+
+    const userResult = await query(
+      'SELECT u.*, b.name as business_name FROM users u JOIN businesses b ON u.business_id = b.id WHERE u.email = $1',
+      [otpRecord.email]
+    );
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    const user = userResult.rows[0];
+    await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
+
+    const token = generateToken(user);
+    const refreshToken = generateRefreshToken();
+    const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [user.id, refreshToken, refreshExpiresAt]);
+
+    const { password: _, ...userData } = user;
+    const shopsResult = await query('SELECT id, name, location FROM shops WHERE business_id = $1 ORDER BY name', [userData.business_id]);
+    setRefreshCookie(res, refreshToken);
+    setCsrfCookie(req, res);
+
+    res.json({
+      user: { id: userData.id, name: userData.name, email: userData.email, role: userData.role },
+      business: { id: userData.business_id, name: userData.business_name },
+      shops: shopsResult.rows,
+      token,
+    });
+  } catch (err) {
+    console.error('Verify OTP login error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const verifyOTPReset = async (req, res) => {
+  try {
+    const { email, phone, otp } = req.body;
+    if ((!email && !phone) || !otp) return res.status(400).json({ error: 'Email/phone and OTP are required' });
+
+    const result = await query(
+      `SELECT * FROM otp_codes WHERE (email = $1 OR phone = $1) AND otp = $2 AND purpose = 'password_reset' AND used = false AND expires_at > NOW()`,
+      [email || phone, otp]
+    );
+
+    if (result.rows.length === 0) {
+      const attemptResult = await query(
+        `SELECT * FROM otp_codes WHERE (email = $1 OR phone = $1) AND purpose = 'password_reset' AND used = false`,
+        [email || phone]
+      );
+      if (attemptResult.rows.length > 0) {
+        const record = attemptResult.rows[0];
+        const newAttempts = (record.attempts || 0) + 1;
+        if (newAttempts >= 3) {
+          await query('UPDATE otp_codes SET used = true WHERE id = $1', [record.id]);
+          return res.status(429).json({ error: 'Too many attempts. Request a new OTP.' });
+        }
+        await query('UPDATE otp_codes SET attempts = $1 WHERE id = $2', [newAttempts, record.id]);
+      }
+      return res.status(401).json({ error: 'Invalid or expired OTP' });
+    }
+
+    const otpRecord = result.rows[0];
+    await query('UPDATE otp_codes SET used = true WHERE id = $1', [otpRecord.id]);
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    await query('INSERT INTO password_resets (email, token, expires_at) VALUES ($1, $2, $3)', [otpRecord.email, tokenHash, expiresAt]);
+
+    res.json({ message: 'OTP verified', reset_token: resetToken, email: otpRecord.email });
+  } catch (err) {
+    console.error('Verify OTP reset error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };

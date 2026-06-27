@@ -39,6 +39,7 @@ import shopRoutes from './routes/shops.js';
 import reviewRoutes from './routes/reviews.js';
 import messageRoutes from './routes/messages.js';
 import quotationRoutes from './routes/quotations.js';
+import paymentRoutes from './routes/payments.js';
 import oauthRoutes from './routes/oauth.js';
 
 const auditCrud = (resource) => (req, res, next) => {
@@ -213,6 +214,7 @@ app.use('/api/shops', protect, requirePermission, auditCrud('shops'), shopRoutes
 app.use('/api/reviews', protect, requirePermission, auditCrud('reviews'), reviewRoutes);
 app.use('/api/messages', protect, requirePermission, auditCrud('messages'), messageRoutes);
 app.use('/api/quotations', protect, requirePermission, auditCrud('quotations'), quotationRoutes);
+app.use('/api/payments', protect, requirePermission, auditCrud('payments'), paymentRoutes);
 
 // OAuth routes (no auth middleware — passport handles it)
 app.use(passport.initialize());

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api";
 import {
   PageHeader, StatCard, Card, SearchBar, Table, Btn, Badge
-} from "@/components/dashboard/ui";
+} from "@/components/ui/dashboard-ui";
 import { Package, AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
 
 export default function InventoryPage() {

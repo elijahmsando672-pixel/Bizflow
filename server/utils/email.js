@@ -249,6 +249,55 @@ export const sendLowStockAlert = async (to, products) => {
   }
 };
 
+export const sendOTPEmail = async (to, otp, purpose) => {
+  const subject = purpose === 'login' ? 'Your BizFlow Login Code' : 'Your BizFlow Password Reset Code';
+  const mailOptions = {
+    from: `"BizFlow" <${process.env.SMTP_USER || 'noreply@bizflow.co.ke'}>`,
+    to,
+    subject,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #1e293b; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #4f46e5; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; text-align: center; }
+          .otp { font-size: 42px; font-weight: bold; letter-spacing: 8px; color: #4f46e5; margin: 20px 0; }
+          .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin:0;">${purpose === 'login' ? 'Login Code' : 'Password Reset Code'}</h1>
+          </div>
+          <div class="content">
+            <p>${purpose === 'login' ? 'Use the code below to log in to your BizFlow account.' : 'Use the code below to reset your BizFlow password.'}</p>
+            <div class="otp">${otp}</div>
+            <p>This code expires in <strong>10 minutes</strong>.</p>
+            <p style="margin-top:20px;color:#94a3b8;">If you didn't request this, please ignore this email.</p>
+          </div>
+          <div class="footer">
+            <p>&copy; 2026 BizFlow. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`OTP email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('Failed to send OTP email:', error);
+    return false;
+  }
+};
+
 export const sendPasswordResetEmail = async (to, resetToken) => {
   const resetUrl = `${process.env.APP_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
   const mailOptions = {
