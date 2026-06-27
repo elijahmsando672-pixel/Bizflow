@@ -73,11 +73,17 @@ const recordDevice = async (userId, req) => {
 // ── IP whitelist check ───────────────────────────────────────
 const checkIpWhitelist = async (businessId, ip) => {
   if (!businessId || !ip) return true;
-  const result = await query(
+  const entries = await query(
+    'SELECT id FROM ip_whitelist WHERE business_id = $1 AND is_active = true',
+    [businessId]
+  );
+  // If no whitelist entries exist, allow all IPs (whitelist is optional)
+  if (entries.rows.length === 0) return true;
+  const matched = await query(
     'SELECT id FROM ip_whitelist WHERE business_id = $1 AND ip_address = $2 AND is_active = true',
     [businessId, ip]
   );
-  return result.rows.length > 0;
+  return matched.rows.length > 0;
 };
 
 const registerSchema = Joi.object({
