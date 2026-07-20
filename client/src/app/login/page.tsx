@@ -62,7 +62,8 @@ export default function LoginPage() {
       await login(email, password);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Login failed";
-      if (msg === "CAPTCHA_REQUIRED") {
+      const code = (err as any)?.code || "";
+      if (code === "CAPTCHA_REQUIRED" || msg.includes("security check")) {
         setRequireCaptcha(true);
         setError("Please complete the security check.");
       } else if (msg === "Failed to fetch" || msg.includes("fetch") || msg.includes("NetworkError") || msg.includes("Network")) {
@@ -90,10 +91,9 @@ export default function LoginPage() {
       );
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || "Login failed");
+        throw new Error(data.message || data.error || "Login failed");
       }
       const data = await response.json();
-      // Set auth state via context
       localStorage.setItem("token", data.token);
       document.cookie = `token=${data.token}; path=/; max-age=${7 * 86400}; SameSite=Lax`;
       localStorage.setItem("user", JSON.stringify(data.user));

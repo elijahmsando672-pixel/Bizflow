@@ -97,11 +97,13 @@ const registerSchema = Joi.object({
     .messages({ 'string.pattern.base': 'Password must contain uppercase, lowercase, number, and special character', 'string.min': 'Password must be at least 10 characters' }),
   business_name: Joi.string().min(2).max(255).required(),
   phone: Joi.string().pattern(/^[+]?[\d\s-]+$/).optional(),
+  captcha_token: Joi.string().optional(),
 });
 
 const loginSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().min(1).required(),
+  captcha_token: Joi.string().optional(),
 });
 
 // bruteforce check — 5 failed attempts = 15min lockout (per-account, not per-IP)
@@ -230,7 +232,7 @@ export const login = async (req, res) => {
     if (failCount >= 3) {
       const { captcha_token } = req.body;
       if (!captcha_token) {
-        return sendError(res, 400, 'Please complete the security check.') // Clients can check for status 400;
+        return res.status(400).json({ success: false, code: 'CAPTCHA_REQUIRED', message: 'Please complete the security check.' });
       }
       const captchaValid = await verifyCaptcha(captcha_token);
       if (!captchaValid) {
