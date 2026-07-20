@@ -1,4 +1,5 @@
 import { query } from '../config/db.js';
+import { sendError } from '../utils/sendError.js';
 
 const RESOURCES = ['customers', 'products', 'sales', 'expenses', 'invoices', 'leads', 'deals', 'tickets', 'projects', 'vendors', 'purchase_orders', 'employees', 'team', 'reports'];
 
@@ -37,7 +38,9 @@ export const requirePermission = async (req, res, next) => {
   if (!permissionKey) return next();
 
   const baseUrl = req.baseUrl;
-  const resource = resourceRouteMap[baseUrl];
+  // Strip /api/v1 prefix so RBAC works on both /api and /api/v1 routes
+  const normalizedBase = baseUrl.replace(/^\/api\/v\d+/, '/api');
+  const resource = resourceRouteMap[normalizedBase];
   if (!resource) return next();
 
   try {
@@ -47,17 +50,17 @@ export const requirePermission = async (req, res, next) => {
     );
 
     if (!result.rows.length) {
-      return res.status(403).json({ error: `Access denied: no ${permissionKey.replace('can_', '')} permission for ${resource}` });
+      return sendError(res, 403, `Access denied: no ${permissionKey.replace('can_', '')} permission for ${resource}`);
     }
 
     if (!result.rows[0][permissionKey]) {
-      return res.status(403).json({ error: `Access denied: no ${permissionKey.replace('can_', '')} permission for ${resource}` });
+      return sendError(res, 403, `Access denied: no ${permissionKey.replace('can_', '')} permission for ${resource}`);
     }
 
     next();
   } catch (error) {
     console.error('Permission check error:', error.message);
-    return res.status(500).json({ error: 'Access check failed' });
+    return sendError(res, 500, 'Access check failed');
   }
 };
 

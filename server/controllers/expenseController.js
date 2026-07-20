@@ -1,4 +1,5 @@
 import { query, pool } from '../config/db.js';
+import { sendError } from '../utils/sendError.js';
 
 export const getAll = async (req, res) => {
   try {
@@ -18,7 +19,7 @@ export const getAll = async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('Expenses list error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -28,11 +29,11 @@ export const getById = async (req, res) => {
       'SELECT * FROM expenses WHERE id = $1 AND business_id = $2',
       [req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Expense not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Expense not found');
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Expense get error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -43,7 +44,7 @@ export const create = async (req, res) => {
     const { category_id, description, amount, date, vendor, reference, is_receipt_attached, notes } = req.body;
 
     if (!description || !amount) {
-      return res.status(400).json({ error: 'Description and amount are required' });
+      return sendError(res, 400, 'Description and amount are required');
     }
 
     const result = await client.query(
@@ -65,7 +66,7 @@ export const create = async (req, res) => {
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Expense create error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   } finally {
     client.release();
   }
@@ -81,7 +82,7 @@ export const update = async (req, res) => {
     const existing = await client.query('SELECT id, amount FROM expenses WHERE id = $1 AND business_id = $2 FOR UPDATE', [req.params.id, req.business_id]);
     if (existing.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Expense not found' });
+      return sendError(res, 404, 'Expense not found');
     }
 
     const result = await client.query(
@@ -107,7 +108,7 @@ export const update = async (req, res) => {
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Expense update error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   } finally {
     client.release();
   }
@@ -119,11 +120,11 @@ export const remove = async (req, res) => {
       'DELETE FROM expenses WHERE id = $1 AND business_id = $2 RETURNING id',
       [req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Expense not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Expense not found');
     res.json({ message: 'Expense deleted' });
   } catch (error) {
     console.error('Expense delete error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -136,7 +137,7 @@ export const getCategories = async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('Expense categories error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -150,6 +151,6 @@ export const createCategory = async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Expense category create error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };

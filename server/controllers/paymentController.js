@@ -1,4 +1,5 @@
 import { query, pool } from '../config/db.js';
+import { sendError } from '../utils/sendError.js';
 
 export const getAgents = async (req, res) => {
   try {
@@ -9,7 +10,7 @@ export const getAgents = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get agents error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -17,7 +18,7 @@ export const createAgent = async (req, res) => {
   try {
     const { name, phone, mpesa_number, commission_rate } = req.body;
     if (!name || !phone || !mpesa_number) {
-      return res.status(400).json({ error: 'Name, phone, and M-Pesa number are required' });
+      return sendError(res, 400, 'Name, phone, and M-Pesa number are required');
     }
     const result = await query(
       `INSERT INTO mpesa_agents (business_id, name, phone, mpesa_number, commission_rate)
@@ -27,7 +28,7 @@ export const createAgent = async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('Create agent error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -41,11 +42,11 @@ export const updateAgent = async (req, res) => {
        WHERE id = $6 AND business_id = $7 RETURNING *`,
       [name, phone, mpesa_number, commission_rate, is_active, req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Agent not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Agent not found');
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Update agent error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -55,11 +56,11 @@ export const deleteAgent = async (req, res) => {
       'DELETE FROM mpesa_agents WHERE id = $1 AND business_id = $2 RETURNING id',
       [req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Agent not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Agent not found');
     res.json({ message: 'Agent deleted' });
   } catch (err) {
     console.error('Delete agent error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -89,7 +90,7 @@ export const getTransactions = async (req, res) => {
     res.json({ transactions: result.rows, total_inflow: totalIn, total_outflow: totalOut, net: totalIn - totalOut });
   } catch (err) {
     console.error('Get transactions error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -118,6 +119,6 @@ export const getReports = async (req, res) => {
     res.json({ daily: result.rows, summary: summary.rows, top_categories: topCategories.rows });
   } catch (err) {
     console.error('Get reports error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };

@@ -3,6 +3,7 @@ import Joi from 'joi';
 import { query } from '../config/db.js';
 import { hashPassword } from '../utils/password.js';
 import { auditLogger } from '../middleware/security.js';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -37,14 +38,14 @@ router.get('/', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get users error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
 router.post('/', auditLogger('users.create'), async (req, res) => {
   try {
     const { error, value } = createUserSchema.validate(req.body);
-    if (error) return res.status(400).json({ error: error.details[0].message });
+    if (error) return sendError(res, 400, error.details[0].message);
 
     const { name, email, password, role, is_active } = value;
 
@@ -53,7 +54,7 @@ router.post('/', auditLogger('users.create'), async (req, res) => {
       [email, req.business_id]
     );
     if (existing.rows.length > 0) {
-      return res.status(409).json({ error: 'A user with this email already exists in your business' });
+      return sendError(res, 409, 'A user with this email already exists in your business');
     }
 
     const hashedPassword = await hashPassword(password);
@@ -68,7 +69,7 @@ router.post('/', auditLogger('users.create'), async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('Create user error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -79,10 +80,10 @@ router.delete('/:id', auditLogger('users.delete'), async (req, res) => {
       [req.params.id, req.business_id]
     );
     if (check.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
+      return sendError(res, 404, 'User not found');
     }
     if (check.rows[0].role === 'owner') {
-      return res.status(403).json({ error: 'Cannot remove the business owner' });
+      return sendError(res, 403, 'Cannot remove the business owner');
     }
 
     const result = await query(
@@ -90,12 +91,12 @@ router.delete('/:id', auditLogger('users.delete'), async (req, res) => {
       [req.params.id, req.business_id]
     );
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
+      return sendError(res, 404, 'User not found');
     }
     res.json({ message: 'User removed' });
   } catch (err) {
     console.error('Delete user error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 

@@ -89,7 +89,7 @@ describe('Auth API', () => {
       .send(testUser);
     
     expect(res.status).toBe(400);
-    expect(res.body.error).toContain('Invalid registration details');
+    expect(res.body.message).toContain('Invalid registration details');
   });
 
   it('should reject invalid login', async () => {

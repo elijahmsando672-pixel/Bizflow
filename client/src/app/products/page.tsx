@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/toast";
 import { Package, Plus, Pencil, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
 import api from "@/lib/api";
@@ -64,6 +65,7 @@ const columns: Column<Product>[] = [
 ];
 
 export default function ProductsPage() {
+  const toast = useToast();
   const [data, setData] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -136,7 +138,7 @@ export default function ProductsPage() {
       setDialogOpen(false);
       fetchData();
     } catch {
-      alert("Failed to save product");
+      toast.error("Failed to save product");
     }
   };
 
@@ -144,9 +146,10 @@ export default function ProductsPage() {
     if (!confirm("Delete this product?")) return;
     try {
       await api.products.delete(id);
+      toast.success("Product deleted");
       fetchData();
     } catch {
-      alert("Failed to delete product");
+      toast.error("Failed to delete product");
     }
   };
 

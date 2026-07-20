@@ -5,9 +5,11 @@ import api from "@/lib/api";
 import {
   PageHeader, StatCard, Card, SearchBar, Table, Btn, Badge, Modal, InputField
 } from "@/components/ui/dashboard-ui";
+import { useToast } from "@/components/ui/toast";
 import { Package, AlertTriangle, Plus, RefreshCw, DollarSign, Loader2 } from "lucide-react";
 
 export default function InventoryPage() {
+  const toast = useToast();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -33,7 +35,7 @@ export default function InventoryPage() {
       setModal(false); setEditItem(null);
       setForm({ name: "", sku: "", price: "", quantity: "" });
       load();
-    } catch { alert("Failed to save product"); }
+    } catch { toast.error("Failed to save product"); }
   };
 
   const filtered = items.filter((i: any) =>

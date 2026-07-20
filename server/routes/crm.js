@@ -1,5 +1,6 @@
 import express from 'express';
 import { query } from '../config/db.js';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -19,7 +20,7 @@ router.post('/', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Create lead error:', error);
-    res.status(500).json({ error: 'Failed to create lead' });
+    sendError(res, 500, 'Failed to create lead');
   }
 });
 
@@ -47,7 +48,7 @@ router.get('/', async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('Get leads error:', error);
-    res.status(500).json({ error: 'Failed to fetch leads' });
+    sendError(res, 500, 'Failed to fetch leads');
   }
 });
 
@@ -59,11 +60,11 @@ router.get('/:id', async (req, res) => {
        WHERE l.id = $1 AND l.business_id = $2`,
       [req.params.id, req.business_id]
     );
-    if (!result.rows.length) return res.status(404).json({ error: 'Lead not found' });
+    if (!result.rows.length) return sendError(res, 404, 'Lead not found');
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Get lead error:', error);
-    res.status(500).json({ error: 'Failed to fetch lead' });
+    sendError(res, 500, 'Failed to fetch lead');
   }
 });
 
@@ -78,11 +79,11 @@ router.put('/:id', async (req, res) => {
        WHERE id=$1 AND business_id=$14 RETURNING *`,
       [req.params.id, first_name, last_name, email, phone, company, job_title, source, status, lead_score, estimated_value, assigned_to, notes, req.business_id]
     );
-    if (!result.rows.length) return res.status(404).json({ error: 'Lead not found' });
+    if (!result.rows.length) return sendError(res, 404, 'Lead not found');
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Update lead error:', error);
-    res.status(500).json({ error: 'Failed to update lead' });
+    sendError(res, 500, 'Failed to update lead');
   }
 });
 
@@ -92,7 +93,7 @@ router.post('/:id/convert', async (req, res) => {
     const businessId = req.business_id;
 
     const lead = await query(`SELECT * FROM leads WHERE id = $1 AND business_id = $2`, [req.params.id, businessId]);
-    if (!lead.rows.length) return res.status(404).json({ error: 'Lead not found' });
+    if (!lead.rows.length) return sendError(res, 404, 'Lead not found');
 
     const l = lead.rows[0];
     const customerResult = await query(
@@ -114,7 +115,7 @@ router.post('/:id/convert', async (req, res) => {
     res.json({ message: 'Lead converted to customer', customer_id: customerId });
   } catch (error) {
     console.error('Convert lead error:', error);
-    res.status(500).json({ error: 'Failed to convert lead' });
+    sendError(res, 500, 'Failed to convert lead');
   }
 });
 
@@ -129,18 +130,18 @@ router.post('/:id/activities', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Create activity error:', error);
-    res.status(500).json({ error: 'Failed to create activity' });
+    sendError(res, 500, 'Failed to create activity');
   }
 });
 
 router.delete('/:id', async (req, res) => {
   try {
     const result = await query(`DELETE FROM leads WHERE id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
-    if (!result.rowCount) return res.status(404).json({ error: 'Lead not found' });
+    if (!result.rowCount) return sendError(res, 404, 'Lead not found');
     res.json({ message: 'Lead deleted' });
   } catch (error) {
     console.error('Delete lead error:', error);
-    res.status(500).json({ error: 'Failed to delete lead' });
+    sendError(res, 500, 'Failed to delete lead');
   }
 });
 

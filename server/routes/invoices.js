@@ -1,197 +1,52 @@
 import express from 'express';
-import { query, pool } from '../config/db.js';
-import { sendInvoiceEmail } from '../utils/email.js';
+import * as invoiceService from '../services/invoiceService.js';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
   try {
     const { status } = req.query;
-    let sql = `SELECT i.*, c.name as customer_name FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id WHERE i.business_id = $1`;
-    const params = [req.business_id];
-    
-    if (status) {
-      sql += ' AND i.status = $2';
-      params.push(status);
-    }
-    
-    sql += ' ORDER BY i.created_at DESC';
-    
-    const result = await query(sql, params);
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Get invoices error:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
+    const invoices = await invoiceService.getInvoices(req.business_id, status);
+    res.json(invoices);
+  } catch (err) { next(err); }
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res, next) => {
   try {
-    const invoiceResult = await query(
-      `SELECT i.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone
-       FROM invoices i 
-       LEFT JOIN customers c ON i.customer_id = c.id 
-       WHERE i.id = $1 AND i.business_id = $2`,
-      [req.params.id, req.business_id]
-    );
-    
-    if (invoiceResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Invoice not found' });
-    }
-    
-    const itemsResult = await query(
-      'SELECT * FROM invoice_items WHERE invoice_id = $1 AND business_id = $2',
-      [req.params.id, req.business_id]
-    );
-    
-    res.json({
-      ...invoiceResult.rows[0],
-      items: itemsResult.rows
-    });
-  } catch (error) {
-    console.error('Get invoice error:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
+    const invoice = await invoiceService.getInvoiceById(req.business_id, req.params.id);
+    if (!invoice) return sendError(res, 404, 'Invoice not found');
+    res.json(invoice);
+  } catch (err) { next(err); }
 });
 
-router.post('/', async (req, res) => {
-  const client = await pool.connect();
+router.post('/', async (req, res, next) => {
   try {
-    await client.query('BEGIN');
-
-    const { customer_id, invoice_date, due_date, items, notes, discount_amount = 0 } = req.body;
-
-    if (!Array.isArray(items) || !items.length) {
-      return res.status(400).json({ error: 'At least one item is required' });
-    }
-
-    const maxResult = await client.query(
-      "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM 5) AS INTEGER)), 0) + 1 as next_num FROM invoices WHERE business_id = $1",
-      [req.business_id]
-    );
-    const invoiceNumber = `INV-${String(parseInt(maxResult.rows[0].next_num)).padStart(5, '0')}`;
-
-    // Calculate totals
-    let subtotal = 0;
-    for (const item of (items || [])) {
-      subtotal += (item.qty * item.unit_price) - (item.discount || 0);
-    }
-    const tax_amount = subtotal * 0.16;
-    const total = subtotal + tax_amount - discount_amount;
-
-    const invoiceResult = await client.query(
-      `INSERT INTO invoices (business_id, customer_id, invoice_number, invoice_date, due_date, subtotal, tax_amount, discount_amount, total, notes, created_by, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'draft') RETURNING *`,
-      [req.business_id, customer_id, invoiceNumber, invoice_date || new Date(), due_date, subtotal, tax_amount, discount_amount, total, notes, req.user.id]
-    );
-    const invoice = invoiceResult.rows[0];
-
-    for (const item of (items || [])) {
-      const itemTotal = (item.qty * item.unit_price) - (item.discount || 0);
-      await client.query(
-        `INSERT INTO invoice_items (business_id, invoice_id, product_id, product_name, qty, unit_price, discount, total)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [req.business_id, invoice.id, item.product_id, item.product_name, item.qty, item.unit_price, item.discount || 0, itemTotal]
-      );
-    }
-
-    await client.query('COMMIT');
-
-    if (customer_id) {
-      try {
-        const customerResult = await query('SELECT * FROM customers WHERE id = $1 AND business_id = $2', [customer_id, req.business_id]);
-        if (customerResult.rows[0]?.email) {
-          sendInvoiceEmail(customerResult.rows[0].email, invoice, customerResult.rows[0]).catch(() => {});
-        }
-      } catch (emailErr) {
-        console.error('Send invoice email error:', emailErr);
-      }
-    }
-
+    const invoice = await invoiceService.createInvoice(req.business_id, req.user.id, req.body);
     res.status(201).json(invoice);
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Create invoice error:', error);
-    res.status(500).json({ error: 'Server error' });
-  } finally {
-    client.release();
+  } catch (err) {
+    if (err.statusCode === 400) return sendError(res, 400, err.message);
+    next(err);
   }
 });
 
-router.put('/:id', async (req, res) => {
-  const client = await pool.connect();
+router.put('/:id', async (req, res, next) => {
   try {
-    await client.query('BEGIN');
-
-    const { status, due_date, notes, customer_id, items, discount_amount } = req.body;
-    
-    const existingInvoice = await client.query(
-      'SELECT * FROM invoices WHERE id = $1 AND business_id = $2 FOR UPDATE',
-      [req.params.id, req.business_id]
-    );
-    
-    if (existingInvoice.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Invoice not found' });
-    }
-    
-    let subtotal = existingInvoice.rows[0].subtotal;
-    if (items && items.length > 0) {
-      await client.query('DELETE FROM invoice_items WHERE invoice_id = $1 AND business_id = $2', [req.params.id, req.business_id]);
-      
-      subtotal = 0;
-      for (const item of items) {
-        const itemTotal = (item.qty * item.unit_price) - (item.discount || 0);
-        subtotal += itemTotal;
-        await client.query(
-          `INSERT INTO invoice_items (business_id, invoice_id, product_id, product_name, qty, unit_price, discount, total)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [req.business_id, req.params.id, item.product_id, item.product_name, item.qty, item.unit_price, item.discount || 0, itemTotal]
-        );
-      }
-    }
-    
-    const tax_amount = subtotal * 0.16;
-    const total = subtotal + tax_amount - (discount_amount || existingInvoice.rows[0].discount_amount);
-    const paidDate = status === 'paid' ? new Date() : existingInvoice.rows[0].paid_date;
-    
-    const result = await client.query(
-      `UPDATE invoices 
-       SET status = COALESCE($1, status), customer_id = COALESCE($2, customer_id), due_date = COALESCE($3, due_date), 
-           notes = COALESCE($4, notes), subtotal = $5, tax_amount = $6, discount_amount = $7, total = $8, 
-           paid_date = $9, updated_at = NOW()
-       WHERE id = $10 AND business_id = $11
-       RETURNING *`,
-      [status, customer_id, due_date, notes, subtotal, tax_amount, discount_amount || existingInvoice.rows[0].discount_amount, total, paidDate, req.params.id, req.business_id]
-    );
-
-    await client.query('COMMIT');
-    
-    res.json(result.rows[0]);
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Update invoice error:', error);
-    res.status(500).json({ error: 'Server error' });
-  } finally {
-    client.release();
+    const invoice = await invoiceService.updateInvoice(req.business_id, req.params.id, req.body);
+    res.json(invoice);
+  } catch (err) {
+    if (err.statusCode === 404) return sendError(res, 404, 'Not found');
+    next(err);
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', async (req, res, next) => {
   try {
-    const result = await query(
-      'DELETE FROM invoices WHERE id = $1 AND business_id = $2 RETURNING id',
-      [req.params.id, req.business_id]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Invoice not found' });
-    }
-    
+    await invoiceService.deleteInvoice(req.business_id, req.params.id);
     res.json({ message: 'Invoice deleted' });
-  } catch (error) {
-    console.error('Delete invoice error:', error);
-    res.status(500).json({ error: 'Server error' });
+  } catch (err) {
+    if (err.statusCode === 404) return sendError(res, 404, 'Not found');
+    next(err);
   }
 });
 

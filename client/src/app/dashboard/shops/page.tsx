@@ -5,9 +5,11 @@ import api from "@/lib/api";
 import {
   Card, SearchBar, Table, Btn, Modal, InputField, StatCard
 } from "@/components/ui/dashboard-ui";
+import { useToast } from "@/components/ui/toast";
 import { Building2, Plus, Edit3, Trash2, User, Truck, Loader2 } from "lucide-react";
 
 export default function ShopsPage() {
+  const toast = useToast();
   const [shops, setShops] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -32,12 +34,12 @@ export default function ShopsPage() {
       setModal(false); setEditItem(null);
       setForm({ name: "", location: "", phone: "", email: "", manager_name: "" });
       load();
-    } catch { alert("Failed to save shop"); }
+    } catch { toast.error("Failed to save shop"); }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this shop?")) return;
-    try { await api.shops.delete(id); load(); } catch { alert("Delete failed"); }
+    try { await api.shops.delete(id); toast.success("Shop deleted"); load(); } catch { toast.error("Delete failed"); }
   };
 
   const filtered = shops.filter((s: any) =>

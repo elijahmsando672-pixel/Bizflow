@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../config/db.js';
 import { sendPaymentReminderEmail } from '../utils/email.js';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -35,7 +36,7 @@ router.get('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Get notifications error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -50,13 +51,13 @@ router.post('/send-reminder/:id', async (req, res) => {
     );
     
     if (invoiceResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Sale not found' });
+      return sendError(res, 404, 'Sale not found');
     }
     
     const sale = invoiceResult.rows[0];
     
     if (!sale.customer_email) {
-      return res.status(400).json({ error: 'Customer has no email' });
+      return sendError(res, 400, 'Customer has no email');
     }
     
     await sendPaymentReminderEmail(sale.customer_email, sale, { name: sale.customer_name });
@@ -64,7 +65,7 @@ router.post('/send-reminder/:id', async (req, res) => {
     res.json({ message: 'Reminder sent' });
   } catch (error) {
     console.error('Send reminder error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -76,13 +77,13 @@ router.post('/low-stock-alert/:productId', async (req, res) => {
     );
     
     if (productResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Product not found' });
+      return sendError(res, 404, 'Product not found');
     }
     
     res.json({ message: 'Low stock alert noted. Configure email alerts in settings.' });
   } catch (error) {
     console.error('Low stock alert error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -95,7 +96,7 @@ router.post('/:id/read', async (req, res) => {
     res.json({ message: 'Marked as read' });
   } catch (error) {
     console.error('Mark read error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -108,7 +109,7 @@ router.post('/read-all', async (req, res) => {
     res.json({ message: 'All marked as read' });
   } catch (error) {
     console.error('Mark all read error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 

@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../config/db.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -98,7 +99,7 @@ Provide:
     res.json({ data, aiSummary, generated_at: new Date().toISOString() });
   } catch (err) {
     console.error('AI insights error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -147,7 +148,7 @@ Return format: {"predictions": [{"month": "2026-05", "predicted_revenue": 10000,
     res.json(prediction);
   } catch (err) {
     console.error('Predictions error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -160,7 +161,7 @@ router.get('/history', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('AI history error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 

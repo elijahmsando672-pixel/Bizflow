@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/data";
 import {
   PageHeader, StatCard, Card, SearchBar, Table, Btn, Badge, Modal, InputField
 } from "@/components/ui/dashboard-ui";
+import { useToast } from "@/components/ui/toast";
 import { TrendingDown, DollarSign, BarChart3, Layers, Plus, Edit3, Trash2, FileText, Loader2 } from "lucide-react";
 
 interface Expense {
@@ -18,6 +19,7 @@ interface Expense {
 }
 
 export default function ExpensesPage() {
+  const toast = useToast();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,18 +52,18 @@ export default function ExpensesPage() {
       setModal(false); setEditItem(null);
       setForm({ description: "", amount: "", category: "General", expense_date: new Date().toISOString().split("T")[0] });
       load();
-    } catch { alert("Failed to save expense"); }
+    } catch { toast.error("Failed to save expense"); }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this expense?")) return;
-    try { await api.expenses.delete(id); load(); } catch { alert("Delete failed"); }
+    try { await api.expenses.delete(id); toast.success("Expense deleted"); load(); } catch { toast.error("Delete failed"); }
   };
 
   const handleAddCategory = async () => {
     if (!newCat.trim()) return;
-    try { await api.expenses.createCategory({ name: newCat }); setCatModal(false); setNewCat(""); load(); }
-    catch { alert("Failed to create category"); }
+    try { await api.expenses.createCategory({ name: newCat }); setCatModal(false); setNewCat(""); toast.success("Category added"); load(); }
+    catch { toast.error("Failed to create category"); }
   };
 
   const filtered = expenses.filter((e) =>

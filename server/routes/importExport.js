@@ -2,6 +2,7 @@ import express from 'express';
 import { query } from '../config/db.js';
 import csvParser from 'csv-parser';
 import { Readable } from 'stream';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -66,11 +67,11 @@ router.post('/:resource', async (req, res) => {
   try {
     const { resource } = req.params;
     const config = RESOURCE_CONFIG[resource];
-    if (!config) return res.status(400).json({ error: `Unsupported resource: ${resource}` });
+    if (!config) return sendError(res, 400, `Unsupported resource: ${resource}`);
     validateColumnNames(config.columns);
 
     const { data } = req.body;
-    if (!data || !Array.isArray(data)) return res.status(400).json({ error: 'Invalid data: must be array' });
+    if (!data || !Array.isArray(data)) return sendError(res, 400, 'Invalid data: must be array');
 
     const results = { success: 0, failed: 0, errors: [], inserted: [] };
 
@@ -107,7 +108,7 @@ router.post('/:resource', async (req, res) => {
     res.json(results);
   } catch (error) {
     console.error('Import error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -115,11 +116,11 @@ router.post('/csv/:resource', async (req, res) => {
   try {
     const { resource } = req.params;
     const config = RESOURCE_CONFIG[resource];
-    if (!config) return res.status(400).json({ error: `Unsupported resource: ${resource}` });
+    if (!config) return sendError(res, 400, `Unsupported resource: ${resource}`);
     validateColumnNames(config.columns);
 
     const { csvContent } = req.body;
-    if (!csvContent) return res.status(400).json({ error: 'csvContent required' });
+    if (!csvContent) return sendError(res, 400, 'csvContent required');
 
     const rows = [];
     const stream = Readable.from(csvContent);
@@ -176,14 +177,14 @@ router.post('/csv/:resource', async (req, res) => {
     res.json(results);
   } catch (error) {
     console.error('Import CSV error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
 router.get('/:resource', async (req, res) => {
   const { resource } = req.params;
   const config = RESOURCE_CONFIG[resource];
-  if (!config) return res.status(400).json({ error: `Unsupported resource: ${resource}` });
+  if (!config) return sendError(res, 400, `Unsupported resource: ${resource}`);
   validateColumnNames(config.columns);
 
   const format = req.query.format || 'json';
@@ -212,7 +213,7 @@ router.get('/:resource', async (req, res) => {
 
     res.json(result.rows);
   } catch (error) {
-    res.status(500).json({ error: `Failed to export ${resource}: ${error.message}` });
+    sendError(res, 500, `Failed to export ${resource}: ${error.message}`);
   }
 });
 
@@ -231,10 +232,10 @@ router.get('/templates/:resource', (req, res) => {
       tickets: [{ subject: "Login issue", description: "Cannot access dashboard", priority: "high", status: "open", customer_id: "", assignee_id: "" }],
     };
 
-    if (!templates[resource]) return res.status(404).json({ error: 'No template for this resource' });
+    if (!templates[resource]) return sendError(res, 404, 'No template for this resource');
     res.json(templates[resource]);
   } catch (error) {
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 

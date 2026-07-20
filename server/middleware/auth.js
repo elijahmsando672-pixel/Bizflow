@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { query } from '../config/db.js';
+import { sendError } from '../utils/sendError.js';
 
 const getJwtSecret = () => {
   if (!process.env.JWT_SECRET) {
@@ -12,12 +13,12 @@ export const authenticate = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'No token provided' });
+    return sendError(res, 401, 'No token provided');
   }
 
   const JWT_SECRET = getJwtSecret();
   if (!JWT_SECRET) {
-    return res.status(500).json({ error: 'Server configuration error' });
+    return sendError(res, 500, 'Server configuration error');
   }
   
   const token = authHeader.split(' ')[1];
@@ -31,19 +32,19 @@ export const authenticate = async (req, res, next) => {
       [decoded.id]
     );
     if (!userResult.rows.length || !userResult.rows[0].is_active) {
-      return res.status(401).json({ error: 'Account is deactivated' });
+      return sendError(res, 401, 'Account is deactivated');
     }
     if (userResult.rows[0].business_status === 'suspended') {
-      return res.status(403).json({ error: 'Business account is suspended' });
+      return sendError(res, 403, 'Business account is suspended');
     }
     req.user = decoded;
     req.business_id = decoded.business_id;
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Token expired' });
+      return sendError(res, 401, 'Token expired');
     }
-    return res.status(401).json({ error: 'Invalid token' });
+    return sendError(res, 401, 'Invalid token');
   }
 };
 

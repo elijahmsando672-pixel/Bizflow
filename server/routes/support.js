@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../config/db.js';
 import { sendTicketCreatedEmail, sendTicketReplyEmail } from '../utils/email.js';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -44,7 +45,7 @@ router.get('/sla-configs', async (req, res) => {
     }
     res.json(result.rows);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch SLA configs' });
+    sendError(res, 500, 'Failed to fetch SLA configs');
   }
 });
 
@@ -55,10 +56,10 @@ router.put('/sla-configs/:id', async (req, res) => {
       `UPDATE sla_configs SET response_hours=$2, resolution_hours=$3 WHERE id=$1 AND business_id=$4 RETURNING *`,
       [req.params.id, response_hours, resolution_hours, req.business_id]
     );
-    if (!result.rows.length) return res.status(404).json({ error: 'SLA config not found' });
+    if (!result.rows.length) return sendError(res, 404, 'SLA config not found');
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update SLA config' });
+    sendError(res, 500, 'Failed to update SLA config');
   }
 });
 
@@ -90,7 +91,7 @@ router.get('/dashboard-stats', async (req, res) => {
 
     res.json({ stats: stats.rows[0], recent: recent.rows });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch ticket stats' });
+    sendError(res, 500, 'Failed to fetch ticket stats');
   }
 });
 
@@ -133,7 +134,7 @@ router.post('/', async (req, res) => {
     res.status(201).json(ticket);
   } catch (error) {
     console.error('Create ticket error:', error);
-    res.status(500).json({ error: 'Failed to create ticket' });
+    sendError(res, 500, 'Failed to create ticket');
   }
 });
 
@@ -165,7 +166,7 @@ router.get('/', async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('Get tickets error:', error);
-    res.status(500).json({ error: 'Failed to fetch tickets' });
+    sendError(res, 500, 'Failed to fetch tickets');
   }
 });
 
@@ -181,10 +182,10 @@ router.get('/:id', async (req, res) => {
        WHERE t.id = $1 AND t.business_id = $2`,
       [req.params.id, req.business_id]
     );
-    if (!result.rows.length) return res.status(404).json({ error: 'Ticket not found' });
+    if (!result.rows.length) return sendError(res, 404, 'Ticket not found');
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch ticket' });
+    sendError(res, 500, 'Failed to fetch ticket');
   }
 });
 
@@ -210,10 +211,10 @@ router.put('/:id', async (req, res) => {
       `UPDATE support_tickets SET ${updates.join(', ')} WHERE id=$1 AND business_id=$2 RETURNING *`,
       params
     );
-    if (!result.rows.length) return res.status(404).json({ error: 'Ticket not found' });
+    if (!result.rows.length) return sendError(res, 404, 'Ticket not found');
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update ticket' });
+    sendError(res, 500, 'Failed to update ticket');
   }
 });
 
@@ -245,7 +246,7 @@ router.post('/:id/replies', async (req, res) => {
 
     res.status(201).json(reply);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create reply' });
+    sendError(res, 500, 'Failed to create reply');
   }
 });
 
@@ -261,7 +262,7 @@ router.get('/:id/replies', async (req, res) => {
     );
     res.json(result.rows);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch replies' });
+    sendError(res, 500, 'Failed to fetch replies');
   }
 });
 
@@ -269,10 +270,10 @@ router.delete('/:id', async (req, res) => {
   try {
     await query(`DELETE FROM ticket_replies WHERE ticket_id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
     const result = await query(`DELETE FROM support_tickets WHERE id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
-    if (!result.rowCount) return res.status(404).json({ error: 'Ticket not found' });
+    if (!result.rowCount) return sendError(res, 404, 'Ticket not found');
     res.json({ message: 'Ticket deleted' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete ticket' });
+    sendError(res, 500, 'Failed to delete ticket');
   }
 });
 

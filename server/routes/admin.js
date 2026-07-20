@@ -1,5 +1,6 @@
 import express from 'express';
 import { query } from '../config/db.js';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -37,7 +38,7 @@ router.get('/businesses', async (req, res) => {
     res.json(businesses.rows);
   } catch (err) {
     console.error('Admin businesses error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -45,11 +46,11 @@ router.patch('/businesses/:id/status', async (req, res) => {
   try {
     const authResult = await query('SELECT role FROM users WHERE id = $1 AND business_id = $2', [req.user.id, req.business_id]);
     if (!authResult.rows.length || authResult.rows[0].role !== 'owner') {
-      return res.status(403).json({ error: 'Only business owner can change status' });
+      return sendError(res, 403, 'Only business owner can change status');
     }
     const { status } = req.body;
     if (!['active', 'suspended', 'pending'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status' });
+      return sendError(res, 400, 'Invalid status');
     }
     
     await query(
@@ -60,7 +61,7 @@ router.patch('/businesses/:id/status', async (req, res) => {
     res.json({ message: 'Business status updated' });
   } catch (err) {
     console.error('Update business status error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -75,7 +76,7 @@ router.get('/stats', async (req, res) => {
     });
   } catch (err) {
     console.error('Admin stats error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 

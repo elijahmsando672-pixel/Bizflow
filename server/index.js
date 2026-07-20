@@ -7,10 +7,11 @@ import { initDatabase } from './config/db.js';
 import { protect } from './middleware/protect.js';
 import { requirePermission } from './middleware/rbac.js';
 import { logAudit, getClientIp } from './utils/audit.js';
-import { securityHeaders, sanitizeInput, xssPrevent, globalRateLimiter, userRateLimiter, authRateLimiter, passwordResetRateLimiter, refreshTokenRateLimiter } from './middleware/security.js';
+import { securityHeaders, sanitizeInput, xssPrevent, globalRateLimiter, userRateLimiter, authRateLimiter, passwordResetRateLimiter, refreshTokenRateLimiter, stopRateLimitCleanup } from './middleware/security.js';
 import { reportSuspiciousAccess } from './utils/securityMonitor.js';
 import { passport } from './config/oauth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { sendError } from './utils/sendError.js';
 import { authenticateApiKey } from './middleware/apiKey.js';
 import { trackRequest, getMetrics } from './utils/metrics.js';
 import { pool } from './config/db.js';
@@ -237,7 +238,7 @@ const mountRoutes = (base) => {
 
   app.get(`${base}/queue`, protect, (req, res) => {
     if (req.user.role !== 'admin' && req.user.role !== 'owner') {
-      return res.status(403).json({ success: false, message: 'Admin access required', code: 403 });
+      return sendError(res, 403, 'Admin access required');
     }
     res.json({ success: true, data: getQueueStats() });
   });
@@ -273,7 +274,7 @@ app.get('/api/health', async (req, res) => {
     await pool.query('SELECT 1');
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   } catch {
-    res.status(503).json({ success: false, message: 'Service unavailable', code: 503 });
+    sendError(res, 503, 'Service unavailable');
   }
 });
 
@@ -281,7 +282,7 @@ app.get('/api/health', async (req, res) => {
 app.get('/api/metrics', protect, async (req, res, next) => {
   try {
     if (req.user.role !== 'admin' && req.user.role !== 'owner') {
-      return res.status(403).json({ success: false, message: 'Admin access required', code: 403 });
+      return sendError(res, 403, 'Admin access required');
     }
     const metrics = await getMetrics(pool);
     res.json({ success: true, data: metrics });
@@ -333,6 +334,7 @@ const startServer = async () => {
 
   const shutdown = async () => {
     console.log('Shutting down gracefully...');
+    stopRateLimitCleanup();
     server.close(() => {
       console.log('HTTP server closed');
     });

@@ -63,4 +63,12 @@ export class FinanceController {
   getCategories(@RequireBusiness('id') businessId: string) {
     return this.financeService.getCategories(businessId);
   }
+
+  @Get('transactions/:id/receipt')
+  getReceipt(
+    @RequireBusiness('id') businessId: string,
+    @Param('id') id: string,
+  ) {
+    return this.financeService.getReceipt(businessId, id);
+  }
 }

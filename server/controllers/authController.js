@@ -13,6 +13,7 @@ import { JWT_SECRET_KEY as JWT_SECRET } from '../middleware/auth.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 import { createTempToken, consumeTempToken } from '../utils/tempToken.js';
 import https from 'https';
+import { sendError } from '../utils/sendError.js';
 
 const APP_NAME = 'BizFlow';
 const CAPTCHA_SECRET = process.env.TURNSTILE_SECRET_KEY || '';
@@ -140,20 +141,20 @@ const setRefreshCookie = (req, res, token) => {
 export const register = async (req, res) => {
   try {
     const { error, value } = registerSchema.validate(req.body);
-    if (error) return res.status(400).json({ error: error.details[0].message });
+    if (error) return sendError(res, 400, error.details[0].message);
 
     // Require CAPTCHA for registration (only if configured)
     if (CAPTCHA_SECRET) {
       const { captcha_token } = req.body;
-      if (!captcha_token) return res.status(400).json({ error: 'CAPTCHA_REQUIRED', message: 'Please complete the security check.' });
+      if (!captcha_token) return sendError(res, 400, 'Please complete the security check.') // Clients can check for status 400;
       const captchaValid = await verifyCaptcha(captcha_token);
-      if (!captchaValid) return res.status(400).json({ error: 'Invalid CAPTCHA. Please try again.' });
+      if (!captchaValid) return sendError(res, 400, 'Invalid CAPTCHA. Please try again.');
     }
 
     const { name, email, password, business_name, phone } = value;
     // don't reveal if email exists — just say "invalid"
     const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
-    if (existingUser.rows.length > 0) return res.status(400).json({ error: 'Invalid registration details' });
+    if (existingUser.rows.length > 0) return sendError(res, 400, 'Invalid registration details');
 
     const businessResult = await query(
       'INSERT INTO businesses (name, email, phone) VALUES ($1, $2, $3) RETURNING id',
@@ -203,21 +204,21 @@ export const register = async (req, res) => {
     });
   } catch (err) {
     console.error('Register error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
 export const login = async (req, res) => {
   try {
     const { error, value } = loginSchema.validate(req.body);
-    if (error) return res.status(400).json({ error: error.details[0].message });
+    if (error) return sendError(res, 400, error.details[0].message);
 
     const { email, password } = value;
     const ip = req.ip || req.socket.remoteAddress;
 
     if (await isLocked(email)) {
       reportAccountLockout(email, ip);
-      return res.status(429).json({ error: 'Too many failed attempts. Please try again later.' });
+      return sendError(res, 429, 'Too many failed attempts. Please try again later.');
     }
 
     // ── CAPTCHA check: require after 3 failed attempts ──
@@ -229,30 +230,30 @@ export const login = async (req, res) => {
     if (failCount >= 3) {
       const { captcha_token } = req.body;
       if (!captcha_token) {
-        return res.status(400).json({ error: 'CAPTCHA_REQUIRED', message: 'Please complete the security check.' });
+        return sendError(res, 400, 'Please complete the security check.') // Clients can check for status 400;
       }
       const captchaValid = await verifyCaptcha(captcha_token);
       if (!captchaValid) {
-        return res.status(400).json({ error: 'Invalid CAPTCHA. Please try again.' });
+        return sendError(res, 400, 'Invalid CAPTCHA. Please try again.');
       }
     }
 
     const result = await query('SELECT u.*, b.name as business_name FROM users u JOIN businesses b ON u.business_id = b.id WHERE u.email = $1', [email]);
-    if (result.rows.length === 0) { await recordLoginAttempt(email, ip, false); return res.status(401).json({ error: 'Invalid credentials' }); }
+    if (result.rows.length === 0) { await recordLoginAttempt(email, ip, false); return sendError(res, 401, 'Invalid credentials'); }
 
     const user = result.rows[0];
     if (!user.password) {
       await recordLoginAttempt(email, ip, false);
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return sendError(res, 401, 'Invalid credentials');
     }
     const valid = await verifyPassword(password, user.password);
     if (!valid) {
       await recordLoginAttempt(email, ip, false);
       if (await isLocked(email)) {
         reportAccountLockout(email, ip);
-        return res.status(429).json({ error: 'Account temporarily locked.' });
+        return sendError(res, 429, 'Account temporarily locked.');
       }
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return sendError(res, 401, 'Invalid credentials');
     }
 
     // ── IP whitelist check ──
@@ -260,7 +261,7 @@ export const login = async (req, res) => {
       const whitelistOk = await checkIpWhitelist(user.business_id, ip);
       if (!whitelistOk) {
         await recordLoginAttempt(email, ip, false);
-        return res.status(403).json({ error: 'Access denied from this IP address.' });
+        return sendError(res, 403, 'Access denied from this IP address.');
       }
     }
 
@@ -276,7 +277,7 @@ export const login = async (req, res) => {
       const tokenUser = await consumeTempToken(clientTempToken);
       if (!tokenUser || tokenUser.user_id !== user.id) {
         await recordLoginAttempt(email, ip, false);
-        return res.status(401).json({ error: 'Invalid verification code.' });
+        return sendError(res, 401, 'Invalid verification code.');
       }
 
       const totpValid = await totp.verify({ secret: user.totp_secret, token: totp_token });
@@ -289,12 +290,12 @@ export const login = async (req, res) => {
           );
           if (backup.rows.length === 0) {
             await recordLoginAttempt(email, ip, false);
-            return res.status(401).json({ error: 'Invalid verification code.' });
+            return sendError(res, 401, 'Invalid verification code.');
           }
           await query('UPDATE totp_backup_codes SET used = true WHERE id = $1', [backup.rows[0].id]);
         } else {
           await recordLoginAttempt(email, ip, false);
-          return res.status(401).json({ error: 'Invalid verification code.' });
+          return sendError(res, 401, 'Invalid verification code.');
         }
       }
     }
@@ -327,7 +328,7 @@ export const login = async (req, res) => {
     });
   } catch (err) {
     console.error('Login error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -338,11 +339,11 @@ export const me = async (req, res) => {
        FROM users u JOIN businesses b ON u.business_id = b.id WHERE u.id = $1`,
       [req.user.id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'User not found');
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Get user error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -356,7 +357,7 @@ export const logout = async (req, res) => {
     res.json({ message: 'Logged out successfully' });
   } catch (err) {
     console.error('Logout error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -364,9 +365,9 @@ export const forgotPassword = async (req, res) => {
   try {
     const { email, captcha_token } = req.body;
     if (CAPTCHA_SECRET) {
-      if (!captcha_token) return res.status(400).json({ error: 'CAPTCHA_REQUIRED', message: 'Please complete the security check.' });
+      if (!captcha_token) return sendError(res, 400, 'Please complete the security check.') // Clients can check for status 400;
       const captchaValid = await verifyCaptcha(captcha_token);
-      if (!captchaValid) return res.status(400).json({ error: 'Invalid CAPTCHA. Please try again.' });
+      if (!captchaValid) return sendError(res, 400, 'Invalid CAPTCHA. Please try again.');
     }
 
     if (!email || Joi.string().email().validate(email).error) {
@@ -383,14 +384,14 @@ export const forgotPassword = async (req, res) => {
     res.json({ message: 'If the email exists in our system, a password reset link will be sent.' });
   } catch (err) {
     console.error('Forgot password error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
 export const resetPassword = async (req, res) => {
   try {
     const { token, password } = req.body;
-    if (!token || !password) return res.status(400).json({ error: 'Token and new password are required' });
+    if (!token || !password) return sendError(res, 400, 'Token and new password are required');
 
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const result = await query(
@@ -398,13 +399,13 @@ export const resetPassword = async (req, res) => {
       [tokenHash]
     );
     const resetRecord = result.rows[0];
-    if (!resetRecord) return res.status(400).json({ error: 'Invalid or expired reset token' });
+    if (!resetRecord) return sendError(res, 400, 'Invalid or expired reset token');
 
     const userResult = await query('SELECT id FROM users WHERE email = $1', [resetRecord.email]);
-    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    if (userResult.rows.length === 0) return sendError(res, 404, 'User not found');
 
     const passwordValidation = Joi.string().min(10).pattern(/[a-z]/).pattern(/[A-Z]/).pattern(/[0-9]/).pattern(/[^a-zA-Z0-9]/).validate(password);
-    if (passwordValidation.error) return res.status(400).json({ error: 'Password must be at least 10 characters with uppercase, lowercase, number, and special character' });
+    if (passwordValidation.error) return sendError(res, 400, 'Password must be at least 10 characters with uppercase, lowercase, number, and special character');
 
     const hashedPassword = await hashPassword(password);
     const client = await pool.connect();
@@ -423,16 +424,16 @@ export const resetPassword = async (req, res) => {
     res.json({ message: 'Password reset successfully' });
   } catch (err) {
     console.error('Reset password error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
 export const sendOTP = async (req, res) => {
   try {
     const { email, phone, purpose } = req.body;
-    if (!email && !phone) return res.status(400).json({ error: 'Email or phone is required' });
+    if (!email && !phone) return sendError(res, 400, 'Email or phone is required');
     if (!purpose || !['login', 'password_reset'].includes(purpose)) {
-      return res.status(400).json({ error: 'Purpose must be "login" or "password_reset"' });
+      return sendError(res, 400, 'Purpose must be "login" or "password_reset"');
     }
 
     if (email) {
@@ -461,14 +462,14 @@ export const sendOTP = async (req, res) => {
     res.json({ message: 'OTP sent successfully', expires_in: 600 });
   } catch (err) {
     console.error('Send OTP error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
 export const verifyOTPLogin = async (req, res) => {
   try {
     const { email, phone, otp } = req.body;
-    if ((!email && !phone) || !otp) return res.status(400).json({ error: 'Email/phone and OTP are required' });
+    if ((!email && !phone) || !otp) return sendError(res, 400, 'Email/phone and OTP are required');
 
     const result = await query(
       `SELECT * FROM otp_codes WHERE (email = $1 OR phone = $1) AND otp = $2 AND purpose = 'login' AND used = false AND expires_at > NOW()`,
@@ -485,11 +486,11 @@ export const verifyOTPLogin = async (req, res) => {
         const newAttempts = (record.attempts || 0) + 1;
         if (newAttempts >= 3) {
           await query('UPDATE otp_codes SET used = true WHERE id = $1', [record.id]);
-          return res.status(429).json({ error: 'Too many attempts. Request a new OTP.' });
+          return sendError(res, 429, 'Too many attempts. Request a new OTP.');
         }
         await query('UPDATE otp_codes SET attempts = $1 WHERE id = $2', [newAttempts, record.id]);
       }
-      return res.status(401).json({ error: 'Invalid or expired OTP' });
+      return sendError(res, 401, 'Invalid or expired OTP');
     }
 
     const otpRecord = result.rows[0];
@@ -499,7 +500,7 @@ export const verifyOTPLogin = async (req, res) => {
       'SELECT u.*, b.name as business_name FROM users u JOIN businesses b ON u.business_id = b.id WHERE u.email = $1',
       [otpRecord.email]
     );
-    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    if (userResult.rows.length === 0) return sendError(res, 404, 'User not found');
 
     const user = userResult.rows[0];
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
@@ -522,14 +523,14 @@ export const verifyOTPLogin = async (req, res) => {
     });
   } catch (err) {
     console.error('Verify OTP login error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
 export const verifyOTPReset = async (req, res) => {
   try {
     const { email, phone, otp } = req.body;
-    if ((!email && !phone) || !otp) return res.status(400).json({ error: 'Email/phone and OTP are required' });
+    if ((!email && !phone) || !otp) return sendError(res, 400, 'Email/phone and OTP are required');
 
     const result = await query(
       `SELECT * FROM otp_codes WHERE (email = $1 OR phone = $1) AND otp = $2 AND purpose = 'password_reset' AND used = false AND expires_at > NOW()`,
@@ -546,11 +547,11 @@ export const verifyOTPReset = async (req, res) => {
         const newAttempts = (record.attempts || 0) + 1;
         if (newAttempts >= 3) {
           await query('UPDATE otp_codes SET used = true WHERE id = $1', [record.id]);
-          return res.status(429).json({ error: 'Too many attempts. Request a new OTP.' });
+          return sendError(res, 429, 'Too many attempts. Request a new OTP.');
         }
         await query('UPDATE otp_codes SET attempts = $1 WHERE id = $2', [newAttempts, record.id]);
       }
-      return res.status(401).json({ error: 'Invalid or expired OTP' });
+      return sendError(res, 401, 'Invalid or expired OTP');
     }
 
     const otpRecord = result.rows[0];
@@ -564,7 +565,7 @@ export const verifyOTPReset = async (req, res) => {
     res.json({ message: 'OTP verified', reset_token: resetToken, email: otpRecord.email });
   } catch (err) {
     console.error('Verify OTP reset error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -572,14 +573,14 @@ export const verifyOTPReset = async (req, res) => {
 export const verifyEmail = async (req, res) => {
   try {
     const { token } = req.body;
-    if (!token) return res.status(400).json({ error: 'Verification token is required' });
+    if (!token) return sendError(res, 400, 'Verification token is required');
 
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const result = await query(
       `SELECT * FROM verification_tokens WHERE token = $1 AND type = 'email_verification' AND used = false AND expires_at > NOW()`,
       [tokenHash]
     );
-    if (result.rows.length === 0) return res.status(400).json({ error: 'Invalid or expired verification token' });
+    if (result.rows.length === 0) return sendError(res, 400, 'Invalid or expired verification token');
 
     const record = result.rows[0];
     await query('UPDATE verification_tokens SET used = true WHERE id = $1', [record.id]);
@@ -588,14 +589,14 @@ export const verifyEmail = async (req, res) => {
     res.json({ message: 'Email verified successfully' });
   } catch (err) {
     console.error('Verify email error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
 export const resendVerification = async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email is required' });
+    if (!email) return sendError(res, 400, 'Email is required');
 
     const userResult = await query('SELECT id, email_verified FROM users WHERE email = $1', [email]);
     if (userResult.rows.length === 0) return res.json({ message: 'If the account exists, a verification email will be sent.' });
@@ -616,7 +617,7 @@ export const resendVerification = async (req, res) => {
     res.json({ message: 'Verification email sent' });
   } catch (err) {
     console.error('Resend verification error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -644,44 +645,44 @@ export const setupTOTP = async (req, res) => {
     res.json({ secret, qr_code: qrCode, backup_codes: codes });
   } catch (err) {
     console.error('TOTP setup error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
 export const verifyTOTPSetup = async (req, res) => {
   try {
     const { token } = req.body;
-    if (!token) return res.status(400).json({ error: 'Verification code is required' });
+    if (!token) return sendError(res, 400, 'Verification code is required');
 
     const user = await query('SELECT totp_secret FROM users WHERE id = $1', [req.user.id]);
-    if (!user.rows[0]?.totp_secret) return res.status(400).json({ error: 'TOTP not set up yet' });
+    if (!user.rows[0]?.totp_secret) return sendError(res, 400, 'TOTP not set up yet');
 
     const valid = await totp.verify({ secret: user.rows[0].totp_secret, token });
-    if (!valid) return res.status(400).json({ error: 'Invalid verification code' });
+    if (!valid) return sendError(res, 400, 'Invalid verification code');
 
     await query('UPDATE users SET totp_enabled = true WHERE id = $1', [req.user.id]);
     res.json({ message: 'Two-factor authentication enabled.' });
   } catch (err) {
     console.error('TOTP verify error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
 export const disableTOTP = async (req, res) => {
   try {
     const { password } = req.body;
-    if (!password) return res.status(400).json({ error: 'Password is required to disable 2FA' });
+    if (!password) return sendError(res, 400, 'Password is required to disable 2FA');
 
     const user = await query('SELECT password FROM users WHERE id = $1', [req.user.id]);
     const valid = await verifyPassword(password, user.rows[0].password);
-    if (!valid) return res.status(401).json({ error: 'Invalid password' });
+    if (!valid) return sendError(res, 401, 'Invalid password');
 
     await query('UPDATE users SET totp_secret = NULL, totp_enabled = false WHERE id = $1', [req.user.id]);
     await query('DELETE FROM totp_backup_codes WHERE user_id = $1', [req.user.id]);
     res.json({ message: 'Two-factor authentication disabled.' });
   } catch (err) {
     console.error('TOTP disable error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -695,7 +696,7 @@ export const getDevices = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get devices error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -706,7 +707,7 @@ export const revokeDevice = async (req, res) => {
     res.json({ message: 'Device revoked' });
   } catch (err) {
     console.error('Revoke device error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -720,14 +721,14 @@ export const getIpWhitelist = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get IP whitelist error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
 export const addIpWhitelist = async (req, res) => {
   try {
     const { ip_address, label } = req.body;
-    if (!ip_address) return res.status(400).json({ error: 'IP address is required' });
+    if (!ip_address) return sendError(res, 400, 'IP address is required');
 
     const result = await query(
       'INSERT INTO ip_whitelist (business_id, ip_address, label, created_by) VALUES ($1, $2, $3, $4) ON CONFLICT (business_id, ip_address) DO UPDATE SET label = $3, is_active = true RETURNING id, ip_address, label',
@@ -736,7 +737,7 @@ export const addIpWhitelist = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Add IP whitelist error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -747,14 +748,14 @@ export const removeIpWhitelist = async (req, res) => {
     res.json({ message: 'IP removed from whitelist' });
   } catch (err) {
     console.error('Remove IP whitelist error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
 export const refreshToken = async (req, res) => {
   try {
     const refreshToken = req.cookies?.refreshToken;
-    if (!refreshToken) return res.status(401).json({ error: 'No refresh token provided' });
+    if (!refreshToken) return sendError(res, 401, 'No refresh token provided');
 
     const result = await query(
       `SELECT rt.*, u.id as user_id, u.name, u.email, u.role, u.business_id, b.name as business_name
@@ -763,7 +764,7 @@ export const refreshToken = async (req, res) => {
       [refreshToken]
     );
 
-    if (result.rows.length === 0) { res.clearCookie('refreshToken', { path: '/api/auth' }); return res.status(401).json({ error: 'Invalid or expired refresh token' }); }
+    if (result.rows.length === 0) { res.clearCookie('refreshToken', { path: '/api/auth' }); return sendError(res, 401, 'Invalid or expired refresh token'); }
 
     const oldTokenRecord = result.rows[0];
 
@@ -779,7 +780,7 @@ export const refreshToken = async (req, res) => {
     res.json({ token: accessToken });
   } catch (err) {
     console.error('Refresh token error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 

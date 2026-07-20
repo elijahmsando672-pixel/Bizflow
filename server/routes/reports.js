@@ -1,5 +1,6 @@
 import express from 'express';
 import { query } from '../config/db.js';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -60,7 +61,7 @@ router.get('/profit-loss', async (req, res) => {
     });
   } catch (err) {
     console.error('P&L report error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -110,7 +111,7 @@ router.get('/sales-report', async (req, res) => {
     });
   } catch (err) {
     console.error('Sales report error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -149,7 +150,7 @@ router.get('/inventory-report', async (req, res) => {
     });
   } catch (err) {
     console.error('Inventory report error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -202,7 +203,7 @@ router.get('/cashflow-report', async (req, res) => {
     });
   } catch (err) {
     console.error('Cashflow report error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -239,7 +240,7 @@ router.get('/tax-summary', async (req, res) => {
     });
   } catch (err) {
     console.error('Tax summary error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 

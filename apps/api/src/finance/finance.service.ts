@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { CreateTransactionDto, UpdateTransactionDto, TransactionFiltersDto } from './dto';
 
@@ -68,6 +68,22 @@ export class FinanceService {
   }
 
   async createTransaction(businessId: string, dto: CreateTransactionDto) {
+    if (dto.items && dto.items.length > 0) {
+      for (const item of dto.items) {
+        const product = await this.prisma.product.findFirst({
+          where: { id: item.productId, businessId },
+        });
+        if (!product) {
+          throw new NotFoundException(`Product ${item.productId} not found`);
+        }
+        if (dto.type === 'INCOME' && product.stock < item.quantity) {
+          throw new BadRequestException(
+            `Insufficient stock for ${product.name}: ${product.stock} available, ${item.quantity} requested`,
+          );
+        }
+      }
+    }
+
     const data: any = {
       type: dto.type,
       amount: dto.amount,
@@ -88,9 +104,24 @@ export class FinanceService {
           total: item.quantity * item.unitPrice,
         })),
       };
+
+      if (dto.type === 'INCOME') {
+        for (const item of dto.items) {
+          await this.prisma.product.update({
+            where: { id: item.productId },
+            data: { stock: { decrement: item.quantity } },
+          });
+        }
+      }
     }
 
-    return this.prisma.transaction.create({ data });
+    return this.prisma.transaction.create({
+      data,
+      include: {
+        customer: true,
+        items: { include: { product: true } },
+      },
+    });
   }
 
   async updateTransaction(businessId: string, id: string, dto: UpdateTransactionDto) {
@@ -106,7 +137,17 @@ export class FinanceService {
   }
 
   async deleteTransaction(businessId: string, id: string) {
-    await this.getTransaction(businessId, id);
+    const tx = await this.getTransaction(businessId, id);
+
+    if (tx.type === 'INCOME' && tx.items?.length > 0) {
+      for (const item of tx.items) {
+        await this.prisma.product.update({
+          where: { id: item.productId! },
+          data: { stock: { increment: item.quantity } },
+        });
+      }
+    }
+
     return this.prisma.transaction.delete({ where: { id } });
   }
 
@@ -158,5 +199,37 @@ export class FinanceService {
     });
 
     return transactions.map((t) => t.category).filter(Boolean);
+  }
+
+  async getReceipt(businessId: string, id: string) {
+    const tx = await this.getTransaction(businessId, id);
+
+    const business = await this.prisma.business.findUnique({
+      where: { id: businessId },
+    });
+
+    return {
+      receipt: {
+        id: tx.id,
+        number: tx.reference || `RCP-${tx.id.slice(0, 8).toUpperCase()}`,
+        date: tx.date,
+        type: tx.type,
+        description: tx.description,
+      },
+      business: business
+        ? { name: business.name, currency: business.currency }
+        : null,
+      customer: tx.customer,
+      items: tx.items?.map((i) => ({
+        product: i.product?.name ?? 'Unknown',
+        quantity: i.quantity,
+        unitPrice: Number(i.unitPrice),
+        total: Number(i.total),
+      })),
+      summary: {
+        subtotal: Number(tx.amount),
+        total: Number(tx.amount),
+      },
+    };
   }
 }

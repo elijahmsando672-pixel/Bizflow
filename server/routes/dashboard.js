@@ -1,5 +1,6 @@
 import express from 'express';
 import { query } from '../config/db.js';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -86,7 +87,7 @@ router.get('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Dashboard error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -125,7 +126,7 @@ router.get('/revenue-chart', async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('Revenue chart error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -143,7 +144,7 @@ router.get('/expenses-chart', async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('Expenses chart error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -171,7 +172,7 @@ router.get('/profit-summary', async (req, res) => {
     });
   } catch (error) {
     console.error('Profit summary error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -191,7 +192,7 @@ router.get('/low-stock', async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('Low stock error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -220,7 +221,7 @@ router.get('/top-products', async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('Top products error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -247,7 +248,7 @@ router.get('/frequent-customers', async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('Frequent customers error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -276,7 +277,7 @@ router.get('/restock-budget', async (req, res) => {
     });
   } catch (error) {
     console.error('Restock budget error:', error);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -320,7 +321,7 @@ router.post('/restock-budget', async (req, res) => {
     res.status(201).json({ message: 'Restock budget created', purchaseOrder: po.rows[0], total });
   } catch (error) {
     console.error('Create restock budget error:', error);
-    res.status(500).json({ error: 'Failed to create restock budget' });
+    sendError(res, 500, 'Failed to create restock budget');
   }
 });
 

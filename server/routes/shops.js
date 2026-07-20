@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../config/db.js';
 import sanitizeHtml from 'sanitize-html';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ router.get('/', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get shops error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -27,18 +28,18 @@ router.get('/:id', async (req, res) => {
       'SELECT * FROM shops WHERE id = $1 AND business_id = $2',
       [req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Shop not found');
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Get shop error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
 router.post('/', async (req, res) => {
   try {
     const { name, location, phone, email, manager_name, opening_time, closing_time } = req.body;
-    if (!name) return res.status(400).json({ error: 'Shop name is required' });
+    if (!name) return sendError(res, 400, 'Shop name is required');
 
     const result = await query(
       `INSERT INTO shops (business_id, name, location, phone, email, manager_name, opening_time, closing_time)
@@ -49,7 +50,7 @@ router.post('/', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('Create shop error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -72,11 +73,11 @@ router.put('/:id', async (req, res) => {
        status, sanitize(manager_name), opening_time, closing_time,
        req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Shop not found');
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Update shop error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -86,11 +87,11 @@ router.delete('/:id', async (req, res) => {
       'DELETE FROM shops WHERE id = $1 AND business_id = $2 RETURNING id',
       [req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Shop not found');
     res.json({ message: 'Shop deleted' });
   } catch (err) {
     console.error('Delete shop error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 

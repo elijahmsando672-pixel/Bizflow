@@ -6,6 +6,7 @@ import { fetchFrequentCustomers, formatCurrency } from "@/lib/data";
 import {
   PageHeader, StatCard, Card, SearchBar, Table, Btn, Avatar, Badge, Modal, InputField
 } from "@/components/ui/dashboard-ui";
+import { useToast } from "@/components/ui/toast";
 import { Users as UsersIcon, Plus, RefreshCw, Loader2 } from "lucide-react";
 
 interface Customer {
@@ -20,6 +21,7 @@ interface Customer {
 }
 
 export default function CustomersPage() {
+  const toast = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -45,7 +47,7 @@ export default function CustomersPage() {
       setModal(false); setEditItem(null);
       setForm({ name: "", email: "", phone: "", address: "" });
       load();
-    } catch { alert("Failed to save customer"); }
+    } catch { toast.error("Failed to save customer"); }
   };
 
   const filtered = customers.filter((c) =>

@@ -1,6 +1,7 @@
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import sanitizeHtml from 'sanitize-html';
+import { sendError } from '../utils/sendError.js';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -88,19 +89,22 @@ export const userRateLimiter = (maxRequests = 60, windowMs = 15 * 60 * 1000) => 
     }
     record.count++;
     if (record.count > maxRequests) {
-      return res.status(429).json({ error: 'Too many requests, please slow down.' });
+      return sendError(res, 429, 'Too many requests, please slow down.');
     }
     next();
   };
 };
 
 // Clean up stale entries every 10 minutes
-setInterval(() => {
+const rateLimitCleanupInterval = setInterval(() => {
   const now = Date.now();
   for (const [key, record] of userRateStore.entries()) {
     if (now - record.windowStart > 15 * 60 * 1000) userRateStore.delete(key);
   }
 }, 10 * 60 * 1000);
+
+// Allow the interval to be cleared on shutdown
+export const stopRateLimitCleanup = () => clearInterval(rateLimitCleanupInterval);
 
 // Strips ASCII control chars from input strings — data quality, NOT a security control.
 // SQL injection is prevented by parameterized queries; XSS by output encoding.
@@ -152,7 +156,7 @@ export const xssPrevent = (req, res, next) => {
   };
 
   if (req.body && typeof req.body === 'object' && checkValue(req.body)) {
-    return res.status(400).json({ error: 'Invalid input detected' });
+    return sendError(res, 400, 'Invalid input detected');
   }
   next();
 };

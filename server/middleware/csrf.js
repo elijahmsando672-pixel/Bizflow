@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { sendError } from '../utils/sendError.js';
 
 const CSRF_TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
 const CSRF_COOKIE_NAME = 'csrf_token';
@@ -71,9 +72,7 @@ export const validateCsrf = (req, res, next) => {
   const headerToken = req.headers['x-csrf-token'];
   
   if (!cookieToken || !headerToken) {
-    return res.status(403).json({ 
-      error: 'CSRF protection: Token required' 
-    });
+    return sendError(res, 403, 'CSRF protection: Token required');
   }
   
   try {
@@ -81,18 +80,18 @@ export const validateCsrf = (req, res, next) => {
     const headerBuf = Buffer.from(headerToken, 'hex');
     
     if (tokenBuf.length !== headerBuf.length) {
-      return res.status(403).json({ error: 'CSRF protection: Invalid token' });
+      return sendError(res, 403, 'CSRF protection: Invalid token');
     }
     
     if (!crypto.timingSafeEqual(tokenBuf, headerBuf)) {
-      return res.status(403).json({ error: 'CSRF protection: Token mismatch' });
+      return sendError(res, 403, 'CSRF protection: Token mismatch');
     }
 
     if (!req.cookies?.csrf_expiry || Date.now() > parseInt(req.cookies.csrf_expiry)) {
-      return res.status(403).json({ error: 'CSRF protection: Token expired' });
+      return sendError(res, 403, 'CSRF protection: Token expired');
     }
   } catch (err) {
-    return res.status(400).json({ error: 'CSRF protection: Invalid token format' });
+    return sendError(res, 400, 'CSRF protection: Invalid token format');
   }
   
   next();

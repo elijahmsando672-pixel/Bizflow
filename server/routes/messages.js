@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../config/db.js';
 import sanitizeHtml from 'sanitize-html';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ router.get('/', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get messages error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -27,18 +28,18 @@ router.get('/:id', async (req, res) => {
       'SELECT * FROM messages WHERE id = $1 AND business_id = $2',
       [req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Message not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Message not found');
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Get message error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
 router.post('/', async (req, res) => {
   try {
     const { sender_name, sender_email, subject, body } = req.body;
-    if (!sender_name || !sender_email || !subject) return res.status(400).json({ error: 'Sender name, email and subject are required' });
+    if (!sender_name || !sender_email || !subject) return sendError(res, 400, 'Sender name, email and subject are required');
 
     const result = await query(
       `INSERT INTO messages (business_id, sender_name, sender_email, subject, body)
@@ -48,7 +49,7 @@ router.post('/', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('Create message error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -65,11 +66,11 @@ router.put('/:id', async (req, res) => {
        WHERE id = $6 AND business_id = $7 RETURNING *`,
       [sanitize(sender_name), sanitize(sender_email), sanitize(subject), sanitize(body), is_read, req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Message not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Message not found');
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Update message error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -79,11 +80,11 @@ router.patch('/:id/read', async (req, res) => {
       `UPDATE messages SET is_read = true WHERE id = $1 AND business_id = $2 RETURNING *`,
       [req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Message not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Message not found');
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Mark message read error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -93,11 +94,11 @@ router.delete('/:id', async (req, res) => {
       'DELETE FROM messages WHERE id = $1 AND business_id = $2 RETURNING id',
       [req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Message not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Message not found');
     res.json({ message: 'Message deleted' });
   } catch (err) {
     console.error('Delete message error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 

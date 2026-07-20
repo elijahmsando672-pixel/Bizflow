@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/data";
 import {
   PageHeader, StatCard, Card, SearchBar, Table, Btn, Modal, InputField
 } from "@/components/ui/dashboard-ui";
+import { useToast } from "@/components/ui/toast";
 import { Package, DollarSign, Plus, RefreshCw, Loader2 } from "lucide-react";
 import type { Product as SaleProduct } from "@/types/sales";
 
@@ -19,6 +20,7 @@ interface ProductItem extends SaleProduct {
 }
 
 export default function ProductsPage() {
+  const toast = useToast();
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -45,7 +47,7 @@ export default function ProductsPage() {
       setModal(false); setEditItem(null);
       setForm({ name: "", sku: "", price: "", quantity: "", description: "" });
       load();
-    } catch { alert("Failed to save product"); }
+    } catch { toast.error("Failed to save product"); }
   };
 
   const filtered = products.filter((p) =>

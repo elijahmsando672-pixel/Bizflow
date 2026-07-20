@@ -1,5 +1,6 @@
 import express from 'express';
 import { query, pool } from '../config/db.js';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ router.post('/vendors', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Create vendor error:', error);
-    res.status(500).json({ error: 'Failed to create vendor' });
+    sendError(res, 500, 'Failed to create vendor');
   }
 });
 
@@ -40,17 +41,17 @@ router.get('/vendors', async (req, res) => {
     );
     res.json(result.rows);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch vendors' });
+    sendError(res, 500, 'Failed to fetch vendors');
   }
 });
 
 router.get('/vendors/:id', async (req, res) => {
   try {
     const result = await query(`SELECT * FROM vendors WHERE id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
-    if (!result.rows.length) return res.status(404).json({ error: 'Vendor not found' });
+    if (!result.rows.length) return sendError(res, 404, 'Vendor not found');
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch vendor' });
+    sendError(res, 500, 'Failed to fetch vendor');
   }
 });
 
@@ -64,20 +65,20 @@ router.put('/vendors/:id', async (req, res) => {
        WHERE id=$1 AND business_id=$10 RETURNING *`,
       [req.params.id, name, email, phone, address, contact_person, payment_terms, rating, notes, req.business_id]
     );
-    if (!result.rows.length) return res.status(404).json({ error: 'Vendor not found' });
+    if (!result.rows.length) return sendError(res, 404, 'Vendor not found');
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update vendor' });
+    sendError(res, 500, 'Failed to update vendor');
   }
 });
 
 router.delete('/vendors/:id', async (req, res) => {
   try {
     const result = await query(`DELETE FROM vendors WHERE id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
-    if (!result.rowCount) return res.status(404).json({ error: 'Vendor not found' });
+    if (!result.rowCount) return sendError(res, 404, 'Vendor not found');
     res.json({ message: 'Vendor deleted' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete vendor' });
+    sendError(res, 500, 'Failed to delete vendor');
   }
 });
 
@@ -124,7 +125,7 @@ router.post('/purchase-orders', async (req, res) => {
     res.status(201).json({ ...fullResult.rows[0], items: poItems.rows });
   } catch (error) {
     console.error('Create PO error:', error);
-    res.status(500).json({ error: 'Failed to create purchase order' });
+    sendError(res, 500, 'Failed to create purchase order');
   }
 });
 
@@ -147,7 +148,7 @@ router.get('/purchase-orders', async (req, res) => {
     );
     res.json(result.rows);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch purchase orders' });
+    sendError(res, 500, 'Failed to fetch purchase orders');
   }
 });
 
@@ -158,12 +159,12 @@ router.get('/purchase-orders/:id', async (req, res) => {
        WHERE po.id = $1 AND po.business_id = $2`,
       [req.params.id, req.business_id]
     );
-    if (!poResult.rows.length) return res.status(404).json({ error: 'Purchase order not found' });
+    if (!poResult.rows.length) return sendError(res, 404, 'Purchase order not found');
 
     const itemsResult = await query(`SELECT * FROM po_items WHERE po_id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
     res.json({ ...poResult.rows[0], items: itemsResult.rows });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch purchase order' });
+    sendError(res, 500, 'Failed to fetch purchase order');
   }
 });
 
@@ -175,10 +176,10 @@ router.put('/purchase-orders/:id', async (req, res) => {
        notes=COALESCE($4,notes), updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND business_id=$5 RETURNING *`,
       [req.params.id, status, expected_delivery, notes, req.business_id]
     );
-    if (!result.rows.length) return res.status(404).json({ error: 'Purchase order not found' });
+    if (!result.rows.length) return sendError(res, 404, 'Purchase order not found');
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update purchase order' });
+    sendError(res, 500, 'Failed to update purchase order');
   }
 });
 
@@ -186,10 +187,10 @@ router.delete('/purchase-orders/:id', async (req, res) => {
   try {
     await query(`DELETE FROM po_items WHERE po_id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
     const result = await query(`DELETE FROM purchase_orders WHERE id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
-    if (!result.rowCount) return res.status(404).json({ error: 'Purchase order not found' });
+    if (!result.rowCount) return sendError(res, 404, 'Purchase order not found');
     res.json({ message: 'Purchase order deleted' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete purchase order' });
+    sendError(res, 500, 'Failed to delete purchase order');
   }
 });
 

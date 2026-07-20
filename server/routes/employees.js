@@ -1,6 +1,7 @@
 import express from 'express';
 import { query, pool } from '../config/db.js';
 import Joi from 'joi';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -39,7 +40,7 @@ router.get('/', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get employees error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -60,7 +61,7 @@ router.get('/attendance', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get attendance list error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -83,7 +84,7 @@ router.get('/payroll', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get payroll list error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -98,7 +99,7 @@ router.post('/payroll', async (req, res) => {
       'SELECT id FROM employees WHERE id = $1 AND business_id = $2',
       [employee_id, req.business_id]
     );
-    if (employeeResult.rows.length === 0) return res.status(404).json({ error: 'Employee not found' });
+    if (employeeResult.rows.length === 0) return sendError(res, 404, 'Employee not found');
 
     const net_salary = gross_salary + bonuses + overtime_pay - deductions - tax_amount;
 
@@ -133,7 +134,7 @@ router.post('/payroll', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Create payroll error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   } finally {
     client.release();
   }
@@ -147,7 +148,7 @@ router.put('/payroll/:id', async (req, res) => {
       'SELECT * FROM payroll WHERE id = $1 AND business_id = $2',
       [req.params.id, req.business_id]
     );
-    if (existing.rows.length === 0) return res.status(404).json({ error: 'Payroll not found' });
+    if (existing.rows.length === 0) return sendError(res, 404, 'Payroll not found');
 
     const payroll = existing.rows[0];
     const newStatus = status || payroll.status;
@@ -169,7 +170,7 @@ router.put('/payroll/:id', async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Update payroll error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -179,18 +180,18 @@ router.get('/:id', async (req, res) => {
       'SELECT * FROM employees WHERE id = $1 AND business_id = $2',
       [req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Employee not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Employee not found');
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Get employee error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
 router.post('/', async (req, res) => {
   try {
     const { error, value } = employeeSchema.validate(req.body);
-    if (error) return res.status(400).json({ error: error.details[0].message });
+    if (error) return sendError(res, 400, error.details[0].message);
 
     const {
       first_name, last_name, email, phone, position, department, hire_date,
@@ -210,14 +211,14 @@ router.post('/', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('Create employee error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
 router.put('/:id', async (req, res) => {
   try {
     const { error, value } = employeeSchema.validate(req.body);
-    if (error) return res.status(400).json({ error: error.details[0].message });
+    if (error) return sendError(res, 400, error.details[0].message);
 
     const {
       first_name, last_name, email, phone, position, department, hire_date,
@@ -235,11 +236,11 @@ router.put('/:id', async (req, res) => {
        status, salary, salary_type, bank_name, bank_account, id_number, address,
        emergency_contact_name, emergency_contact_phone, notes, req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Employee not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Employee not found');
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Update employee error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -249,11 +250,11 @@ router.delete('/:id', async (req, res) => {
       'DELETE FROM employees WHERE id = $1 AND business_id = $2 RETURNING id',
       [req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Not found');
     res.json({ message: 'Employee deleted' });
   } catch (err) {
     console.error('Delete employee error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -271,7 +272,7 @@ router.get('/:id/attendance', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get attendance error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -284,7 +285,7 @@ router.post('/:id/clock-in', async (req, res) => {
     );
 
     if (existing.rows.length > 0) {
-      return res.status(400).json({ error: 'Already clocked in today' });
+      return sendError(res, 400, 'Already clocked in today');
     }
 
     const result = await query(
@@ -295,7 +296,7 @@ router.post('/:id/clock-in', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('Clock in error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -306,11 +307,11 @@ router.post('/:id/clock-out', async (req, res) => {
       `UPDATE attendance SET clock_out = NOW() WHERE employee_id = $1 AND date = $2 AND business_id = $3 RETURNING *`,
       [req.params.id, today, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'No clock-in found for today' });
+    if (result.rows.length === 0) return sendError(res, 404, 'No clock-in found for today');
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Clock out error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -323,7 +324,7 @@ router.get('/:id/payroll', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get payroll error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 

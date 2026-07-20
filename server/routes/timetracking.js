@@ -1,5 +1,6 @@
 import express from 'express';
 import { query } from '../config/db.js';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -14,7 +15,7 @@ router.post('/', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Create time entry error:', error);
-    res.status(500).json({ error: 'Failed to create time entry' });
+    sendError(res, 500, 'Failed to create time entry');
   }
 });
 
@@ -44,7 +45,7 @@ router.get('/', async (req, res) => {
     );
     res.json(result.rows);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch time entries' });
+    sendError(res, 500, 'Failed to fetch time entries');
   }
 });
 
@@ -90,7 +91,7 @@ router.get('/summary', async (req, res) => {
 
     res.json({ summary: summary.rows[0], by_project: byProject.rows, by_user: byUser.rows });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch summary' });
+    sendError(res, 500, 'Failed to fetch summary');
   }
 });
 
@@ -104,20 +105,20 @@ router.put('/:id', async (req, res) => {
        WHERE id=$1 AND business_id=$8 RETURNING *`,
       [req.params.id, description, duration_minutes, is_billable, billed_amount, start_time, end_time, req.business_id]
     );
-    if (!result.rows.length) return res.status(404).json({ error: 'Time entry not found' });
+    if (!result.rows.length) return sendError(res, 404, 'Time entry not found');
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update time entry' });
+    sendError(res, 500, 'Failed to update time entry');
   }
 });
 
 router.delete('/:id', async (req, res) => {
   try {
     const result = await query(`DELETE FROM time_entries WHERE id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
-    if (!result.rowCount) return res.status(404).json({ error: 'Time entry not found' });
+    if (!result.rowCount) return sendError(res, 404, 'Time entry not found');
     res.json({ message: 'Time entry deleted' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete time entry' });
+    sendError(res, 500, 'Failed to delete time entry');
   }
 });
 

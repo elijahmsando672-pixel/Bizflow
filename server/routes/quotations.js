@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../config/db.js';
 import sanitizeHtml from 'sanitize-html';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -27,7 +28,7 @@ router.get('/', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get quotations error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -37,18 +38,18 @@ router.get('/:id', async (req, res) => {
       'SELECT * FROM quotations WHERE id = $1 AND business_id = $2',
       [req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Quotation not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Quotation not found');
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Get quotation error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
 router.post('/', async (req, res) => {
   try {
     const { customer_id, customer_name, status, subtotal, tax_amount, discount_amount, total, valid_until, notes } = req.body;
-    if (!customer_name) return res.status(400).json({ error: 'Customer name is required' });
+    if (!customer_name) return sendError(res, 400, 'Customer name is required');
 
     const quotationNumber = await generateQuotationNumber(req.business_id);
 
@@ -60,7 +61,7 @@ router.post('/', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('Create quotation error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -82,11 +83,11 @@ router.put('/:id', async (req, res) => {
        WHERE id = $10 AND business_id = $11 RETURNING *`,
       [customer_id, sanitize(customer_name), status, subtotal, tax_amount, discount_amount, total, valid_until, sanitize(notes), req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Quotation not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Quotation not found');
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Update quotation error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -96,11 +97,11 @@ router.delete('/:id', async (req, res) => {
       'DELETE FROM quotations WHERE id = $1 AND business_id = $2 RETURNING id',
       [req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Quotation not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Quotation not found');
     res.json({ message: 'Quotation deleted' });
   } catch (err) {
     console.error('Delete quotation error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 

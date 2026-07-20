@@ -1,5 +1,6 @@
 import express from 'express';
 import { query } from '../config/db.js';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ router.get('/roles', async (req, res) => {
     res.json([...defaultRoles, ...roles]);
   } catch (error) {
     console.error('Fetch roles error:', error);
-    res.status(500).json({ error: 'Failed to fetch roles' });
+    sendError(res, 500, 'Failed to fetch roles');
   }
 });
 
@@ -53,7 +54,7 @@ router.get('/permissions', async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('Fetch permissions error:', error);
-    res.status(500).json({ error: 'Failed to fetch permissions' });
+    sendError(res, 500, 'Failed to fetch permissions');
   }
 });
 
@@ -64,11 +65,11 @@ router.put('/permissions/:id', async (req, res) => {
       `UPDATE permissions SET can_create=$2, can_read=$3, can_update=$4, can_delete=$5 WHERE id=$1 AND business_id=$6 RETURNING *`,
       [req.params.id, can_create, can_read, can_update, can_delete, req.business_id]
     );
-    if (!result.rows.length) return res.status(404).json({ error: 'Permission not found' });
+    if (!result.rows.length) return sendError(res, 404, 'Permission not found');
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Update permission error:', error);
-    res.status(500).json({ error: 'Failed to update permission' });
+    sendError(res, 500, 'Failed to update permission');
   }
 });
 
@@ -86,14 +87,14 @@ router.post('/permissions/bulk', async (req, res) => {
     res.json({ message: 'Permissions updated' });
   } catch (error) {
     console.error('Bulk update permissions error:', error);
-    res.status(500).json({ error: 'Failed to update permissions' });
+    sendError(res, 500, 'Failed to update permissions');
   }
 });
 
 router.get('/check', async (req, res) => {
   try {
     const { role, resource } = req.query;
-    if (!role || !resource) return res.status(400).json({ error: 'role and resource required' });
+    if (!role || !resource) return sendError(res, 400, 'role and resource required');
     const result = await query(
       `SELECT * FROM permissions WHERE business_id = $1 AND role_name = $2 AND resource = $3`,
       [req.business_id, role, resource]
@@ -102,7 +103,7 @@ router.get('/check', async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Check permissions error:', error);
-    res.status(500).json({ error: 'Failed to check permissions' });
+    sendError(res, 500, 'Failed to check permissions');
   }
 });
 

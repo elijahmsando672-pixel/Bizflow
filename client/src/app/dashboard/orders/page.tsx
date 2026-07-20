@@ -6,9 +6,11 @@ import { formatCurrency } from "@/lib/data";
 import {
   PageHeader, StatCard, Card, SearchBar, Select, Table, Btn, Badge, Modal, InputField
 } from "@/components/ui/dashboard-ui";
+import { useToast } from "@/components/ui/toast";
 import { FileText, ShoppingCart, Clock, Plus, RefreshCw, User, DollarSign, Loader2 } from "lucide-react";
 
 export default function OrdersPage() {
+  const toast = useToast();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -33,7 +35,7 @@ export default function OrdersPage() {
       setModal(false);
       setForm({ customer_name: "", total: "", status: "pending", sale_date: new Date().toISOString().split("T")[0] });
       load();
-    } catch { alert("Failed to create order"); }
+    } catch { toast.error("Failed to create order"); }
   };
 
   const filtered = orders.filter((o: any) =>

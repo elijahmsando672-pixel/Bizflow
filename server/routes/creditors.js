@@ -1,6 +1,7 @@
 import express from 'express';
 import Joi from 'joi';
 import { query, pool } from '../config/db.js';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -22,7 +23,7 @@ const creditorPaymentSchema = Joi.object({
 
 const validate = (schema) => (req, res, next) => {
   const { error, value } = schema.validate(req.body, { abortEarly: false, stripUnknown: true });
-  if (error) return res.status(400).json({ error: error.details.map(d => d.message).join(', ') });
+  if (error) return sendError(res, 400, error.details.map(d => d.message).join(', '));
   req.body = value;
   next();
 };
@@ -38,7 +39,7 @@ router.get('/', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get creditors error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -54,7 +55,7 @@ router.post('/', validate(creditorSchema), async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('Create creditor error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -66,11 +67,11 @@ router.put('/:id', validate(creditorSchema), async (req, res) => {
        WHERE id=$7 AND business_id=$8 RETURNING *`,
       [name, email, phone, address, opening_balance, notes, req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Not found');
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Update creditor error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -80,11 +81,11 @@ router.delete('/:id', async (req, res) => {
       'DELETE FROM creditors WHERE id = $1 AND business_id = $2 RETURNING id',
       [req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Not found');
     res.json({ message: 'Deleted' });
   } catch (err) {
     console.error('Delete creditor error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -111,7 +112,7 @@ router.post('/:id/payments', validate(creditorPaymentSchema), async (req, res) =
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Record creditor payment error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   } finally {
     client.release();
   }

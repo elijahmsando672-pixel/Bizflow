@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { query } from '../config/db.js';
 import { cacheGet, cacheSet } from '../utils/cache.js';
+import { sendError } from '../utils/sendError.js';
 
 const hashKey = (key) => crypto.createHash('sha256').update(key).digest('hex');
 
@@ -23,20 +24,20 @@ export const authenticateApiKey = async (req, res, next) => {
         [keyHash]
       );
       if (result.rows.length === 0) {
-        return res.status(401).json({ success: false, message: 'Invalid API key', code: 401 });
+        return sendError(res, 401, 'Invalid API key');
       }
       keyData = result.rows[0];
       cacheSet(cacheKey, keyData, 300000);
     }
 
     if (keyData.business_status === 'suspended') {
-      return res.status(403).json({ success: false, message: 'Business account is suspended', code: 403 });
+      return sendError(res, 403, 'Business account is suspended');
     }
 
     const ip = req.ip || req.socket?.remoteAddress;
     if (keyData.ip_whitelist && keyData.ip_whitelist.length > 0) {
       if (!keyData.ip_whitelist.includes(ip)) {
-        return res.status(403).json({ success: false, message: 'IP not whitelisted for this API key', code: 403 });
+        return sendError(res, 403, 'IP not whitelisted for this API key');
       }
     }
 
@@ -48,7 +49,7 @@ export const authenticateApiKey = async (req, res, next) => {
     next();
   } catch (err) {
     console.error('API key auth error:', err);
-    return res.status(500).json({ success: false, message: 'Authentication error', code: 500 });
+    return sendError(res, 500, 'Authentication error');
   }
 };
 
@@ -57,7 +58,7 @@ export const requireApiKeyScope = (scope) => {
     if (!req.apiKey) return next();
     const scopes = req.apiKey.scopes || [];
     if (scopes.includes('*') || scopes.includes(scope)) return next();
-    return res.status(403).json({ success: false, message: `API key missing required scope: ${scope}`, code: 403 });
+    return sendError(res, 403, `API key missing required scope: ${scope}`);
   };
 };
 

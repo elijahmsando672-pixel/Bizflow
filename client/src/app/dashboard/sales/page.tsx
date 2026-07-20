@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/data";
 import {
   PageHeader, StatCard, Card, SearchBar, Select, Table, Btn, Badge, Modal, InputField
 } from "@/components/ui/dashboard-ui";
+import { useToast } from "@/components/ui/toast";
 import { ShoppingCart, DollarSign, Clock, BarChart3, Plus, RefreshCw, Edit3, Trash2, User, Loader2 } from "lucide-react";
 import type { Sale } from "@/types/sales";
 
@@ -18,6 +19,7 @@ interface SaleForm {
 }
 
 export default function SalesPage() {
+  const toast = useToast();
   const [search, setSearch] = useState("");
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,12 +50,12 @@ export default function SalesPage() {
       setModal(false); setEditItem(null);
       setForm({ customer_name: "", total: "", status: "completed", sale_date: new Date().toISOString().split("T")[0] });
       load();
-    } catch { alert("Failed to save sale"); }
+    } catch { toast.error("Failed to save sale"); }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this sale?")) return;
-    try { await api.sales.delete(id); load(); } catch { alert("Delete failed"); }
+    try { await api.sales.delete(id); toast.success("Sale deleted"); load(); } catch { toast.error("Delete failed"); }
   };
 
   const filtered = sales.filter((s: Sale) =>

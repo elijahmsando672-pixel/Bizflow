@@ -1,5 +1,6 @@
 import express from 'express';
 import { query } from '../config/db.js';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -14,7 +15,7 @@ router.post('/', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Create project error:', error);
-    res.status(500).json({ error: 'Failed to create project' });
+    sendError(res, 500, 'Failed to create project');
   }
 });
 
@@ -45,7 +46,7 @@ router.get('/', async (req, res) => {
     );
     res.json(result.rows);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch projects' });
+    sendError(res, 500, 'Failed to fetch projects');
   }
 });
 
@@ -60,10 +61,10 @@ router.get('/:id', async (req, res) => {
        WHERE p.id = $1 AND p.business_id = $2`,
       [req.params.id, req.business_id]
     );
-    if (!result.rows.length) return res.status(404).json({ error: 'Project not found' });
+    if (!result.rows.length) return sendError(res, 404, 'Project not found');
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch project' });
+    sendError(res, 500, 'Failed to fetch project');
   }
 });
 
@@ -77,10 +78,10 @@ router.put('/:id', async (req, res) => {
        WHERE id=$1 AND business_id=$9 RETURNING *`,
       [req.params.id, name, description, status, start_date, end_date, budget, assigned_to, req.business_id]
     );
-    if (!result.rows.length) return res.status(404).json({ error: 'Project not found' });
+    if (!result.rows.length) return sendError(res, 404, 'Project not found');
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update project' });
+    sendError(res, 500, 'Failed to update project');
   }
 });
 
@@ -99,7 +100,7 @@ router.get('/:id/tasks', async (req, res) => {
     );
     res.json(result.rows);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch tasks' });
+    sendError(res, 500, 'Failed to fetch tasks');
   }
 });
 
@@ -113,7 +114,7 @@ router.post('/:id/tasks', async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create task' });
+    sendError(res, 500, 'Failed to create task');
   }
 });
 
@@ -138,10 +139,10 @@ router.put('/tasks/:taskId', async (req, res) => {
       `UPDATE project_tasks SET ${updates.join(', ')} WHERE id=$1 AND business_id=$2 RETURNING *`,
       params
     );
-    if (!result.rows.length) return res.status(404).json({ error: 'Task not found' });
+    if (!result.rows.length) return sendError(res, 404, 'Task not found');
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update task' });
+    sendError(res, 500, 'Failed to update task');
   }
 });
 
@@ -149,10 +150,10 @@ router.delete('/:id', async (req, res) => {
   try {
     await query(`DELETE FROM project_tasks WHERE project_id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
     const result = await query(`DELETE FROM projects WHERE id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
-    if (!result.rowCount) return res.status(404).json({ error: 'Project not found' });
+    if (!result.rowCount) return sendError(res, 404, 'Project not found');
     res.json({ message: 'Project deleted' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete project' });
+    sendError(res, 500, 'Failed to delete project');
   }
 });
 

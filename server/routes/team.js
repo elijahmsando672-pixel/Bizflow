@@ -5,6 +5,7 @@ import { query } from '../config/db.js';
 import { sendTeamInvitationEmail } from '../utils/email.js';
 import { hashPassword } from '../utils/password.js';
 import { generateToken } from '../middleware/auth.js';
+import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
@@ -38,23 +39,23 @@ router.get('/members', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get team members error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
 router.post('/invite', async (req, res) => {
   try {
     const { error, value } = inviteSchema.validate(req.body);
-    if (error) return res.status(400).json({ error: error.details[0].message });
+    if (error) return sendError(res, 400, error.details[0].message);
 
     const { email, role } = value;
 
     const existing = await query('SELECT id, business_id FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0) {
       if (existing.rows[0].business_id === req.business_id) {
-        return res.status(400).json({ error: 'User is already a member of this business' });
+        return sendError(res, 400, 'User is already a member of this business');
       }
-      return res.status(400).json({ error: 'A user with this email already exists in another business. Use a different email.' });
+      return sendError(res, 400, 'A user with this email already exists in another business. Use a different email.');
     }
 
     const pendingInvite = await query(
@@ -62,7 +63,7 @@ router.post('/invite', async (req, res) => {
       [email, req.business_id]
     );
     if (pendingInvite.rows.length > 0) {
-      return res.status(400).json({ error: 'Invitation already sent to this email' });
+      return sendError(res, 400, 'Invitation already sent to this email');
     }
 
     const token = crypto.randomBytes(32).toString('hex');
@@ -79,7 +80,7 @@ router.post('/invite', async (req, res) => {
     res.status(201).json({ message: 'Invitation sent', email, role });
   } catch (err) {
     console.error('Invite team member error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -93,14 +94,14 @@ router.post('/accept', async (req, res) => {
     );
 
     if (inviteResult.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid or expired invitation' });
+      return sendError(res, 400, 'Invalid or expired invitation');
     }
 
     const invite = inviteResult.rows[0];
 
     const existingUser = await query('SELECT id FROM users WHERE email = $1', [invite.email]);
     if (existingUser.rows.length > 0) {
-      return res.status(400).json({ error: 'User already exists' });
+      return sendError(res, 400, 'User already exists');
     }
 
     const hashedPassword = await hashPassword(password);
@@ -123,7 +124,7 @@ router.post('/accept', async (req, res) => {
     });
   } catch (err) {
     console.error('Accept invitation error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -140,7 +141,7 @@ router.get('/invitations', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get invitations error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -151,12 +152,12 @@ router.delete('/invitations/:id', async (req, res) => {
       [req.params.id, req.business_id]
     );
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Invitation not found' });
+      return sendError(res, 404, 'Invitation not found');
     }
     res.json({ message: 'Invitation revoked' });
   } catch (err) {
     console.error('Revoke invitation error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -165,7 +166,7 @@ router.put('/:id/role', async (req, res) => {
     const { role } = req.body;
     const validRoles = ['owner', 'admin', 'manager', 'staff', 'accountant'];
     if (!validRoles.includes(role)) {
-      return res.status(400).json({ error: 'Invalid role' });
+      return sendError(res, 400, 'Invalid role');
     }
 
     const result = await query(
@@ -174,13 +175,13 @@ router.put('/:id/role', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
+      return sendError(res, 404, 'User not found');
     }
 
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Update role error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 
@@ -192,12 +193,12 @@ router.patch('/:id', async (req, res) => {
       [is_active, req.params.id, req.business_id]
     );
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
+      return sendError(res, 404, 'User not found');
     }
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Update member error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 });
 

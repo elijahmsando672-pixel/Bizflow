@@ -5,6 +5,7 @@ import api from "@/lib/api";
 import {
   PageHeader, Card, SearchBar, Table, Btn, Badge, Modal, InputField
 } from "@/components/ui/dashboard-ui";
+import { useToast } from "@/components/ui/toast";
 import { Smartphone, Plus, Edit3, Trash2, RefreshCw, Loader2, Phone, DollarSign, User } from "lucide-react";
 
 interface MpesaAgent {
@@ -17,6 +18,7 @@ interface MpesaAgent {
 }
 
 export default function MPesaAgentsPage() {
+  const toast = useToast();
   const [agents, setAgents] = useState<MpesaAgent[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -45,19 +47,20 @@ export default function MPesaAgentsPage() {
       setModal(false); setEditItem(null);
       setForm({ name: "", phone: "", mpesa_number: "", commission_rate: "" });
       load();
-    } catch { alert("Failed to save agent"); }
+    } catch { toast.error("Failed to save agent"); }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this agent?")) return;
-    try { await api.payments.mpesa.deleteAgent(id); load(); } catch { alert("Delete failed"); }
+    try { await api.payments.mpesa.deleteAgent(id); toast.success("Agent deleted"); load(); } catch { toast.error("Delete failed"); }
   };
 
   const toggleActive = async (agent: MpesaAgent) => {
     try {
       await api.payments.mpesa.updateAgent(agent.id, { is_active: !agent.is_active });
+      toast.success("Agent updated");
       load();
-    } catch { alert("Failed to update"); }
+    } catch { toast.error("Failed to update"); }
   };
 
   const filtered = agents.filter(a =>

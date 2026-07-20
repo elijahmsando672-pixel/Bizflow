@@ -6,10 +6,12 @@ import { formatCurrency } from "@/lib/data";
 import {
   PageHeader, StatCard, Card, SearchBar, Select, Table, Btn, Badge, Modal, InputField
 } from "@/components/ui/dashboard-ui";
+import { useToast } from "@/components/ui/toast";
 import { Clock, CheckCircle, TrendingUp, TrendingDown, Plus, RefreshCw, Loader2, Smartphone, ArrowRightLeft, BarChart3 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function PaymentsPage() {
+  const toast = useToast();
   const [payments, setPayments] = useState<any[]>([]);
   const [mpesaTx, setMpesaTx] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +33,7 @@ export default function PaymentsPage() {
       setInvModal(false);
       setInvForm({ customer: "", total: "", due_date: "" });
       load();
-    } catch { alert("Failed to create invoice"); }
+    } catch { toast.error("Failed to create invoice"); }
   };
 
   const load = useCallback(async () => {

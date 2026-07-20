@@ -1,4 +1,5 @@
 import { query, pool } from '../config/db.js';
+import { sendError } from '../utils/sendError.js';
 
 export const getCategories = async (req, res) => {
   try {
@@ -9,7 +10,7 @@ export const getCategories = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Categories list error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -23,7 +24,7 @@ export const createCategory = async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('Category create error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -41,7 +42,7 @@ export const getAll = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Products list error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -51,11 +52,11 @@ export const getById = async (req, res) => {
       'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = $1 AND p.business_id = $2',
       [req.params.id, req.business_id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Product not found');
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Product get error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -79,7 +80,7 @@ export const create = async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('Product create error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -93,7 +94,7 @@ export const update = async (req, res) => {
     const current = await client.query('SELECT stock_qty FROM products WHERE id=$1 AND business_id=$2 FOR UPDATE', [req.params.id, req.business_id]);
     if (current.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Product not found' });
+      return sendError(res, 404, 'Product not found');
     }
 
     const oldQty = parseInt(current.rows[0].stock_qty || 0);
@@ -120,7 +121,7 @@ export const update = async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Product update error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   } finally {
     client.release();
   }
@@ -129,11 +130,11 @@ export const update = async (req, res) => {
 export const remove = async (req, res) => {
   try {
     const result = await query('DELETE FROM products WHERE id=$1 AND business_id=$2 RETURNING id', [req.params.id, req.business_id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    if (result.rows.length === 0) return sendError(res, 404, 'Not found');
     res.json({ message: 'Deleted' });
   } catch (err) {
     console.error('Product delete error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
 
@@ -146,6 +147,6 @@ export const getStockHistory = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Stock history error:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, 500, 'Server error');
   }
 };
