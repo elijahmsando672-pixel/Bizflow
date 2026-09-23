@@ -31,7 +31,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   ];
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-border bg-background/80 px-4 lg:px-6 backdrop-blur-xl">
+    <header className="flex h-16 items-center justify-between border-b border-border bg-card/85 px-4 lg:px-6 backdrop-blur-xl">
       <div className="flex flex-1 items-center gap-3">
         {onMenuClick && (
           <Button variant="ghost" size="icon" className="lg:hidden text-muted-foreground" onClick={onMenuClick}>
@@ -57,7 +57,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
             Quick Action
           </Button>
           {open && (
-            <div className="absolute right-0 top-full mt-2 w-48 overflow-hidden rounded-xl border border-border bg-card/90 backdrop-blur-xl shadow-dropdown z-50">
+            <div className="absolute right-0 top-full mt-2 w-48 overflow-hidden rounded-md border border-border bg-card/90 backdrop-blur-xl shadow-dropdown z-50">
               <div className="border-b border-border px-3 py-2">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Create New</p>
               </div>

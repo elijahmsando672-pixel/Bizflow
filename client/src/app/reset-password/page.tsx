@@ -68,15 +68,15 @@ function ResetPasswordForm() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-600">
-              <Lock className="h-8 w-8 text-white" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-md bg-success/15">
+              <Lock className="h-8 w-8 text-success" />
             </div>
           </div>
           <CardTitle className="text-2xl">Password Reset</CardTitle>
           <CardDescription>Your password has been reset successfully</CardDescription>
         </CardHeader>
         <CardContent className="text-center">
-          <p className="text-sm text-green-600 mb-4">
+          <p className="text-sm text-success mb-4">
             Redirecting to login...
           </p>
         </CardContent>
@@ -88,8 +88,8 @@ function ResetPasswordForm() {
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
         <div className="flex justify-center mb-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600">
-            <Lock className="h-8 w-8 text-white" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary/15">
+            <Lock className="h-8 w-8 text-primary" />
           </div>
         </div>
         <CardTitle className="text-2xl">Reset Password</CardTitle>
@@ -98,7 +98,7 @@ function ResetPasswordForm() {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
+            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
               {error}
             </div>
           )}
@@ -141,10 +141,10 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-background">
       <Suspense fallback={
         <div className="flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       }>
         <ResetPasswordForm />

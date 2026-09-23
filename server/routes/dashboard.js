@@ -34,7 +34,8 @@ router.get('/', async (req, res) => {
     );
     
     const activeInvoices = await query(
-      "SELECT COUNT(*) as count FROM sales WHERE business_id = $1 AND status = 'draft'",
+      `SELECT COUNT(*) as count FROM invoices
+       WHERE business_id = $1 AND status NOT IN ('paid', 'cancelled')`,
       [businessId]
     );
     

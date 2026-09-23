@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { fetchDashboardData, formatCurrency } from "@/lib/data";
 import api from "@/lib/api";
 import type { DashboardData } from "@/types";
+import DashboardLoading from "./loading";
 import {
   DollarSign, TrendingDown, TrendingUp, Users, CreditCard, Package,
   Landmark, BarChart3, ShoppingCart, FileText, UserPlus, Bell, List,
@@ -35,14 +36,14 @@ const kpiIcons = [
 ];
 
 const kpiColors = [
-  "from-emerald-600 to-emerald-400",
-  "from-orange-600 to-orange-400",
-  "from-purple-600 to-purple-400",
-  "from-blue-600 to-blue-400",
-  "from-red-600 to-red-400",
-  "from-amber-600 to-amber-400",
-  "from-teal-600 to-teal-400",
-  "from-indigo-600 to-indigo-400",
+  "#4caf50",
+  "#f5a623",
+  "#e44d7b",
+  "#4dd0e1",
+  "#e44d7b",
+  "#f5a623",
+  "#4caf50",
+  "#4dd0e1",
 ];
 
 export default function Dashboard() {
@@ -66,10 +67,24 @@ export default function Dashboard() {
     try {
       const [dashResult, notifs] = await Promise.all([
         fetchDashboardData(),
-        api.notifications.getAll().catch(() => []),
+        api.notifications.getAll().catch(() => null),
       ]);
       setData(dashResult);
-      setNotifications(Array.isArray(notifs) ? notifs : []);
+      const notifObject = notifs && typeof notifs === "object" && !Array.isArray(notifs) ? (notifs as any) : null;
+      const systemNotifs: any[] = Array.isArray(notifObject?.systemNotifications) ? notifObject.systemNotifications : [];
+      const alertNotifs: any[] = [
+        ...(notifObject?.overdueSales ?? []).map((s: any) => ({
+          message: `Overdue payment: ${s.customer_name || "Customer"}`,
+          type: "alert",
+          created_at: s.due_date || s.sale_date,
+        })),
+        ...(notifObject?.lowStockProducts ?? []).map((p: any) => ({
+          message: `Low stock: ${p.name || "Product"}`,
+          type: "warning",
+          created_at: new Date().toISOString(),
+        })),
+      ];
+      setNotifications([...alertNotifs, ...systemNotifs]);
     } catch {
       setError("Could not load dashboard data.");
     } finally {
@@ -119,11 +134,11 @@ export default function Dashboard() {
     ...recentExpenses.slice(0, 2).map((e: any) => ({
       text: `Expense: ${e.description || "Untitled"}`,
       amount: formatCurrency(e.amount || 0),
-      time: e.expense_date ? new Date(e.expense_date).toLocaleDateString() : "",
+      time: e.date ? new Date(e.date).toLocaleDateString() : "",
     })),
   ];
 
-  if (loading) return null;
+  if (loading) return <DashboardLoading />;
 
   return (
     <>
@@ -142,11 +157,14 @@ export default function Dashboard() {
           return (
             <div
               key={idx}
-              className="bg-card rounded-xl p-5 border border-border shadow-sm transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
+              className="bg-card rounded-md p-5 border border-border shadow-sm transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
             >
               <div className="flex justify-between items-start mb-3">
-                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${kpiColors[idx]} flex items-center justify-center shadow-lg`}>
-                  <Icon className="h-5 w-5 text-white" />
+                <div
+                  className="w-10 h-10 rounded-md flex items-center justify-center"
+                  style={{ backgroundColor: `${kpiColors[idx]}1f`, color: kpiColors[idx] }}
+                >
+                  <Icon className="h-5 w-5" />
                 </div>
                 <span className="text-[11px] text-muted-foreground font-medium bg-muted px-2 py-0.5 rounded-md">
                   {kpi.change}
@@ -167,7 +185,7 @@ export default function Dashboard() {
         className="grid gap-4 mb-6"
         style={{ gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr" }}
       >
-        <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+        <div className="bg-card rounded-md border border-border p-5 shadow-sm">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-sm font-semibold text-foreground m-0">Sales This Week</h3>
             <button onClick={() => router.push("/dashboard/sales")} className="text-xs text-primary bg-none border-none cursor-pointer font-medium hover:underline">
@@ -178,7 +196,7 @@ export default function Dashboard() {
             {weekData.map((d, idx) => (
               <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end">
                 <div
-                  className="w-full max-w-[40px] rounded-t-md bg-gradient-to-t from-blue-500 to-blue-400 min-h-[12px]"
+                  className="w-full max-w-[40px] rounded-t-md bg-primary min-h-[12px]"
                   style={{ height: `${d.value}%` }}
                 />
                 <span className="text-[10px] text-muted-foreground mt-1.5 font-medium">{d.day}</span>
@@ -187,7 +205,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+        <div className="bg-card rounded-md border border-border p-5 shadow-sm">
           <h3 className="text-sm font-semibold text-foreground mb-3">Quick Actions</h3>
           <div className="grid grid-cols-2 gap-2">
             {quickActions.map((action, idx) => {
@@ -214,7 +232,7 @@ export default function Dashboard() {
         className="grid gap-4 mb-6"
         style={{ gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr" }}
       >
-        <div className="bg-card rounded-xl border border-border shadow-sm">
+        <div className="bg-card rounded-md border border-border shadow-sm">
           <div className="px-5 py-4 border-b border-border flex justify-between items-center">
             <h3 className="text-sm font-semibold text-foreground m-0 flex items-center gap-2">
               <Bell className="h-4 w-4 text-muted-foreground" />
@@ -243,7 +261,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-card rounded-xl border border-border shadow-sm">
+        <div className="bg-card rounded-md border border-border shadow-sm">
           <div className="px-5 py-4 border-b border-border flex items-center gap-2">
             <List className="h-4 w-4 text-muted-foreground" />
             <h3 className="text-sm font-semibold text-foreground m-0">Recent Activity</h3>

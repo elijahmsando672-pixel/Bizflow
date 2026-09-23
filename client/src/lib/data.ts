@@ -30,7 +30,7 @@ export const statusStyles: Record<string, string> = {
   draft: "bg-yellow-500/10 text-yellow-400",
   pending: "bg-orange-500/10 text-orange-400",
   completed: "bg-green-500/10 text-green-400",
-  shipped: "bg-blue-500/10 text-blue-400",
+  shipped: "bg-primary/10 text-primary",
   cancelled: "bg-red-500/10 text-red-400",
 };
 

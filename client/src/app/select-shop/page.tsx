@@ -3,10 +3,10 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { Building2, ArrowRight, Store } from "lucide-react";
+import { Building2, ArrowRight, Store, RotateCcw, LogOut, Loader2 } from "lucide-react";
 
 export default function SelectShopPage() {
-  const { shops, setSelectedShop, business, isLoading, token } = useAuth();
+  const { shops, setSelectedShop, business, isLoading, token, fetchShops, logout } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -15,46 +15,70 @@ export default function SelectShopPage() {
     }
   }, [isLoading, token, router]);
 
-  useEffect(() => {
-    if (!isLoading && shops.length === 1) {
-      setSelectedShop(shops[0]);
-      router.push("/dashboard");
-    }
-  }, [isLoading, shops, setSelectedShop, router]);
-
-  if (isLoading || shops.length === 0) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg animate-pulse">
-            <Store className="w-8 h-8 text-white" />
+          <div className="w-16 h-16 mx-auto mb-4 rounded-lg bg-primary/10 flex items-center justify-center shadow-md shadow-primary/20 animate-pulse">
+            <Store className="w-8 h-8 text-primary" />
           </div>
-          <p className="text-gray-500">Loading shops...</p>
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mx-auto mb-2" />
+          <p className="text-muted-foreground">Loading shops...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (shops.length === 0) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center max-w-sm">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-lg bg-destructive/10 flex items-center justify-center">
+            <Store className="w-8 h-8 text-destructive" />
+          </div>
+          <h2 className="text-xl font-bold text-foreground mb-2">No shops found</h2>
+          <p className="text-muted-foreground text-sm mb-6">
+            Your business has no shops available. Try again, or sign out and back in.
+          </p>
+          <div className="flex justify-center gap-3">
+            <button
+              onClick={() => fetchShops()}
+              className="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90 transition-opacity"
+            >
+              <RotateCcw className="h-4 w-4" /> Retry
+            </button>
+            <button
+              onClick={() => { logout(); router.replace("/login"); }}
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+            >
+              <LogOut className="h-4 w-4" /> Sign out
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   const shopColors = [
-    "from-blue-500 to-blue-600",
-    "from-green-500 to-emerald-600",
-    "from-purple-500 to-purple-600",
-    "from-orange-500 to-orange-600",
-    "from-teal-500 to-cyan-500",
-    "from-pink-500 to-rose-600",
+    "#4dd0e1",
+    "#4caf50",
+    "#e44d7b",
+    "#f5a623",
+    "#4dd0e1",
+    "#4caf50",
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-blue-50">
+    <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-5 py-16">
         <div className="text-center mb-12">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/25">
-            <Building2 className="w-8 h-8 text-white" />
+          <div className="w-16 h-16 mx-auto mb-4 rounded-lg bg-primary/10 flex items-center justify-center shadow-md shadow-primary/20">
+            <Building2 className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+          <h1 className="text-3xl font-bold text-foreground mb-2">
             {business?.name || "Your Business"}
           </h1>
-          <p className="text-gray-500">Select a shop to start managing</p>
+          <p className="text-muted-foreground">Select a shop to start managing</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -65,16 +89,19 @@ export default function SelectShopPage() {
                 setSelectedShop(shop);
                 router.push("/dashboard");
               }}
-              className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer border border-gray-100 text-left"
+              className="group bg-card rounded-md p-6 shadow-sm hover:shadow-modal transition-all duration-300 transform hover:-translate-y-1 cursor-pointer border border-border text-left"
             >
               <div className="flex flex-col items-center gap-4">
-                <div className={`bg-gradient-to-br ${shopColors[index % shopColors.length]} p-4 rounded-2xl group-hover:scale-110 transition-transform`}>
-                  <Store className="w-8 h-8 text-white" />
+                <div
+                  className="p-4 rounded-md group-hover:scale-110 transition-transform"
+                  style={{ backgroundColor: `${shopColors[index % shopColors.length]}1f` }}
+                >
+                  <Store className="w-8 h-8" style={{ color: shopColors[index % shopColors.length] }} />
                 </div>
                 <div className="text-center">
-                  <h3 className="text-gray-800 font-semibold text-lg">{shop.name}</h3>
+                  <h3 className="text-foreground font-semibold text-lg">{shop.name}</h3>
                   {shop.location && (
-                    <p className="text-gray-500 text-sm mt-1">{shop.location}</p>
+                    <p className="text-muted-foreground text-sm mt-1">{shop.location}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-1 text-primary text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">

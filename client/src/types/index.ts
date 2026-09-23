@@ -23,7 +23,7 @@ export interface DashboardExpense {
   id: string;
   description: string;
   amount: number;
-  expense_date: string;
+  date: string;
 }
 
 export interface DashboardData {

@@ -78,9 +78,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchShops = useCallback(async () => {
     try {
+      const savedToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || "/api"}/shops`,
-        { credentials: 'include' }
+        {
+          headers: savedToken ? { Authorization: `Bearer ${savedToken}` } : {},
+          credentials: 'include',
+        }
       );
       if (response.ok) {
         const data = await response.json();
@@ -218,13 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("user", JSON.stringify(data.user));
     localStorage.setItem("business", JSON.stringify(data.business));
 
-    if (data.shops && data.shops.length === 1) {
-      setSelectedShopState(data.shops[0]);
-      localStorage.setItem("selectedShop", JSON.stringify(data.shops[0]));
-      router.push("/dashboard");
-    } else {
-      router.push("/select-shop");
-    }
+    router.push("/modules");
   };
 
   const loginWithOTP = async (data: { email?: string; phone?: string; otp: string }) => {
@@ -256,13 +254,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("user", JSON.stringify(result.user));
     localStorage.setItem("business", JSON.stringify(result.business));
 
-    if (result.shops && result.shops.length === 1) {
-      setSelectedShopState(result.shops[0]);
-      localStorage.setItem("selectedShop", JSON.stringify(result.shops[0]));
-      router.push("/dashboard");
-    } else {
-      router.push("/select-shop");
-    }
+    router.push("/modules");
   };
 
   const register = async (name: string, email: string, password: string, businessName: string, phone?: string) => {
@@ -292,13 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("user", JSON.stringify(data.user));
     localStorage.setItem("business", JSON.stringify(data.business));
 
-    if (data.shops && data.shops.length === 1) {
-      setSelectedShopState(data.shops[0]);
-      localStorage.setItem("selectedShop", JSON.stringify(data.shops[0]));
-      router.push("/dashboard");
-    } else {
-      router.push("/select-shop");
-    }
+    router.push("/modules");
   };
 
   // ── Session idle timeout ──

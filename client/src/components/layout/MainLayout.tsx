@@ -6,12 +6,12 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 
-const SKIP_PATHS = ["/", "/login", "/signup", "/register", "/reset-password", "/accept-invite", "/auth", "/auth/callback", "/dashboard", "/select-shop", "/features", "/about", "/pricing", "/contact"];
+const SKIP_PATHS = ["/", "/login", "/signup", "/register", "/reset-password", "/accept-invite", "/auth", "/auth/callback", "/dashboard", "/select-shop", "/modules", "/features", "/about", "/pricing", "/contact"];
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
-  const skipLayout = SKIP_PATHS.includes(pathname) || pathname.startsWith("/dashboard/");
+  const skipLayout = SKIP_PATHS.includes(pathname) || pathname.startsWith("/dashboard/") || pathname.startsWith("/modules/");
 
   if (skipLayout) {
     return <>{children}</>;

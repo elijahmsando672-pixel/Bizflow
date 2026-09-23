@@ -219,7 +219,7 @@ export function DataTable<T extends Record<string, any>>({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="flex flex-wrap gap-3 rounded-xl border border-border bg-card p-4">
+            <div className="flex flex-wrap gap-3 rounded-md border border-border bg-card p-4">
               {filters.map((filter) => (
                 <div key={filter.key} className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-muted-foreground">{filter.label}</label>
@@ -229,7 +229,7 @@ export function DataTable<T extends Record<string, any>>({
                       setActiveFilters((prev) => ({ ...prev, [filter.key]: e.target.value }));
                       setPage(1);
                     }}
-                    className="h-9 rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+                    className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
                   >
                     <option value="">All</option>
                     {filter.options.map((opt) => (
@@ -250,7 +250,7 @@ export function DataTable<T extends Record<string, any>>({
         )}
       </AnimatePresence>
 
-      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="overflow-hidden rounded-md border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full caption-bottom text-sm">
             <thead>

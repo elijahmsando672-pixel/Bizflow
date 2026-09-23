@@ -38,7 +38,7 @@ function DialogContent({
   children: React.ReactNode
 }) {
   return (
-    <div className={cn("rounded-xl border bg-card p-6 shadow-modal", className)}>
+    <div className={cn("rounded-md border bg-card p-6 shadow-modal", className)}>
       {children}
     </div>
   )

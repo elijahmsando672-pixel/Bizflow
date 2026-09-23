@@ -11,8 +11,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (token && publicPaths.includes(pathname) && pathname !== "/" && pathname !== "/login") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+  if (token && publicPaths.includes(pathname) && pathname !== "/" && pathname !== "/login" && pathname !== "/select-shop") {
+    return NextResponse.redirect(new URL("/modules", request.url));
   }
 
   return NextResponse.next();

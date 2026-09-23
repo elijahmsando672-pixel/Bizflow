@@ -8,8 +8,8 @@ export default function NewExpensePage() {
       <div className="bg-gradient-to-br from-cyan-500 to-teal-500 p-4 rounded-2xl mb-4">
         <TrendingDown className="w-8 h-8 text-white" />
       </div>
-      <h2 className="text-xl font-bold text-gray-100 mb-2">New Expense</h2>
-      <p className="text-gray-400 text-sm">Manage new expense.</p>
+      <h2 className="text-xl font-bold text-foreground mb-2">New Expense</h2>
+      <p className="text-muted-foreground text-sm">Manage new expense.</p>
     </div>
   );
 }

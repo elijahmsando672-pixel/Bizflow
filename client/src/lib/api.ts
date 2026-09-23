@@ -1,6 +1,17 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+const DEFAULT_TIMEOUT_MS = 30000;
 
 let refreshPromise: Promise<boolean> | null = null;
+
+function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const { signal, ...rest } = options;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  if (signal) {
+    signal.addEventListener('abort', () => controller.abort());
+  }
+  return fetch(url, { ...rest, signal: controller.signal }).finally(() => clearTimeout(timeout));
+}
 
 class ApiError extends Error {
   status: number;
@@ -34,7 +45,7 @@ async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<u
     }
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
     credentials: 'include',
@@ -45,14 +56,14 @@ async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<u
     const MAX_CSRF_RETRIES = 1;
     while (csrfRetries < MAX_CSRF_RETRIES) {
       try {
-        const csrfResponse = await fetch(
+        const csrfResponse = await fetchWithTimeout(
           `${API_BASE_URL}/auth/csrf-token`,
           { method: 'GET', credentials: 'include' }
         );
         if (csrfResponse.ok) {
           const { csrfToken } = await csrfResponse.json();
           headers['X-Csrf-Token'] = csrfToken;
-          const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+          const retryResponse = await fetchWithTimeout(`${API_BASE_URL}${endpoint}`, {
             ...options,
             headers,
             credentials: 'include',
@@ -74,7 +85,7 @@ async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<u
     try {
       if (!refreshPromise) {
         refreshPromise = (async () => {
-          const resp = await fetch(
+          const resp = await fetchWithTimeout(
             `${API_BASE_URL}/auth/refresh-token`,
             { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include' }
           );
@@ -91,7 +102,7 @@ async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<u
       const savedToken = localStorage.getItem('token');
       const newHeaders = { ...headers, Authorization: `Bearer ${savedToken}` };
 
-      const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const retryResponse = await fetchWithTimeout(`${API_BASE_URL}${endpoint}`, {
         ...options,
         headers: newHeaders,
         credentials: 'include',
@@ -179,7 +190,7 @@ interface ExpenseData {
   description: string;
   amount: number;
   category: string;
-  expense_date?: string;
+  date?: string;
   status?: string;
   receipt_url?: string;
 }

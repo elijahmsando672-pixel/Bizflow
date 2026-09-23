@@ -20,8 +20,8 @@ type LoginMode = "password" | "otp";
 type ResetStep = "email" | "otp" | "password";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("admin@bizflow.com");
-  const [password, setPassword] = useState("Bizflow@2026");
+  const [email, setEmail] = useState("elijah@bizflow.com");
+  const [password, setPassword] = useState("Test@1234");
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -39,7 +39,7 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (token) router.replace("/select-shop");
+    if (token) router.replace("/modules");
   }, [token, router]);
 
   useEffect(() => {
@@ -99,7 +99,7 @@ export default function LoginPage() {
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("business", JSON.stringify(data.business));
       if (data.shops) localStorage.setItem("shops", JSON.stringify(data.shops));
-      window.location.href = data.shops?.length === 1 ? "/dashboard" : "/select-shop";
+      window.location.href = "/modules";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
       setRequireCaptcha(false);
@@ -238,45 +238,45 @@ export default function LoginPage() {
   const otpExpiry = otpTimer > 0 ? `${Math.floor(otpTimer / 60)}:${String(otpTimer % 60).padStart(2, "0")}` : "";
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+    <main className="min-h-screen flex items-center justify-center p-4 bg-background">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute w-96 h-96 bg-blue-400/20 dark:bg-blue-500/10 rounded-full blur-3xl -top-48 -left-48 animate-pulse" />
-        <div className="absolute w-96 h-96 bg-purple-400/20 dark:bg-purple-500/10 rounded-full blur-3xl -bottom-48 -right-48 animate-pulse" style={{ animationDelay: "1s" }} />
-        <div className="absolute w-96 h-96 bg-pink-400/10 dark:bg-pink-500/5 rounded-full blur-3xl top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" style={{ animationDelay: "2s" }} />
+        <div className="absolute w-96 h-96 bg-primary/25 dark:bg-primary/10 rounded-full blur-3xl -top-48 -left-48 animate-pulse" />
+        <div className="absolute w-96 h-96 bg-warning/20 dark:bg-warning/10 rounded-full blur-3xl -bottom-48 -right-48 animate-pulse" style={{ animationDelay: "1s" }} />
+        <div className="absolute w-96 h-96 bg-destructive/15 dark:bg-destructive/5 rounded-full blur-3xl top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" style={{ animationDelay: "2s" }} />
       </div>
 
       <button
         onClick={toggleTheme}
-        className="absolute right-6 top-6 z-20 flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+        className="absolute right-6 top-6 z-20 flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-muted transition-colors"
         aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
       >
         {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
       </button>
 
       <div className="w-full max-w-md relative z-10">
-        <Link href="/" className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors mb-6 group">
+        <Link href="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6 group">
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           Back to Home
         </Link>
 
         <div className="text-center mb-8 animate-slide-up">
           <Link href="/">
-            <div className="w-16 h-16 relative mb-4 mx-auto rounded-2xl overflow-hidden shadow-lg shadow-blue-500/50 hover:scale-105 transition-transform cursor-pointer">
+            <div className="w-16 h-16 relative mb-4 mx-auto rounded-lg overflow-hidden shadow-md shadow-primary/20 hover:scale-105 transition-transform cursor-pointer">
               <Image src="/logo.png" alt="BizFlow" fill sizes="64px" className="object-contain" />
             </div>
           </Link>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-600 bg-clip-text text-transparent mb-2">BizFlow</h1>
-          <p className="text-gray-600 dark:text-gray-400">Modern Business Management Software</p>
+          <h1 className="text-4xl font-bold text-foreground mb-2">BizFlow</h1>
+          <p className="text-muted-foreground">Modern Business Management Software</p>
         </div>
 
-        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-gray-200/50 dark:border-gray-700/50 animate-slide-up" style={{ animationDelay: "0.1s" }}>
+        <div className="bg-card/90 backdrop-blur-xl rounded-lg p-8 shadow-modal border border-border animate-slide-up" style={{ animationDelay: "0.1s" }}>
           <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            <h2 className="text-2xl font-bold text-foreground mb-2">
               {isForgotPassword
                 ? resetStep === "password" ? "Set New Password" : "Reset Password"
                 : "Welcome Back"}
             </h2>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-muted-foreground">
               {isForgotPassword
                 ? resetStep === "email" ? "Enter your email to receive a reset code"
                   : resetStep === "otp" ? "Enter the code sent to your email"
@@ -286,11 +286,11 @@ export default function LoginPage() {
           </div>
 
           {!isForgotPassword && (
-            <div className="flex mb-6 bg-gray-100 dark:bg-gray-700 rounded-xl p-1">
+            <div className="flex mb-6 bg-muted rounded-md p-1">
               <button
                 type="button"
                 onClick={() => { setLoginMode("password"); setError(""); setMessage(""); }}
-                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${loginMode === "password" ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"}`}
+                className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${loginMode === "password" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
               >
                 <Lock className="h-3.5 w-3.5 inline mr-1.5" />
                 Password
@@ -298,7 +298,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => { setLoginMode("otp"); setError(""); setMessage(""); setOtp(""); }}
-                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${loginMode === "otp" ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"}`}
+                className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${loginMode === "otp" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
               >
                 <Smartphone className="h-3.5 w-3.5 inline mr-1.5" />
                 Send Code
@@ -310,13 +310,13 @@ export default function LoginPage() {
           {!isForgotPassword && loginMode === "password" && (
             <form onSubmit={handlePasswordLogin} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Email Address</label>
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     type="email"
                     placeholder="you@example.com"
-                    className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-auto"
+                    className="w-full pl-12 pr-4 py-3 bg-muted/60 border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all h-auto"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -326,21 +326,21 @@ export default function LoginPage() {
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
+                  <label className="block text-sm font-medium text-foreground">Password</label>
                   <button
                     type="button"
                     onClick={() => { setIsForgotPassword(true); setResetStep("email"); setOtp(""); setError(""); setMessage(""); }}
-                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors"
+                    className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
                   >
                     Forgot password?
                   </button>
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
-                    className="w-full pl-12 pr-12 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-auto"
+                    className="w-full pl-12 pr-12 py-3 bg-muted/60 border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all h-auto"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -348,7 +348,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
                     aria-label="Show password"
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -357,7 +357,7 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400 flex items-center gap-2">
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center gap-2">
                   {error.includes("security check") && <ShieldAlert className="h-4 w-4 flex-shrink-0" />}
                   {error}
                 </div>
@@ -371,7 +371,7 @@ export default function LoginPage() {
               )}
 
               {!requireCaptcha && (
-                <Button type="submit" disabled={isLoading} className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
+                <Button type="submit" disabled={isLoading} className="w-full py-3 bg-primary text-primary-foreground font-semibold rounded-md hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all shadow-md shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
                   {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
                   {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
@@ -383,13 +383,13 @@ export default function LoginPage() {
           {!isForgotPassword && loginMode === "otp" && (
             <form onSubmit={handleVerifyOTP} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Email Address</label>
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     type="email"
                     placeholder="you@example.com"
-                    className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-auto"
+                    className="w-full pl-12 pr-4 py-3 bg-muted/60 border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all h-auto"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -399,28 +399,28 @@ export default function LoginPage() {
               </div>
 
               {!message && !otpTimer ? (
-                <Button type="button" onClick={handleSendOTP} disabled={isLoading || !email} className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
+                <Button type="button" onClick={handleSendOTP} disabled={isLoading || !email} className="w-full py-3 bg-primary text-primary-foreground font-semibold rounded-md hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all shadow-md shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
                   {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Smartphone className="h-5 w-5" />}
                   {isLoading ? "Sending..." : "Send OTP"}
                 </Button>
               ) : (
                 <>
                   {message && !error && (
-                    <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400 flex items-center justify-between">
+                    <div className="rounded-md border border-success/30 bg-success/10 px-4 py-3 text-sm text-success flex items-center justify-between">
                       <span>{message}</span>
                       {otpExpiry && <span className="font-mono text-xs">{otpExpiry}</span>}
                     </div>
                   )}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">One-Time Code</label>
+                    <label className="block text-sm font-medium text-foreground mb-2">One-Time Code</label>
                     <div className="relative">
-                      <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                      <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                       <Input
                         type="text"
                         inputMode="numeric"
                         placeholder="000000"
                         maxLength={6}
-                        className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-auto text-center text-2xl tracking-widest"
+                        className="w-full pl-12 pr-4 py-3 bg-muted/60 border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all h-auto text-center text-2xl tracking-widest"
                         value={otp}
                         onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                         required
@@ -430,18 +430,18 @@ export default function LoginPage() {
                   </div>
 
                   {error && (
-                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                       {error}
                     </div>
                   )}
 
-                  <Button type="submit" disabled={isLoading || otp.length !== 6} className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
+                  <Button type="submit" disabled={isLoading || otp.length !== 6} className="w-full py-3 bg-primary text-primary-foreground font-semibold rounded-md hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all shadow-md shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
                     {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <KeyRound className="h-5 w-5" />}
                     {isLoading ? "Verifying..." : "Verify & Sign In"}
                   </Button>
 
                   {otpTimer === 0 && (
-                    <button type="button" onClick={handleSendOTP} className="w-full text-center text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 bg-transparent border-none cursor-pointer">
+                    <button type="button" onClick={handleSendOTP} className="w-full text-center text-sm text-primary hover:underline mt-2 bg-transparent border-none cursor-pointer">
                       Resend OTP
                     </button>
                   )}
@@ -454,13 +454,13 @@ export default function LoginPage() {
           {isForgotPassword && resetStep === "email" && (
             <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Email Address</label>
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     type="email"
                     placeholder="you@example.com"
-                    className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-auto"
+                    className="w-full pl-12 pr-4 py-3 bg-muted/60 border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all h-auto"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -470,17 +470,17 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                   {error}
                 </div>
               )}
               {message && (
-                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
+                <div className="rounded-md border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
                   {message}
                 </div>
               )}
 
-              <Button type="button" onClick={handleSendResetOTP} disabled={isLoading || !email} className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
+              <Button type="button" onClick={handleSendResetOTP} disabled={isLoading || !email} className="w-full py-3 bg-primary text-primary-foreground font-semibold rounded-md hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all shadow-md shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
                 {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
                 {isLoading ? "Sending..." : "Send Reset Code"}
               </Button>
@@ -491,21 +491,21 @@ export default function LoginPage() {
           {isForgotPassword && resetStep === "otp" && (
             <div className="space-y-5">
               {message && (
-                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400 flex items-center justify-between">
+                <div className="rounded-md border border-success/30 bg-success/10 px-4 py-3 text-sm text-success flex items-center justify-between">
                   <span>{message}</span>
                   {otpExpiry && <span className="font-mono text-xs">{otpExpiry}</span>}
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">One-Time Code</label>
+                <label className="block text-sm font-medium text-foreground mb-2">One-Time Code</label>
                 <div className="relative">
-                  <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                  <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     type="text"
                     inputMode="numeric"
                     placeholder="000000"
                     maxLength={6}
-                    className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-auto text-center text-2xl tracking-widest"
+                    className="w-full pl-12 pr-4 py-3 bg-muted/60 border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all h-auto text-center text-2xl tracking-widest"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                     required
@@ -515,17 +515,17 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                   {error}
                 </div>
               )}
 
-              <Button type="button" onClick={handleVerifyResetOTP} disabled={isLoading || otp.length !== 6} className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
+              <Button type="button" onClick={handleVerifyResetOTP} disabled={isLoading || otp.length !== 6} className="w-full py-3 bg-primary text-primary-foreground font-semibold rounded-md hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all shadow-md shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
                 {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <KeyRound className="h-5 w-5" />}
                 {isLoading ? "Verifying..." : "Verify Code"}
               </Button>
 
-              <button type="button" onClick={handleSendResetOTP} className="w-full text-center text-sm text-blue-600 dark:text-blue-400 hover:underline bg-transparent border-none cursor-pointer">
+              <button type="button" onClick={handleSendResetOTP} className="w-full text-center text-sm text-primary hover:underline bg-transparent border-none cursor-pointer">
                 Resend code
               </button>
             </div>
@@ -535,13 +535,13 @@ export default function LoginPage() {
           {isForgotPassword && resetStep === "password" && (
             <form onSubmit={handleResetPassword} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">New Password</label>
+                <label className="block text-sm font-medium text-foreground mb-2">New Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     type={showPassword ? "text" : "password"}
                     placeholder="At least 10 characters"
-                    className="w-full pl-12 pr-12 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-auto"
+                    className="w-full pl-12 pr-12 py-3 bg-muted/60 border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all h-auto"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     required
@@ -550,7 +550,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -558,17 +558,17 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                   {error}
                 </div>
               )}
               {message && (
-                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
+                <div className="rounded-md border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
                   {message}
                 </div>
               )}
 
-              <Button type="submit" disabled={isLoading || !newPassword} className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
+              <Button type="submit" disabled={isLoading || !newPassword} className="w-full py-3 bg-primary text-primary-foreground font-semibold rounded-md hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all shadow-md shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-auto">
                 {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
                 {isLoading ? "Resetting..." : "Reset Password"}
               </Button>
@@ -577,11 +577,11 @@ export default function LoginPage() {
 
           {/* Footer links */}
           {isForgotPassword && (
-            <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+            <p className="mt-6 text-center text-sm text-muted-foreground">
               <button
                 type="button"
                 onClick={() => { setIsForgotPassword(false); setResetStep("email"); setOtp(""); setNewPassword(""); setError(""); setMessage(""); }}
-                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors bg-transparent border-none cursor-pointer"
+                className="text-primary hover:text-primary/80 font-semibold transition-colors bg-transparent border-none cursor-pointer"
               >
                 Back to login
               </button>
@@ -593,10 +593,10 @@ export default function LoginPage() {
               <div className="mt-6">
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-200 dark:border-gray-700" />
+                    <div className="w-full border-t border-border" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white px-2 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                    <span className="bg-card px-2 text-muted-foreground">
                       Or continue with
                     </span>
                   </div>
@@ -605,7 +605,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => window.location.href = `${BASE_URL}/auth/google`}
-                    className="flex h-11 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                    className="flex h-11 items-center justify-center gap-2 rounded-md border border-border bg-card text-sm font-medium text-foreground hover:bg-muted transition-colors"
                   >
                     <svg className="h-5 w-5" viewBox="0 0 24 24">
                       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -618,7 +618,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => window.location.href = `${BASE_URL}/auth/apple`}
-                    className="flex h-11 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                    className="flex h-11 items-center justify-center gap-2 rounded-md border border-border bg-card text-sm font-medium text-foreground hover:bg-muted transition-colors"
                   >
                     <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
@@ -628,9 +628,9 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+              <p className="mt-6 text-center text-sm text-muted-foreground">
                 Don&apos;t have an account?{" "}
-                <a href="/register" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors">
+                <a href="/register" className="text-primary hover:text-primary/80 font-semibold transition-colors">
                   Register your business
                 </a>
               </p>
@@ -638,7 +638,7 @@ export default function LoginPage() {
           )}
         </div>
 
-        <div className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400 animate-fade-in" style={{ animationDelay: "0.3s" }}>
+        <div className="mt-6 text-center text-sm text-muted-foreground animate-fade-in" style={{ animationDelay: "0.3s" }}>
           <p>Multi-tenant support &bull; Secure &bull; Scalable</p>
         </div>
       </div>

@@ -81,7 +81,7 @@ function AcceptInviteContent() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && <div className="rounded-lg bg-red-50 p-4 text-red-600">{error}</div>}
+            {error && <div className="rounded-md bg-destructive/10 p-4 text-destructive">{error}</div>}
             <div>
               <label className="text-sm font-medium">Full Name</label>
               <Input

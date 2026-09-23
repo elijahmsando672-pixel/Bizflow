@@ -39,7 +39,7 @@ function TabsList({
   children: React.ReactNode
 }) {
   return (
-    <div className={cn("inline-flex h-10 items-center justify-center rounded-md bg-gray-100 p-1 text-gray-500", className)}>
+    <div className={cn("inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground", className)}>
       {children}
     </div>
   )
@@ -62,8 +62,8 @@ function TabsTrigger({
       className={cn(
         "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
         isActive
-          ? "bg-white text-gray-900 shadow-sm"
-          : "hover:bg-gray-200 hover:text-gray-900",
+          ? "bg-white text-foreground shadow-sm dark:bg-card"
+          : "hover:bg-muted/80 hover:text-foreground",
         className
       )}
       onClick={() => onValueChange(value)}
@@ -86,7 +86,7 @@ function TabsContent({
   if (selectedValue !== value) return null
 
   return (
-    <div className={cn("mt-4 ring-offset-white focus-visible:outline-none", className)}>
+    <div className={cn("mt-4 focus-visible:outline-none", className)}>
       {children}
     </div>
   )

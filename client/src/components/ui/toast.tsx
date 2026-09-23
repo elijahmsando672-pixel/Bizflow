@@ -46,24 +46,24 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
 function Toast({ message, type, onClose }: { message: string; type: ToastType; onClose: () => void }) {
   const icons = {
-    success: <CheckCircle className="h-5 w-5 text-green-600" />,
-    error: <AlertCircle className="h-5 w-5 text-red-600" />,
-    warning: <AlertTriangle className="h-5 w-5 text-yellow-600" />,
-    info: <Info className="h-5 w-5 text-blue-600" />,
+    success: <CheckCircle className="h-5 w-5 text-success" />,
+    error: <AlertCircle className="h-5 w-5 text-destructive" />,
+    warning: <AlertTriangle className="h-5 w-5 text-warning" />,
+    info: <Info className="h-5 w-5 text-primary" />,
   };
 
   const bgColors = {
-    success: "bg-green-50 border-green-200",
-    error: "bg-red-50 border-red-200",
-    warning: "bg-yellow-50 border-yellow-200",
-    info: "bg-blue-50 border-blue-200",
+    success: "bg-success/10 border-success/30",
+    error: "bg-destructive/10 border-destructive/30",
+    warning: "bg-warning/10 border-warning/30",
+    info: "bg-primary/10 border-primary/30",
   };
 
   return (
-    <div className={`flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg ${bgColors[type]}`}>
+    <div className={`flex items-center gap-3 rounded-lg border px-4 py-3 shadow-dropdown ${bgColors[type]} bg-card`}>
       {icons[type]}
-      <span className="text-sm font-medium text-gray-900">{message}</span>
-      <button onClick={onClose} className="ml-2 text-gray-400 hover:text-gray-600">
+      <span className="text-sm font-medium text-foreground">{message}</span>
+      <button onClick={onClose} className="ml-2 text-muted-foreground hover:text-foreground">
         <X className="h-4 w-4" />
       </button>
     </div>

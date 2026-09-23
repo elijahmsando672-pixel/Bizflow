@@ -85,9 +85,9 @@ function NavGroupItem({ group, pathname }: { group: NavGroup; pathname: string }
               key={item.href}
               href={item.href}
               className={cn(
-                "group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
+                "group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200",
                 active
-                  ? "bg-primary/10 text-primary"
+                  ? "bg-accent text-primary"
                   : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
               )}
             >
@@ -96,9 +96,9 @@ function NavGroupItem({ group, pathname }: { group: NavGroup; pathname: string }
               )}
               <span
                 className={cn(
-                  "flex h-7 w-7 items-center justify-center rounded-lg transition-all duration-200",
+                  "flex h-7 w-7 items-center justify-center rounded-md transition-all duration-200",
                   active
-                    ? "bg-primary/15 text-primary"
+                    ? "bg-accent/60 text-primary"
                     : "text-muted-foreground/70 group-hover:text-foreground"
                 )}
               >
@@ -149,7 +149,7 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
         </div>
         <button
           onClick={logout}
-          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-muted-foreground hover:bg-white/[0.04] hover:text-foreground transition-all duration-200"
+          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-white/[0.04] hover:text-foreground transition-all duration-200"
         >
           <LogOut className="h-4 w-4" />
           Logout

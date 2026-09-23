@@ -8,8 +8,8 @@ export default function StockAuditingPage() {
       <div className="bg-gradient-to-br from-cyan-500 to-teal-500 p-4 rounded-2xl mb-4">
         <ListChecks className="w-8 h-8 text-white" />
       </div>
-      <h2 className="text-xl font-bold text-gray-100 mb-2">Stock Auditing</h2>
-      <p className="text-gray-400 text-sm">Manage stock auditing.</p>
+      <h2 className="text-xl font-bold text-foreground mb-2">Stock Auditing</h2>
+      <p className="text-muted-foreground text-sm">Manage stock auditing.</p>
     </div>
   );
 }

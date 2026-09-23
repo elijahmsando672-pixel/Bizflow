@@ -6,7 +6,7 @@ import { Search, FileText } from "lucide-react";
 export const Card = ({ children, accent, hover, className, ...props }: any) => (
   <div
     className={cn(
-      "relative overflow-hidden rounded-xl border bg-card p-[18px_20px] shadow-sm transition-all duration-200",
+      "relative overflow-hidden rounded-md border bg-card p-[18px_20px] shadow-sm transition-all duration-200",
       hover && "cursor-pointer hover:shadow-md hover:-translate-y-0.5",
       className,
     )}
@@ -24,7 +24,7 @@ export const StatCard = ({ label, value, sub, icon, accent, wide, className }: a
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:shadow-md",
+        "relative overflow-hidden rounded-md border bg-card p-4 shadow-sm transition-all duration-200 hover:shadow-md",
         className,
       )}
       style={{ flex: wide ? "1 1 100%" : "1 1 calc(50% - 8px)", minWidth: 140 }}
@@ -42,7 +42,7 @@ export const StatCard = ({ label, value, sub, icon, accent, wide, className }: a
           )}
         </div>
         {icon && (
-          <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl border text-lg"
+          <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-md border text-lg"
             style={{ background: `${c}18`, borderColor: `${c}22` }}
           >
             {icon}
@@ -58,7 +58,7 @@ export const Btn = ({ children, color, outline, onClick, small, className, disab
     onClick={onClick}
     disabled={disabled}
     className={cn(
-      "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-[18px] py-[9px] text-[13px] font-semibold transition-all duration-200",
+      "inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-[18px] py-[9px] text-[13px] font-semibold transition-all duration-200",
       small && "px-[14px] py-[6px] text-xs",
       disabled && "cursor-not-allowed opacity-40",
       className,
@@ -98,7 +98,7 @@ export const SearchBar = ({ placeholder, value, onChange }: any) => (
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      className="rounded-lg pl-[34px] text-[13px] bg-muted border-border"
+      className="rounded-md pl-[34px] text-[13px] bg-muted border-border"
     />
   </div>
 );
@@ -108,7 +108,7 @@ export const Select = ({ options, value, onChange, className }: any) => (
     value={value}
     onChange={e => onChange(e.target.value)}
     className={cn(
-      "cursor-pointer rounded-lg border border-border px-3 py-[9px] text-[13px] outline-none transition-all bg-muted text-foreground",
+      "cursor-pointer rounded-md border border-border px-3 py-[9px] text-[13px] outline-none transition-all bg-muted text-foreground",
       className,
     )}
   >
@@ -121,10 +121,10 @@ export const Select = ({ options, value, onChange, className }: any) => (
 export const Table = ({ cols, rows, headers, empty }: any) => {
   const h = cols || headers || [];
   return (
-    <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+    <div className="overflow-hidden rounded-md border bg-card shadow-sm">
       <table className="w-full border-collapse">
         <thead>
-          <tr className="bg-primary/[0.08]">
+          <tr className="bg-muted/50">
             {h.map((c: string) => (
               <th key={c} className="px-4 py-[14px] text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border">
                 {c}
@@ -145,7 +145,7 @@ export const Table = ({ cols, rows, headers, empty }: any) => {
               </td>
             </tr>
           ) : rows.map((r: any[], i: number) => (
-            <tr key={i} className={cn("transition-colors border-b border-border last:border-0", i % 2 === 0 ? "bg-transparent" : "bg-primary/[0.02]")}>
+            <tr key={i} className={cn("transition-colors border-b border-border last:border-0", i % 2 === 0 ? "bg-transparent" : "bg-muted/30")}>
               {r.map((cell: any, j: number) => (
                 <td key={j} className="px-4 py-[13px] text-[13px] text-foreground">{cell}</td>
               ))}
@@ -212,7 +212,7 @@ export const InputField = ({ label, value, onChange, placeholder, type, icon, re
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
           rows={rows}
-          className="w-full resize-y rounded-lg border border-border bg-muted px-3 py-[9px] text-[13px] text-foreground outline-none transition-all focus:ring-2 focus:ring-primary/30"
+          className="w-full resize-y rounded-md border border-border bg-muted px-3 py-[9px] text-[13px] text-foreground outline-none transition-all focus:ring-2 focus:ring-primary/30"
           style={{ paddingLeft: icon ? 30 : 12 }}
         />
       ) : (
@@ -222,7 +222,7 @@ export const InputField = ({ label, value, onChange, placeholder, type, icon, re
           placeholder={placeholder}
           type={type || "text"}
           readOnly={readOnly}
-          className={cn("rounded-lg text-[13px] bg-muted border-border", icon && "pl-[30px]")}
+          className={cn("rounded-md text-[13px] bg-muted border-border", icon && "pl-[30px]")}
           style={{ opacity: readOnly ? .6 : 1 }}
         />
       )}

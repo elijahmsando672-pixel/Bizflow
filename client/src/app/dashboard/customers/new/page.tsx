@@ -8,8 +8,8 @@ export default function NewCustomerPage() {
       <div className="bg-gradient-to-br from-cyan-500 to-teal-500 p-4 rounded-2xl mb-4">
         <UserPlus className="w-8 h-8 text-white" />
       </div>
-      <h2 className="text-xl font-bold text-gray-100 mb-2">New Customer</h2>
-      <p className="text-gray-400 text-sm">Manage new customer.</p>
+      <h2 className="text-xl font-bold text-foreground mb-2">New Customer</h2>
+      <p className="text-muted-foreground text-sm">Manage new customer.</p>
     </div>
   );
 }
