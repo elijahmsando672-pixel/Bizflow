@@ -49,7 +49,7 @@ export const create = async (req, res) => {
 
     const result = await client.query(
       `INSERT INTO expenses (business_id, category_id, description, amount, date, vendor, reference, is_receipt_attached, notes, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+       OUTPUT INSERTED.* VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [req.business_id, category_id, description, amount, date || new Date(), vendor, reference, is_receipt_attached, notes, req.user.id]
     );
 
@@ -79,7 +79,7 @@ export const update = async (req, res) => {
 
     const { category_id, description, amount, date, vendor, reference, is_receipt_attached, notes } = req.body;
 
-    const existing = await client.query('SELECT id, amount FROM expenses WHERE id = $1 AND business_id = $2 FOR UPDATE', [req.params.id, req.business_id]);
+    const existing = await client.query('SELECT id, amount FROM expenses WITH (UPDLOCK, ROWLOCK) WHERE id = $1 AND business_id = $2', [req.params.id, req.business_id]);
     if (existing.rows.length === 0) {
       await client.query('ROLLBACK');
       return sendError(res, 404, 'Expense not found');
@@ -90,7 +90,7 @@ export const update = async (req, res) => {
        amount = COALESCE($3, amount), date = COALESCE($4, date), vendor = COALESCE($5, vendor),
        reference = COALESCE($6, reference), is_receipt_attached = COALESCE($7, is_receipt_attached),
        notes = COALESCE($8, notes), updated_at = NOW()
-       WHERE id = $9 AND business_id = $10 RETURNING *`,
+       OUTPUT INSERTED.* WHERE id = $9 AND business_id = $10`,
       [category_id, description, amount, date, vendor, reference, is_receipt_attached, notes, req.params.id, req.business_id]
     );
 
@@ -117,7 +117,7 @@ export const update = async (req, res) => {
 export const remove = async (req, res) => {
   try {
     const result = await query(
-      'DELETE FROM expenses WHERE id = $1 AND business_id = $2 RETURNING id',
+      'DELETE FROM expenses OUTPUT DELETED.id WHERE id = $1 AND business_id = $2',
       [req.params.id, req.business_id]
     );
     if (result.rows.length === 0) return sendError(res, 404, 'Expense not found');
@@ -145,7 +145,7 @@ export const createCategory = async (req, res) => {
   try {
     const { name, description, icon } = req.body;
     const result = await query(
-      'INSERT INTO expense_categories (business_id, name, description, icon) VALUES ($1, $2, $3, $4) RETURNING *',
+      'INSERT INTO expense_categories (business_id, name, description, icon) OUTPUT INSERTED.* VALUES ($1, $2, $3, $4)',
       [req.business_id, name, description, icon]
     );
     res.status(201).json(result.rows[0]);

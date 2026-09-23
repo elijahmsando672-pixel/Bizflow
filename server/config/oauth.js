@@ -58,7 +58,7 @@ async function findOrCreateUser(profile, provider) {
     const row = userByEmail.rows[0];
     if (!row.is_active || row.business_status === 'suspended') return null;
     await query(
-      'INSERT INTO social_accounts (user_id, provider, provider_id, email) VALUES ($1, $2, $3, $4) ON CONFLICT (provider, provider_id) DO NOTHING',
+      'MERGE social_accounts AS t USING (SELECT @p1 AS user_id, @p2 AS provider, @p3 AS provider_id, @p4 AS email) AS s ON t.provider = s.provider AND t.provider_id = s.provider_id WHEN NOT MATCHED THEN INSERT (user_id, provider, provider_id, email) VALUES (s.user_id, s.provider, s.provider_id, s.email);',
       [row.id, provider, providerId, email]
     );
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [row.id]);
@@ -69,13 +69,13 @@ async function findOrCreateUser(profile, provider) {
   }
 
   const businessResult = await query(
-    'INSERT INTO businesses (name, email) VALUES ($1, $2) RETURNING id',
+    'INSERT INTO businesses (name, email) OUTPUT INSERTED.id VALUES ($1, $2)',
     [name + "'s Business", email]
   );
   const business_id = businessResult.rows[0].id;
 
   const userResult = await query(
-    `INSERT INTO users (business_id, name, email, password, role) VALUES ($1, $2, $3, NULL, 'owner') RETURNING id, name, email, role, business_id`,
+    `INSERT INTO users (business_id, name, email, password, role) OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.role, INSERTED.business_id VALUES ($1, $2, $3, NULL, 'owner')`,
     [business_id, name, email]
   );
   const user = userResult.rows[0];

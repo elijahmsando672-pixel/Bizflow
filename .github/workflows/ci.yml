@@ -22,21 +22,28 @@ jobs:
   server-test:
     runs-on: ubuntu-latest
     services:
-      postgres:
-        image: postgres:16
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
         env:
-          POSTGRES_DB: bizflow_test
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
+          ACCEPT_EULA: 'Y'
+          MSSQL_SA_PASSWORD: 'BizflowTest#2026!'
+          MSSQL_PID: 'Developer'
         ports:
-          - 5432:5432
+          - 1433:1433
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'BizflowTest#2026!' -Q 'SELECT 1'"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
+          --health-start-period 30s
     env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/bizflow_test
+      DB_SERVER: localhost
+      DB_PORT: '1433'
+      DB_NAME: bizflow_test
+      DB_USER: sa
+      DB_PASSWORD: 'BizflowTest#2026!'
+      DB_ENCRYPT: 'false'
+      DB_TRUST_SERVER_CERT: 'true'
       JWT_SECRET: test-secret-key
       NODE_ENV: test
     steps:

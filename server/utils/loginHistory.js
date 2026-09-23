@@ -22,7 +22,7 @@ export const recordLoginHistory = async ({
 
 export const getLoginHistory = async (userId, limit = 50) => {
   const r = await query(
-    'SELECT * FROM login_history WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2',
+    'SELECT * FROM login_history WHERE user_id = $1 ORDER BY created_at DESC OFFSET 0 ROWS FETCH NEXT @p2 ROWS ONLY',
     [userId, limit]
   );
   return r.rows;
@@ -31,7 +31,7 @@ export const getLoginHistory = async (userId, limit = 50) => {
 export const getActiveSessions = async (userId) => {
   const r = await query(
     `SELECT lh.* FROM login_history lh
-     JOIN refresh_tokens rt ON lh.session_id = encode(digest(rt.token, 'sha256'), 'hex')
+     JOIN refresh_tokens rt ON lh.session_id = CONVERT(NVARCHAR(64), HASHBYTES('SHA2_256', rt.token), 2)
      WHERE lh.user_id = $1 AND rt.expires_at > NOW() AND lh.success = true
      ORDER BY lh.created_at DESC`,
     [userId]

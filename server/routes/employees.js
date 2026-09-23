@@ -233,7 +233,7 @@ router.put('/:id', async (req, res) => {
        department=$6, hire_date=$7, termination_date=$8, status=$9, salary=$10, salary_type=$11,
        bank_name=$12, bank_account=$13, id_number=$14, address=$15, emergency_contact_name=$16,
        emergency_contact_phone=$17, notes=$18, updated_at=NOW()
-       WHERE id=$19 AND business_id=$20 RETURNING *`,
+       OUTPUT INSERTED.* WHERE id=$19 AND business_id=$20`,
       [first_name, last_name, email, phone, position, department, hire_date, termination_date,
        status, salary, salary_type, bank_name, bank_account, id_number, address,
        emergency_contact_name, emergency_contact_phone, notes, req.params.id, req.business_id]

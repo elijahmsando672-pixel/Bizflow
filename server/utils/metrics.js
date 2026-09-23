@@ -56,9 +56,10 @@ export const getMetrics = async (pool) => {
     activeSessions = parseInt(sessions.rows[0].count) || 0;
 
     const size = await pool.query(`
-      SELECT pg_database_size(current_database()) / (1024*1024) as size_mb
+      SELECT CAST(SUM(size * 8.0) / 1024 / 1024 AS DECIMAL(18, 2)) as size_mb
+      FROM sys.database_files
     `);
-    dbSize = parseInt(size.rows[0].size_mb) || null;
+    dbSize = parseFloat(size.rows[0].size_mb) || null;
   } catch {
     dbStatus = 'unhealthy';
   }
