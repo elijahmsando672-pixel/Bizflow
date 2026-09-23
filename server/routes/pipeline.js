@@ -22,7 +22,7 @@ router.get('/stages', async (req, res) => {
       ];
       const results = await Promise.all(
         stages.map(s => query(
-          `INSERT INTO deal_stages (business_id, name, order_index, win_probability, color) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+          `INSERT INTO deal_stages (business_id, name, order_index, win_probability, color) OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5)`,
           [req.business_id, s.name, s.order_index, s.win_probability, s.color]
         ))
       );
@@ -40,7 +40,8 @@ router.post('/stages', async (req, res) => {
     const { name, order_index, win_probability, color } = req.body;
     const result = await query(
       `INSERT INTO deal_stages (business_id, name, order_index, win_probability, color)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+       OUTPUT INSERTED.*
+       VALUES ($1, $2, $3, $4, $5)`,
       [req.business_id, name, order_index, win_probability, color]
     );
     res.status(201).json(result.rows[0]);
@@ -56,7 +57,8 @@ router.put('/stages/:id', async (req, res) => {
     const result = await query(
       `UPDATE deal_stages SET name=COALESCE($2,name), order_index=COALESCE($3,order_index),
        win_probability=COALESCE($4,win_probability), color=COALESCE($5,color)
-       WHERE id=$1 AND business_id=$6 RETURNING *`,
+       OUTPUT INSERTED.*
+       WHERE id=$1 AND business_id=$6`,
       [req.params.id, name, order_index, win_probability, color, req.business_id]
     );
     if (!result.rows.length) return sendError(res, 404, 'Stage not found');
@@ -85,7 +87,7 @@ router.post('/', async (req, res) => {
     const { customer_id, lead_id, name, stage_id, value, priority, expected_close_date, assigned_to, notes } = req.body;
     const result = await query(
       `INSERT INTO deals (business_id, customer_id, lead_id, name, stage_id, value, priority, expected_close_date, assigned_to, notes, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) OUTPUT INSERTED.*`,
       [req.business_id, customer_id, lead_id, name, stage_id, value, priority, expected_close_date, assigned_to, notes, req.user.id]
     );
     const deal = result.rows[0];
@@ -150,10 +152,10 @@ router.get('/pipeline-summary', async (req, res) => {
 
     const summary = await query(
       `SELECT 
-         COUNT(*) FILTER (WHERE outcome = 'won') as won_deals,
-         COALESCE(SUM(value) FILTER (WHERE outcome = 'won'), 0) as won_value,
-         COUNT(*) FILTER (WHERE outcome = 'lost') as lost_deals,
-         COALESCE(SUM(value) FILTER (WHERE outcome = 'lost'), 0) as lost_value
+         COUNT(CASE WHEN outcome = 'won' THEN 1 END) as won_deals,
+         COALESCE(SUM(CASE WHEN outcome = 'won' THEN value END), 0) as won_value,
+         COUNT(CASE WHEN outcome = 'lost' THEN 1 END) as lost_deals,
+         COALESCE(SUM(CASE WHEN outcome = 'lost' THEN value END), 0) as lost_value
        FROM deals WHERE business_id = $1 AND outcome IS NOT NULL`,
       [req.business_id]
     );
@@ -207,7 +209,7 @@ router.put('/:id', async (req, res) => {
     if (outcome === 'lost') { updates.push(`actual_close_date=CURRENT_DATE`); }
 
     const result = await query(
-      `UPDATE deals SET ${updates.join(', ')} WHERE id=$1 AND business_id=$2 RETURNING *`,
+      `UPDATE deals SET ${updates.join(', ')} OUTPUT INSERTED.* WHERE id=$1 AND business_id=$2`,
       params
     );
     if (!result.rows.length) return sendError(res, 404, 'Deal not found');
@@ -232,7 +234,8 @@ router.post('/:id/activities', async (req, res) => {
     const { activity_type, description } = req.body;
     const result = await query(
       `INSERT INTO deal_activities (business_id, deal_id, activity_type, description, created_by)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+       OUTPUT INSERTED.*
+       VALUES ($1, $2, $3, $4, $5)`,
       [req.business_id, req.params.id, activity_type, description, req.user.id]
     );
     res.status(201).json(result.rows[0]);

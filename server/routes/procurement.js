@@ -6,7 +6,7 @@ const router = express.Router();
 
 async function getNextPONumber(business_id) {
   const result = await query(
-    `SELECT COALESCE(MAX(CAST(SUBSTRING(po_number FROM 4) AS INTEGER)), 0) + 1 as next_num FROM purchase_orders WHERE business_id = $1`,
+    `SELECT COALESCE(MAX(CAST(SUBSTRING(po_number, 4, LEN(po_number)) AS INTEGER)), 0) + 1 as next_num FROM purchase_orders WHERE business_id = $1`,
     [business_id]
   );
   return `PO-${String(result.rows[0].next_num).padStart(5, '0')}`;
@@ -18,7 +18,8 @@ router.post('/vendors', async (req, res) => {
     const { name, email, phone, address, contact_person, payment_terms, notes } = req.body;
     const result = await query(
       `INSERT INTO vendors (business_id, name, email, phone, address, contact_person, payment_terms, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+       OUTPUT INSERTED.*
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [req.business_id, name, email, phone, address, contact_person, payment_terms, notes]
     );
     res.status(201).json(result.rows[0]);
@@ -62,7 +63,7 @@ router.put('/vendors/:id', async (req, res) => {
       `UPDATE vendors SET name=COALESCE($2,name), email=COALESCE($3,email), phone=COALESCE($4,phone),
        address=COALESCE($5,address), contact_person=COALESCE($6,contact_person), payment_terms=COALESCE($7,payment_terms),
        rating=COALESCE($8,rating), notes=COALESCE($9,notes), updated_at=CURRENT_TIMESTAMP
-       WHERE id=$1 AND business_id=$10 RETURNING *`,
+       WHERE id=$1 AND business_id=$10 OUTPUT INSERTED.*`,
       [req.params.id, name, email, phone, address, contact_person, payment_terms, rating, notes, req.business_id]
     );
     if (!result.rows.length) return sendError(res, 404, 'Vendor not found');
@@ -94,7 +95,8 @@ router.post('/purchase-orders', async (req, res) => {
 
     const poResult = await query(
       `INSERT INTO purchase_orders (business_id, po_number, vendor_id, expected_delivery, subtotal, tax_amount, total, notes, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+       OUTPUT INSERTED.*
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [req.business_id, poNumber, vendor_id, expected_delivery, subtotal, taxAmount, total, notes, req.user.id]
     );
 
@@ -173,7 +175,7 @@ router.put('/purchase-orders/:id', async (req, res) => {
     const { status, expected_delivery, notes } = req.body;
     const result = await query(
       `UPDATE purchase_orders SET status=COALESCE($2,status), expected_delivery=COALESCE($3,expected_delivery),
-       notes=COALESCE($4,notes), updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND business_id=$5 RETURNING *`,
+       notes=COALESCE($4,notes), updated_at=CURRENT_TIMESTAMP OUTPUT INSERTED.* WHERE id=$1 AND business_id=$5`,
       [req.params.id, status, expected_delivery, notes, req.business_id]
     );
     if (!result.rows.length) return sendError(res, 404, 'Purchase order not found');

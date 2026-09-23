@@ -5,7 +5,7 @@ const TAX_RATE = 0.16;
 
 async function generateInvoiceNumber(client, businessId) {
   const result = await client.query(
-    "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM 5) AS INTEGER)), 0) + 1 as next_num FROM invoices WHERE business_id = $1",
+    "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number, 5, LEN(invoice_number)) AS BIGINT)), 0) + 1 as next_num FROM invoices WHERE business_id = $1",
     [businessId]
   );
   return `INV-${String(parseInt(result.rows[0].next_num)).padStart(5, '0')}`;
@@ -62,7 +62,8 @@ export async function createInvoice(businessId, userId, data) {
 
     const invoiceResult = await client.query(
       `INSERT INTO invoices (business_id, customer_id, invoice_number, invoice_date, due_date, subtotal, tax_amount, discount_amount, total, notes, created_by, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'draft') RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'draft')
+       OUTPUT INSERTED.*`,
       [businessId, customer_id, invoiceNumber, invoice_date || new Date(), due_date, subtotal, taxAmount, discount_amount, total, notes, userId]
     );
     const invoice = invoiceResult.rows[0];
@@ -92,7 +93,7 @@ export async function updateInvoice(businessId, invoiceId, data) {
     const { status, due_date, notes, customer_id, items, discount_amount } = data;
 
     const existingInvoice = await client.query(
-      'SELECT * FROM invoices WHERE id = $1 AND business_id = $2 FOR UPDATE',
+      'SELECT * FROM invoices WITH (UPDLOCK, ROWLOCK) WHERE id = $1 AND business_id = $2',
       [invoiceId, businessId]
     );
     if (!existingInvoice.rows.length) {
@@ -116,9 +117,8 @@ export async function updateInvoice(businessId, invoiceId, data) {
       `UPDATE invoices 
        SET status = COALESCE($1, status), customer_id = COALESCE($2, customer_id), due_date = COALESCE($3, due_date),
            notes = COALESCE($4, notes), subtotal = $5, tax_amount = $6, discount_amount = $7, total = $8,
-           paid_date = $9, updated_at = NOW()
-       WHERE id = $10 AND business_id = $11
-       RETURNING *`,
+           paid_date = $9, updated_at = NOW() OUTPUT INSERTED.*
+       WHERE id = $10 AND business_id = $11`,
       [status, customer_id, due_date, notes, subtotal, taxAmount, finalDiscount, total, paidDate, invoiceId, businessId]
     );
 
@@ -134,7 +134,7 @@ export async function updateInvoice(businessId, invoiceId, data) {
 
 export async function deleteInvoice(businessId, invoiceId) {
   const result = await query(
-    'DELETE FROM invoices WHERE id = $1 AND business_id = $2 RETURNING id',
+    'DELETE FROM invoices OUTPUT DELETED.id WHERE id = $1 AND business_id = $2',
     [invoiceId, businessId]
   );
   if (!result.rows.length) {

@@ -62,7 +62,7 @@ router.post('/', auditLogger('users.create'), async (req, res) => {
     const result = await query(
       `INSERT INTO users (business_id, name, email, password, role, is_active)
        VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, name, email, role, is_active, created_at`,
+       OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.role, INSERTED.is_active, INSERTED.created_at`,
       [req.business_id, name, email, hashedPassword, role, is_active]
     );
 
@@ -87,7 +87,7 @@ router.delete('/:id', auditLogger('users.delete'), async (req, res) => {
     }
 
     const result = await query(
-      'DELETE FROM users WHERE id = $1 AND business_id = $2 RETURNING id',
+      'DELETE FROM users OUTPUT DELETED.id WHERE id = $1 AND business_id = $2',
       [req.params.id, req.business_id]
     );
     if (result.rows.length === 0) {

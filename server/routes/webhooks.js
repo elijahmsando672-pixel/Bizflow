@@ -22,7 +22,7 @@ router.post('/', async (req, res, next) => {
 
     const r = await query(
       `INSERT INTO webhooks (business_id, name, url, secret, event, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, url, event, is_active, created_at`,
+       VALUES ($1, $2, $3, $4, $5, $6) OUTPUT INSERTED.id, INSERTED.name, INSERTED.url, INSERTED.event, INSERTED.is_active, INSERTED.created_at`,
       [req.business_id, name, url, secret, event, req.user.id]
     );
     logAction({ businessId: req.business_id, userId: req.user.id, action: 'Webhook Created', result: 'success', resourceType: 'webhooks', resourceId: r.rows[0].id, details: { event }, ip: req.ip, userAgent: req.get('User-Agent') }).catch(() => {});
@@ -39,7 +39,7 @@ router.put('/:id', async (req, res, next) => {
     }
     if (!sets.length) throw new AppError('No fields to update', 400);
     vals.push(req.params.id, req.business_id);
-    const r = await query(`UPDATE webhooks SET ${sets.join(', ')} WHERE id=$${i++} AND business_id=$${i} RETURNING id`, vals);
+    const r = await query(`UPDATE webhooks SET ${sets.join(', ')} OUTPUT INSERTED.id WHERE id=$${i++} AND business_id=$${i}`, vals);
     if (!r.rows.length) throw new AppError('Webhook not found', 404);
     res.json({ success: true, message: 'Webhook updated' });
   } catch (err) { next(err); }
@@ -47,7 +47,7 @@ router.put('/:id', async (req, res, next) => {
 
 router.delete('/:id', async (req, res, next) => {
   try {
-    const r = await query('DELETE FROM webhooks WHERE id = $1 AND business_id = $2 RETURNING id', [req.params.id, req.business_id]);
+    const r = await query('DELETE FROM webhooks OUTPUT DELETED.id WHERE id = $1 AND business_id = $2', [req.params.id, req.business_id]);
     if (!r.rows.length) throw new AppError('Webhook not found', 404);
     res.json({ success: true, message: 'Webhook deleted' });
   } catch (err) { next(err); }

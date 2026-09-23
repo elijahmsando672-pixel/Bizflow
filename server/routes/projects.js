@@ -9,7 +9,8 @@ router.post('/', async (req, res) => {
     const { name, description, start_date, end_date, budget, customer_id, assigned_to } = req.body;
     const result = await query(
       `INSERT INTO projects (business_id, name, description, start_date, end_date, budget, customer_id, assigned_to, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+       OUTPUT INSERTED.*
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [req.business_id, name, description, start_date, end_date, budget, customer_id, assigned_to, req.user.id]
     );
     res.status(201).json(result.rows[0]);
@@ -30,9 +31,9 @@ router.get('/', async (req, res) => {
     const result = await query(
       `SELECT p.*, c.name as customer_name,
               u.name as assigned_name,
-              COUNT(pt.id) FILTER (WHERE pt.status = 'todo') as tasks_todo,
-              COUNT(pt.id) FILTER (WHERE pt.status = 'in_progress') as tasks_in_progress,
-              COUNT(pt.id) FILTER (WHERE pt.status = 'completed') as tasks_done,
+              COUNT(CASE WHEN pt.status = 'todo' THEN pt.id END) as tasks_todo,
+              COUNT(CASE WHEN pt.status = 'in_progress' THEN pt.id END) as tasks_in_progress,
+              COUNT(CASE WHEN pt.status = 'completed' THEN pt.id END) as tasks_done,
               COALESCE(SUM(te.duration_minutes), 0) / 60.0 as total_hours
        FROM projects p
        LEFT JOIN customers c ON p.customer_id = c.id
@@ -75,7 +76,7 @@ router.put('/:id', async (req, res) => {
       `UPDATE projects SET name=COALESCE($2,name), description=COALESCE($3,description), status=COALESCE($4,status),
        start_date=COALESCE($5,start_date), end_date=COALESCE($6,end_date), budget=COALESCE($7,budget),
        assigned_to=COALESCE($8,assigned_to), updated_at=CURRENT_TIMESTAMP
-       WHERE id=$1 AND business_id=$9 RETURNING *`,
+       WHERE id=$1 AND business_id=$9 OUTPUT INSERTED.*`,
       [req.params.id, name, description, status, start_date, end_date, budget, assigned_to, req.business_id]
     );
     if (!result.rows.length) return sendError(res, 404, 'Project not found');
@@ -109,7 +110,7 @@ router.post('/:id/tasks', async (req, res) => {
     const { title, description, status, priority, assignee_id, due_date, estimated_hours } = req.body;
     const result = await query(
       `INSERT INTO project_tasks (business_id, project_id, title, description, status, priority, assignee_id, due_date, estimated_hours)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) OUTPUT INSERTED.*`,
       [req.business_id, req.params.id, title, description, status || 'todo', priority, assignee_id, due_date, estimated_hours]
     );
     res.status(201).json(result.rows[0]);
@@ -136,7 +137,7 @@ router.put('/tasks/:taskId', async (req, res) => {
     if (status === 'completed') { updates.push(`completed_at=CURRENT_TIMESTAMP`); }
 
     const result = await query(
-      `UPDATE project_tasks SET ${updates.join(', ')} WHERE id=$1 AND business_id=$2 RETURNING *`,
+      `UPDATE project_tasks SET ${updates.join(', ')} OUTPUT INSERTED.* WHERE id=$1 AND business_id=$2`,
       params
     );
     if (!result.rows.length) return sendError(res, 404, 'Task not found');

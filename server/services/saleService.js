@@ -91,7 +91,7 @@ function generateReceiptHTML(business, sale, items) {
 async function deductInventory(client, businessId, items) {
   for (const item of items) {
     if (item.product_id) {
-      const productResult = await client.query('SELECT stock_qty FROM products WHERE id = $1 FOR UPDATE', [item.product_id]);
+      const productResult = await client.query('SELECT stock_qty FROM products WITH (UPDLOCK, ROWLOCK) WHERE id = $1', [item.product_id]);
       const currentStock = productResult.rows[0]?.stock_qty || 0;
       if (currentStock < item.qty) {
         throw new Error(`Insufficient stock for ${item.product_name || 'item'}. Available: ${currentStock}, requested: ${item.qty}`);
@@ -134,7 +134,7 @@ async function createCashflowEntry(client, businessId, saleId, total, saleDate, 
 
 async function generateReceiptNumber(client, businessId) {
   const counter = await client.query(
-    `SELECT COALESCE(MAX(CAST(SUBSTRING(receipt_number FROM 5) AS INTEGER)), 0) as max_num FROM receipts WHERE business_id = $1`,
+    `SELECT COALESCE(MAX(CAST(SUBSTRING(receipt_number, 5, LEN(receipt_number)) AS INTEGER)), 0) as max_num FROM receipts WHERE business_id = $1`,
     [businessId]
   );
   return `RCP-${String(parseInt(counter.rows[0].max_num) + 1).padStart(5, '0')}`;
@@ -142,7 +142,7 @@ async function generateReceiptNumber(client, businessId) {
 
 async function generateReceiptNumberStandalone(businessId) {
   const counter = await query(
-    `SELECT COALESCE(MAX(CAST(SUBSTRING(receipt_number FROM 5) AS INTEGER)), 0) as max_num FROM receipts WHERE business_id = $1`,
+    `SELECT COALESCE(MAX(CAST(SUBSTRING(receipt_number, 5, LEN(receipt_number)) AS INTEGER)), 0) as max_num FROM receipts WHERE business_id = $1`,
     [businessId]
   );
   return `RCP-${String(parseInt(counter.rows[0].max_num) + 1).padStart(5, '0')}`;
@@ -150,7 +150,7 @@ async function generateReceiptNumberStandalone(businessId) {
 
 async function generateSaleNumber(client, businessId) {
   const result = await client.query(
-    "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM 5) AS INTEGER)), 0) + 1 as next_num FROM sales WHERE business_id = $1",
+    "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number, 5, LEN(invoice_number)) AS INTEGER)), 0) + 1 as next_num FROM sales WHERE business_id = $1",
     [businessId]
   );
   return `SAL-${String(parseInt(result.rows[0].next_num)).padStart(5, '0')}`;
@@ -178,7 +178,8 @@ export async function createSale(businessId, userId, data) {
 
     const saleResult = await client.query(
       `INSERT INTO sales (business_id, customer_id, invoice_number, sale_date, due_date, subtotal, tax_amount, discount_amount, total, amount_paid, notes, status, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+       OUTPUT INSERTED.*
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [businessId, customer_id, saleNumber, sale_date || new Date(), due_date, subtotal, taxAmount, discount_amount, total, amount_paid || 0, notes, status, userId]
     );
     const sale = saleResult.rows[0];
@@ -224,7 +225,7 @@ export async function updateSale(businessId, saleId, data) {
     const { status, notes } = data;
 
     const saleResult = await client.query(
-      'SELECT id, status, total FROM sales WHERE id = $1 AND business_id = $2 FOR UPDATE',
+      'SELECT id, status, total FROM sales WITH (UPDLOCK, ROWLOCK) WHERE id = $1 AND business_id = $2',
       [saleId, businessId]
     );
     if (!saleResult.rows.length) {
@@ -244,7 +245,7 @@ export async function updateSale(businessId, saleId, data) {
       );
       for (const item of items.rows) {
         if (item.product_id) {
-          const productResult = await client.query('SELECT stock_qty FROM products WHERE id = $1 FOR UPDATE', [item.product_id]);
+          const productResult = await client.query('SELECT stock_qty FROM products WITH (UPDLOCK, ROWLOCK) WHERE id = $1', [item.product_id]);
           const currentStock = productResult.rows[0]?.stock_qty || 0;
           if (currentStock < item.qty) {
             await client.query('ROLLBACK');
@@ -265,7 +266,7 @@ export async function updateSale(businessId, saleId, data) {
       `UPDATE sales SET status = COALESCE($1, status), notes = COALESCE($2, notes),
        amount_paid = CASE WHEN $1 = 'paid' THEN total ELSE amount_paid END,
        paid_date = CASE WHEN $1 = 'paid' THEN $3 ELSE paid_date END,
-       updated_at = NOW() WHERE id = $4 AND business_id = $5 RETURNING *`,
+       updated_at = NOW() OUTPUT INSERTED.* WHERE id = $4 AND business_id = $5`,
       [status, notes, paidDate, saleId, businessId]
     );
 
@@ -345,7 +346,8 @@ export async function generateReceipt(businessId, saleId) {
 
     const receipt = await query(
       `INSERT INTO receipts (business_id, sale_id, receipt_number, customer_name, customer_phone, items, subtotal, discount_amount, tax_amount, total, receipt_html)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+       OUTPUT INSERTED.*
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         businessId, saleId, receiptNumber,
         sale.customer_name || null, sale.customer_phone || null,

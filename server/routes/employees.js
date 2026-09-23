@@ -104,9 +104,10 @@ router.post('/payroll', async (req, res) => {
     const net_salary = gross_salary + bonuses + overtime_pay - deductions - tax_amount;
 
     const payrollResult = await client.query(
-      `INSERT INTO payroll (business_id, employee_id, period_start, period_end, gross_salary, deductions,
-       bonuses, overtime_hours, overtime_pay, tax_amount, net_salary, status, notes, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+`INSERT INTO payroll (business_id, employee_id, period_start, period_end, gross_salary, deductions,
+        bonuses, overtime_hours, overtime_pay, tax_amount, net_salary, status, notes, created_by)
+        OUTPUT INSERTED.*
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
       [req.business_id, employee_id, period_start, period_end, gross_salary, deductions,
        bonuses, overtime_hours, overtime_pay, tax_amount, net_salary, status, notes, req.user.id]
     );
@@ -155,7 +156,7 @@ router.put('/payroll/:id', async (req, res) => {
     const newPayDate = pay_date || payroll.pay_date;
 
     const result = await query(
-      `UPDATE payroll SET status = $1, pay_date = $2 WHERE id = $3 AND business_id = $4 RETURNING *`,
+      `UPDATE payroll SET status = $1, pay_date = $2 OUTPUT INSERTED.* WHERE id = $3 AND business_id = $4`,
       [newStatus, newPayDate, req.params.id, req.business_id]
     );
 
@@ -203,7 +204,8 @@ router.post('/', async (req, res) => {
       `INSERT INTO employees (business_id, first_name, last_name, email, phone, position, department,
        hire_date, termination_date, status, salary, salary_type, bank_name, bank_account, id_number,
        address, emergency_contact_name, emergency_contact_phone, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
+       OUTPUT INSERTED.*
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
       [req.business_id, first_name, last_name, email, phone, position, department, hire_date,
        termination_date, status, salary, salary_type, bank_name, bank_account, id_number,
        address, emergency_contact_name, emergency_contact_phone, notes]
@@ -247,7 +249,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const result = await query(
-      'DELETE FROM employees WHERE id = $1 AND business_id = $2 RETURNING id',
+      'DELETE FROM employees OUTPUT DELETED.id WHERE id = $1 AND business_id = $2',
       [req.params.id, req.business_id]
     );
     if (result.rows.length === 0) return sendError(res, 404, 'Not found');
@@ -290,7 +292,7 @@ router.post('/:id/clock-in', async (req, res) => {
 
     const result = await query(
       `INSERT INTO attendance (business_id, employee_id, date, clock_in, status)
-       VALUES ($1, $2, $3, NOW(), 'present') RETURNING *`,
+       VALUES ($1, $2, $3, NOW(), 'present') OUTPUT INSERTED.*`,
       [req.business_id, req.params.id, today]
     );
     res.status(201).json(result.rows[0]);
@@ -304,7 +306,7 @@ router.post('/:id/clock-out', async (req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
     const result = await query(
-      `UPDATE attendance SET clock_out = NOW() WHERE employee_id = $1 AND date = $2 AND business_id = $3 RETURNING *`,
+      `UPDATE attendance SET clock_out = NOW() OUTPUT INSERTED.* WHERE employee_id = $1 AND date = $2 AND business_id = $3`,
       [req.params.id, today, req.business_id]
     );
     if (result.rows.length === 0) return sendError(res, 404, 'No clock-in found for today');

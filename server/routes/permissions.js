@@ -62,7 +62,7 @@ router.put('/permissions/:id', async (req, res) => {
   try {
     const { can_create, can_read, can_update, can_delete } = req.body;
     const result = await query(
-      `UPDATE permissions SET can_create=$2, can_read=$3, can_update=$4, can_delete=$5 WHERE id=$1 AND business_id=$6 RETURNING *`,
+      `UPDATE permissions SET can_create=$2, can_read=$3, can_update=$4, can_delete=$5 OUTPUT INSERTED.* WHERE id=$1 AND business_id=$6`,
       [req.params.id, can_create, can_read, can_update, can_delete, req.business_id]
     );
     if (!result.rows.length) return sendError(res, 404, 'Permission not found');

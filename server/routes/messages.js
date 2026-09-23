@@ -43,7 +43,8 @@ router.post('/', async (req, res) => {
 
     const result = await query(
       `INSERT INTO messages (business_id, sender_name, sender_email, subject, body)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+       OUTPUT INSERTED.*
+       VALUES ($1, $2, $3, $4, $5)`,
       [req.business_id, sanitize(sender_name), sanitize(sender_email), sanitize(subject), sanitize(body)]
     );
     res.status(201).json(result.rows[0]);
@@ -63,7 +64,8 @@ router.put('/:id', async (req, res) => {
         subject = COALESCE($3, subject),
         body = COALESCE($4, body),
         is_read = COALESCE($5, is_read)
-       WHERE id = $6 AND business_id = $7 RETURNING *`,
+       OUTPUT INSERTED.*
+       WHERE id = $6 AND business_id = $7`,
       [sanitize(sender_name), sanitize(sender_email), sanitize(subject), sanitize(body), is_read, req.params.id, req.business_id]
     );
     if (result.rows.length === 0) return sendError(res, 404, 'Message not found');
@@ -77,7 +79,7 @@ router.put('/:id', async (req, res) => {
 router.patch('/:id/read', async (req, res) => {
   try {
     const result = await query(
-      `UPDATE messages SET is_read = true WHERE id = $1 AND business_id = $2 RETURNING *`,
+      `UPDATE messages SET is_read = true OUTPUT INSERTED.* WHERE id = $1 AND business_id = $2`,
       [req.params.id, req.business_id]
     );
     if (result.rows.length === 0) return sendError(res, 404, 'Message not found');
@@ -91,7 +93,7 @@ router.patch('/:id/read', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const result = await query(
-      'DELETE FROM messages WHERE id = $1 AND business_id = $2 RETURNING id',
+      'DELETE FROM messages OUTPUT DELETED.id WHERE id = $1 AND business_id = $2',
       [req.params.id, req.business_id]
     );
     if (result.rows.length === 0) return sendError(res, 404, 'Message not found');

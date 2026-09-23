@@ -41,9 +41,9 @@ router.get('/profit-loss', async (req, res) => {
     );
 
     const revenueByMonth = await query(
-      `SELECT TO_CHAR(sale_date, 'YYYY-MM') as month, SUM(total) as revenue
+      `SELECT FORMAT(sale_date, 'yyyy-MM') as month, SUM(total) as revenue
        FROM sales WHERE business_id = $1 AND status = 'paid' AND sale_date BETWEEN $2 AND $3
-       GROUP BY TO_CHAR(sale_date, 'YYYY-MM') ORDER BY month`,
+       GROUP BY FORMAT(sale_date, 'yyyy-MM') ORDER BY month`,
       [businessId, startDate, endDate]
     );
 
@@ -73,15 +73,15 @@ router.get('/sales-report', async (req, res) => {
     const businessId = req.business_id;
 
     let dateFormat;
-    if (group_by === 'month') dateFormat = 'YYYY-MM';
-    else if (group_by === 'week') dateFormat = 'IYYY-IW';
-    else dateFormat = 'YYYY-MM-DD';
+    if (group_by === 'month') dateFormat = 'yyyy-MM';
+    else if (group_by === 'week') dateFormat = 'yyyy-ww';
+    else dateFormat = 'yyyy-MM-dd';
 
     const salesByPeriod = await query(
-      `SELECT TO_CHAR(sale_date, '${dateFormat}') as period,
+      `SELECT FORMAT(sale_date, '${dateFormat}') as period,
               COUNT(*) as count, SUM(total) as revenue, AVG(total) as avg_order
        FROM sales WHERE business_id = $1 AND sale_date BETWEEN $2 AND $3
-       GROUP BY period ORDER BY period`,
+       GROUP BY FORMAT(sale_date, '${dateFormat}') ORDER BY period`,
       [businessId, startDate, endDate]
     );
 
@@ -89,7 +89,7 @@ router.get('/sales-report', async (req, res) => {
       `SELECT c.name, COUNT(*) as purchase_count, SUM(s.total) as total_spent
        FROM sales s JOIN customers c ON s.customer_id = c.id
        WHERE s.business_id = $1 AND s.sale_date BETWEEN $2 AND $3
-       GROUP BY c.id, c.name ORDER BY total_spent DESC LIMIT 10`,
+       GROUP BY c.id, c.name ORDER BY total_spent DESC OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY`,
       [businessId, startDate, endDate]
     );
 
@@ -97,7 +97,7 @@ router.get('/sales-report', async (req, res) => {
       `SELECT p.name, SUM(si.qty) as qty_sold, SUM(si.total) as revenue
        FROM sale_items si JOIN products p ON si.product_id = p.id
        WHERE si.business_id = $1 AND si.created_at BETWEEN $2 AND $3
-       GROUP BY p.id, p.name ORDER BY revenue DESC LIMIT 10`,
+       GROUP BY p.id, p.name ORDER BY revenue DESC OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY`,
       [businessId, startDate, endDate]
     );
 
@@ -121,7 +121,7 @@ router.get('/inventory-report', async (req, res) => {
 
     const products = await query(
       `SELECT p.*, c.name as category_name,
-              COALESCE((SELECT SUM(si.qty) FROM sale_items si WHERE si.product_id = p.id AND si.created_at >= NOW() - INTERVAL '30 days'), 0) as sold_30d
+              COALESCE((SELECT SUM(si.qty) FROM sale_items si WHERE si.product_id = p.id AND si.created_at >= DATEADD(day, -30, GETDATE())), 0) as sold_30d
        FROM products p LEFT JOIN categories c ON p.category_id = c.id
        WHERE p.business_id = $1 AND p.is_active = true
        ORDER BY p.stock_qty ASC`,
@@ -135,8 +135,8 @@ router.get('/inventory-report', async (req, res) => {
     const stockMovements = await query(
       `SELECT sm.*, p.name as product_name
        FROM stock_movements sm JOIN products p ON sm.product_id = p.id
-       WHERE sm.business_id = $1 AND sm.created_at >= NOW() - INTERVAL '30 days'
-       ORDER BY sm.created_at DESC LIMIT 50`,
+       WHERE sm.business_id = $1 AND sm.created_at >= DATEADD(day, -30, GETDATE())
+       ORDER BY sm.created_at DESC OFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY`,
       [businessId]
     );
 
@@ -214,21 +214,21 @@ router.get('/tax-summary', async (req, res) => {
     const businessId = req.business_id;
 
     const salesTax = await query(
-      `SELECT COALESCE(SUM(tax_amount), 0) as total FROM sales WHERE business_id = $1 AND EXTRACT(YEAR FROM sale_date) = $2`,
+      `SELECT COALESCE(SUM(tax_amount), 0) as total FROM sales WHERE business_id = $1 AND YEAR(sale_date) = $2`,
       [businessId, targetYear]
     );
 
     const monthlySales = await query(
-      `SELECT TO_CHAR(sale_date, 'MM') as month, COUNT(*) as count, SUM(total) as revenue
-       FROM sales WHERE business_id = $1 AND EXTRACT(YEAR FROM sale_date) = $2
-       GROUP BY month ORDER BY month`,
+      `SELECT FORMAT(sale_date, 'MM') as month, COUNT(*) as count, SUM(total) as revenue
+       FROM sales WHERE business_id = $1 AND YEAR(sale_date) = $2
+       GROUP BY FORMAT(sale_date, 'MM') ORDER BY month`,
       [businessId, targetYear]
     );
 
     const monthlyExpenses = await query(
-      `SELECT TO_CHAR(date, 'MM') as month, SUM(amount) as total
-       FROM expenses WHERE business_id = $1 AND EXTRACT(YEAR FROM date) = $2
-       GROUP BY month ORDER BY month`,
+      `SELECT FORMAT(date, 'MM') as month, SUM(amount) as total
+       FROM expenses WHERE business_id = $1 AND YEAR(date) = $2
+       GROUP BY FORMAT(date, 'MM') ORDER BY month`,
       [businessId, targetYear]
     );
 

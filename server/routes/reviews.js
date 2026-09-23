@@ -43,7 +43,7 @@ router.post('/', async (req, res) => {
 
     const result = await query(
       `INSERT INTO reviews (business_id, customer_id, customer_name, product_id, product_name, rating, comment, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) OUTPUT INSERTED.*`,
       [req.business_id, customer_id, sanitize(customer_name), product_id, sanitize(product_name), rating, sanitize(comment), status || 'pending']
     );
     res.status(201).json(result.rows[0]);
@@ -65,7 +65,7 @@ router.put('/:id', async (req, res) => {
         rating = COALESCE($5, rating),
         comment = COALESCE($6, comment),
         status = COALESCE($7, status)
-       WHERE id = $8 AND business_id = $9 RETURNING *`,
+       WHERE id = $8 AND business_id = $9 OUTPUT INSERTED.*`,
       [customer_id, sanitize(customer_name), product_id, sanitize(product_name), rating, sanitize(comment), status, req.params.id, req.business_id]
     );
     if (result.rows.length === 0) return sendError(res, 404, 'Review not found');
@@ -79,7 +79,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const result = await query(
-      'DELETE FROM reviews WHERE id = $1 AND business_id = $2 RETURNING id',
+      'DELETE FROM reviews OUTPUT DELETED.id WHERE id = $1 AND business_id = $2',
       [req.params.id, req.business_id]
     );
     if (result.rows.length === 0) return sendError(res, 404, 'Review not found');

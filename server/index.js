@@ -74,8 +74,8 @@ const auditCrud = (resource) => (req, res, next) => {
 dotenv.config();
 
 const requiredEnvVars = ['JWT_SECRET'];
-if (!process.env.DATABASE_URL) {
-  requiredEnvVars.push('DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD');
+if (!process.env.DB_CONNECTION_STRING) {
+  requiredEnvVars.push('DB_SERVER', 'DB_NAME', 'DB_USER', 'DB_PASSWORD');
 }
 const missing = requiredEnvVars.filter(key => !process.env[key]);
 if (missing.length > 0) {

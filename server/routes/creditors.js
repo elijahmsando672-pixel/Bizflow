@@ -49,7 +49,8 @@ router.post('/', validate(creditorSchema), async (req, res) => {
 
     const result = await query(
       `INSERT INTO creditors (business_id, name, email, phone, address, opening_balance, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+       OUTPUT INSERTED.*
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [req.business_id, name, email, phone, address, opening_balance || 0, notes]
     );
     res.status(201).json(result.rows[0]);
@@ -64,7 +65,8 @@ router.put('/:id', validate(creditorSchema), async (req, res) => {
     const { name, email, phone, address, opening_balance, notes } = req.body;
     const result = await query(
       `UPDATE creditors SET name=$1, email=$2, phone=$3, address=$4, opening_balance=$5, notes=$6, updated_at=NOW()
-       WHERE id=$7 AND business_id=$8 RETURNING *`,
+       OUTPUT INSERTED.*
+       WHERE id=$7 AND business_id=$8`,
       [name, email, phone, address, opening_balance, notes, req.params.id, req.business_id]
     );
     if (result.rows.length === 0) return sendError(res, 404, 'Not found');
@@ -78,7 +80,7 @@ router.put('/:id', validate(creditorSchema), async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const result = await query(
-      'DELETE FROM creditors WHERE id = $1 AND business_id = $2 RETURNING id',
+      'DELETE FROM creditors OUTPUT DELETED.id WHERE id = $1 AND business_id = $2',
       [req.params.id, req.business_id]
     );
     if (result.rows.length === 0) return sendError(res, 404, 'Not found');
@@ -97,7 +99,8 @@ router.post('/:id/payments', validate(creditorPaymentSchema), async (req, res) =
 
     const paymentResult = await client.query(
       `INSERT INTO creditor_payments (business_id, creditor_id, amount, date, reference, notes, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+       OUTPUT INSERTED.*
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [req.business_id, req.params.id, amount, date || new Date(), reference, notes, req.user.id]
     );
 

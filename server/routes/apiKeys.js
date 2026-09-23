@@ -24,7 +24,8 @@ router.post('/', async (req, res, next) => {
     const { raw, hash, prefix } = generateApiKey();
     const result = await query(
       `INSERT INTO api_keys (business_id, name, key_hash, key_prefix, scopes, expires_at, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, name, key_prefix, scopes, is_active, created_at`,
+       OUTPUT INSERTED.id, INSERTED.name, INSERTED.key_prefix, INSERTED.scopes, INSERTED.is_active, INSERTED.created_at
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [req.business_id, name, hash, prefix, scopes || ['read'], expires_at || null, req.user.id]
     );
 
@@ -39,7 +40,7 @@ router.post('/', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const result = await query(
-      'DELETE FROM api_keys WHERE id = $1 AND business_id = $2 RETURNING id',
+      'DELETE FROM api_keys OUTPUT DELETED.id WHERE id = $1 AND business_id = $2',
       [req.params.id, req.business_id]
     );
     if (!result.rows.length) throw new AppError('API key not found', 404);

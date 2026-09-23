@@ -12,9 +12,9 @@ router.post('/', async (req, res) => {
 
     const result = await query(
       `INSERT INTO leads (business_id, first_name, last_name, email, phone, company, job_title, source, estimated_value, notes, created_by, lead_score)
+       OUTPUT INSERTED.*
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
-         CASE WHEN $8 = 'referral' THEN 80 WHEN $8 = 'inbound' THEN 70 WHEN $8 = 'outbound' THEN 50 ELSE 30 END)
-       RETURNING *`,
+         CASE WHEN $8 = 'referral' THEN 80 WHEN $8 = 'inbound' THEN 70 WHEN $8 = 'outbound' THEN 50 ELSE 30 END)`,
       [businessId, first_name, last_name, email, phone, company, job_title, source, estimated_value || 0, notes, createdById]
     );
     res.status(201).json(result.rows[0]);
@@ -76,7 +76,8 @@ router.put('/:id', async (req, res) => {
        phone=COALESCE($5,phone), company=COALESCE($6,company), job_title=COALESCE($7,job_title), source=COALESCE($8,source),
        status=COALESCE($9,status), lead_score=COALESCE($10,lead_score), estimated_value=COALESCE($11,estimated_value),
        assigned_to=COALESCE($12,assigned_to), notes=COALESCE($13,notes), updated_at=CURRENT_TIMESTAMP
-       WHERE id=$1 AND business_id=$14 RETURNING *`,
+       OUTPUT INSERTED.*
+       WHERE id=$1 AND business_id=$14`,
       [req.params.id, first_name, last_name, email, phone, company, job_title, source, status, lead_score, estimated_value, assigned_to, notes, req.business_id]
     );
     if (!result.rows.length) return sendError(res, 404, 'Lead not found');
@@ -98,7 +99,8 @@ router.post('/:id/convert', async (req, res) => {
     const l = lead.rows[0];
     const customerResult = await query(
       `INSERT INTO customers (business_id, name, email, phone, company)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+       OUTPUT INSERTED.id
+       VALUES ($1, $2, $3, $4, $5)`,
       [businessId, customer_name || `${l.first_name} ${l.last_name}`, customer_email || l.email, customer_phone || l.phone, company || l.company]
     );
 
@@ -124,7 +126,8 @@ router.post('/:id/activities', async (req, res) => {
     const { activity_type, subject, description, scheduled_at } = req.body;
     const result = await query(
       `INSERT INTO customer_activities (business_id, customer_id, activity_type, subject, description, scheduled_at, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+       OUTPUT INSERTED.*
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [req.business_id, req.params.id, activity_type, subject, description, scheduled_at, req.user.id]
     );
     res.status(201).json(result.rows[0]);

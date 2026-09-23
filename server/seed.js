@@ -1,16 +1,7 @@
-import pg from 'pg';
 import dotenv from 'dotenv';
+import { pool } from './config/db.js';
 
 dotenv.config();
-
-const { Pool } = pg;
-const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  database: process.env.DB_NAME || 'bizflow',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-});
 
 const BIZ = '58ce52b4-3079-42d4-86a6-3d1621f94a06';
 const USER = 'f7f5a5cc-8ecb-4822-bdf3-e7ed13904f28';
@@ -37,7 +28,8 @@ async function seed() {
     for (const c of customers) {
       const r = await client.query(
         `INSERT INTO customers (business_id, name, email, phone, company, credit_limit)
-         VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+         OUTPUT INSERTED.id
+         VALUES ($1,$2,$3,$4,$5,$6)`,
         [BIZ, c.name, c.email, c.phone, c.company || null, c.credit_limit]
       );
       customerRows.push(r.rows[0].id);
@@ -58,7 +50,7 @@ async function seed() {
     const expCatRows = [];
     for (const ec of expCats) {
       const r = await client.query(
-        `INSERT INTO expense_categories (business_id, name, description) VALUES ($1,$2,$3) RETURNING id`,
+        `INSERT INTO expense_categories (business_id, name, description) OUTPUT INSERTED.id VALUES ($1,$2,$3)`,
         [BIZ, ec.name, ec.desc]
       );
       expCatRows.push(r.rows[0].id);
@@ -104,7 +96,7 @@ async function seed() {
     const catRows = [];
     for (const c of categories) {
       const r = await client.query(
-        `INSERT INTO categories (business_id, name, description) VALUES ($1,$2,$3) RETURNING id`,
+        `INSERT INTO categories (business_id, name, description) OUTPUT INSERTED.id VALUES ($1,$2,$3)`,
         [BIZ, c.name, c.desc]
       );
       catRows.push(r.rows[0].id);
@@ -137,7 +129,8 @@ async function seed() {
     for (const p of products) {
       const r = await client.query(
         `INSERT INTO products (business_id, sku, name, category_id, cost_price, selling_price, stock_qty, reorder_level)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+         OUTPUT INSERTED.id
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [BIZ, p.sku, p.name, catRows[p.cat], p.cost, p.price, p.stock, p.reorder]
       );
       productRows.push(r.rows[0].id);
@@ -187,7 +180,8 @@ async function seed() {
       const invNum = `INV-${String(++saleCount).padStart(4, '0')}`;
       const sr = await client.query(
         `INSERT INTO sales (business_id, customer_id, invoice_number, status, sale_date, subtotal, total, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+         OUTPUT INSERTED.id
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [BIZ, s.customer !== null ? customerRows[s.customer] : null, invNum, s.status, s.date, subtotal, total, USER]
       );
       const saleId = sr.rows[0].id;
@@ -219,7 +213,8 @@ async function seed() {
     for (const c of creditors) {
       const r = await client.query(
         `INSERT INTO creditors (business_id, name, email, phone, opening_balance)
-         VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+         OUTPUT INSERTED.id
+         VALUES ($1,$2,$3,$4,$5)`,
         [BIZ, c.name, c.email, c.phone, c.opening]
       );
       creditorRows.push(r.rows[0].id);
@@ -272,7 +267,8 @@ async function seed() {
     for (const d of debtors) {
       const r = await client.query(
         `INSERT INTO debtors (business_id, name, phone, opening_balance)
-         VALUES ($1,$2,$3,$4) RETURNING id`,
+         OUTPUT INSERTED.id
+         VALUES ($1,$2,$3,$4)`,
         [BIZ, d.name, d.phone, d.opening]
       );
       debtorRows.push(r.rows[0].id);
@@ -340,7 +336,8 @@ async function seed() {
     for (const v of vendors) {
       const r = await client.query(
         `INSERT INTO vendors (business_id, name, email, phone, contact_person, payment_terms)
-         VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+         OUTPUT INSERTED.id
+         VALUES ($1,$2,$3,$4,$5,$6)`,
         [BIZ, v.name, v.email, v.phone, v.contact, v.terms]
       );
       vendorRows.push(r.rows[0].id);
@@ -411,7 +408,8 @@ async function seed() {
     for (const st of stages) {
       const r = await client.query(
         `INSERT INTO deal_stages (business_id, name, order_index, win_probability, color)
-         VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+         OUTPUT INSERTED.id
+         VALUES ($1,$2,$3,$4,$5)`,
         [BIZ, st.name, st.order, st.prob, ['#94a3b8', '#60a5fa', '#f59e0b', '#8b5cf6', '#22c55e'][st.order]]
       );
       stageRows.push(r.rows[0].id);
