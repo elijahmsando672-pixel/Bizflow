@@ -37,7 +37,12 @@ export const metadata: Metadata = {
     description: "Modern business management dashboard.",
   },
   icons: {
-    icon: "/favicon.svg",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/logo.png", type: "image/png", sizes: "any" },
+    ],
+    apple: "/logo.png",
+    shortcut: "/favicon.svg",
   },
 };
 
