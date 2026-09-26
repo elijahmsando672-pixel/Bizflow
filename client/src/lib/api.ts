@@ -164,6 +164,7 @@ interface ProductData {
 interface CategoryData {
   name: string;
   description?: string;
+  parent_id?: string | null;
 }
 
 interface SaleData {
@@ -287,6 +288,7 @@ const api = {
     getAll: () => fetchApi('/notifications'),
     markAsRead: (id: string) => fetchApi(`/notifications/${id}/read`, { method: 'POST' }),
     markAllRead: () => fetchApi('/notifications/read-all', { method: 'POST' }),
+    sendReminder: (saleId: string) => fetchApi(`/notifications/send-reminder/${saleId}`, { method: 'POST' }),
   },
   team: {
     getMembers: () => fetchApi('/team/members'),

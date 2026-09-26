@@ -16,19 +16,19 @@ router.get('/insights', async (req, res) => {
     const businessId = req.business_id;
 
     const revenue = await query(
-      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status = 'paid' AND sale_date >= DATEADD(day, -30, GETDATE())`,
+      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status = 'paid' AND sale_date >= NOW() - INTERVAL '30 days'`,
       [businessId]
     );
     const expenses = await query(
-      `SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE business_id = $1 AND date >= DATEADD(day, -30, GETDATE())`,
+      `SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE business_id = $1 AND date >= NOW() - INTERVAL '30 days'`,
       [businessId]
     );
     const prevRevenue = await query(
-      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status = 'paid' AND sale_date >= DATEADD(day, -60, GETDATE()) AND sale_date < DATEADD(day, -30, GETDATE())`,
+      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status = 'paid' AND sale_date >= NOW() - INTERVAL '60 days' AND sale_date < NOW() - INTERVAL '30 days'`,
       [businessId]
     );
     const customers = await query(
-      `SELECT COUNT(*) as count FROM customers WHERE business_id = $1 AND created_at >= DATEADD(day, -30, GETDATE())`,
+      `SELECT COUNT(*) as count FROM customers WHERE business_id = $1 AND created_at >= NOW() - INTERVAL '30 days'`,
       [businessId]
     );
     const lowStock = await query(
@@ -38,12 +38,12 @@ router.get('/insights', async (req, res) => {
     const topProducts = await query(
       `SELECT p.name, SUM(si.qty) as qty_sold, SUM(si.total) as revenue
        FROM sale_items si JOIN products p ON si.product_id = p.id
-       WHERE si.business_id = $1 AND si.created_at >= DATEADD(day, -30, GETDATE())
-       GROUP BY p.id, p.name ORDER BY revenue DESC OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY`,
+       WHERE si.business_id = $1 AND si.created_at >= NOW() - INTERVAL '30 days'
+       GROUP BY p.id, p.name ORDER BY revenue DESC LIMIT 5`,
       [businessId]
     );
     const recentSales = await query(
-      `SELECT sale_date, total FROM sales WHERE business_id = $1 AND status = 'paid' AND sale_date >= DATEADD(day, -90, GETDATE()) ORDER BY sale_date`,
+      `SELECT sale_date, total FROM sales WHERE business_id = $1 AND status = 'paid' AND sale_date >= NOW() - INTERVAL '90 days' ORDER BY sale_date`,
       [businessId]
     );
 
@@ -108,9 +108,9 @@ router.get('/predictions', async (req, res) => {
     const businessId = req.business_id;
 
     const salesTrend = await query(
-      `SELECT FORMAT(sale_date, 'yyyy-MM') as month, SUM(total) as revenue, COUNT(*) as count
-       FROM sales WHERE business_id = $1 AND status = 'paid' AND sale_date >= DATEADD(month, -12, GETDATE())
-       GROUP BY FORMAT(sale_date, 'yyyy-MM') ORDER BY month`,
+      `SELECT TO_CHAR(sale_date, 'YYYY-MM') as month, SUM(total) as revenue, COUNT(*) as count
+       FROM sales WHERE business_id = $1 AND status = 'paid' AND sale_date >= NOW() - INTERVAL '12 months'
+       GROUP BY TO_CHAR(sale_date, 'YYYY-MM') ORDER BY month`,
       [businessId]
     );
 
@@ -155,7 +155,7 @@ Return format: {"predictions": [{"month": "2026-05", "predicted_revenue": 10000,
 router.get('/history', async (req, res) => {
   try {
     const result = await query(
-      `SELECT * FROM ai_insights WHERE business_id = $1 ORDER BY created_at DESC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY`,
+      `SELECT * FROM ai_insights WHERE business_id = $1 ORDER BY created_at DESC LIMIT 20`,
       [req.business_id]
     );
     res.json(result.rows);

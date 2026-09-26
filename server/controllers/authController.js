@@ -159,14 +159,14 @@ export const register = async (req, res) => {
     if (existingUser.rows.length > 0) return sendError(res, 400, 'Invalid registration details');
 
     const businessResult = await query(
-      'INSERT INTO businesses (name, email, phone) OUTPUT INSERTED.id VALUES ($1, $2, $3)',
+      'INSERT INTO businesses (name, email, phone) VALUES ($1, $2, $3) RETURNING id',
       [business_name, email, phone]
     );
     const business_id = businessResult.rows[0].id;
 
     const hashedPassword = await hashPassword(password);
     const userResult = await query(
-      `INSERT INTO users (business_id, name, email, password, role) OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.role, INSERTED.business_id VALUES ($1, $2, $3, $4, 'owner')`,
+      `INSERT INTO users (business_id, name, email, password, role) VALUES ($1, $2, $3, $4, 'owner') RETURNING id, name, email, role, business_id`,
       [business_id, name, email, hashedPassword]
     );
     const user = userResult.rows[0];
@@ -178,7 +178,7 @@ export const register = async (req, res) => {
 
     await query(`INSERT INTO expense_categories (business_id, name) VALUES ($1, 'Rent'), ($1, 'Utilities'), ($1, 'Salaries'), ($1, 'Supplies'), ($1, 'Marketing'), ($1, 'Transport'), ($1, 'Other')`, [business_id]);
     const shopResult = await query(
-      `INSERT INTO shops (business_id, name) OUTPUT INSERTED.id VALUES ($1, 'Main Shop')`,
+      `INSERT INTO shops (business_id, name) VALUES ($1, 'Main Shop') RETURNING id`,
       [business_id]
     );
     await recordLoginAttempt(email, req.ip, true);
@@ -225,7 +225,7 @@ export const login = async (req, res) => {
 
     // ── CAPTCHA check: require after 3 failed attempts ──
     const recentFails = await query(
-      'SELECT COUNT(*) as cnt FROM login_attempts WHERE email = $1 AND success = false AND attempted_at > DATEADD(minute, -15, GETDATE())',
+      'SELECT COUNT(*) as cnt FROM login_attempts WHERE email = $1 AND success = false AND attempted_at > NOW() - INTERVAL \'15 minutes\'',
       [email]
     );
     const failCount = parseInt(recentFails.rows[0].cnt);
@@ -337,7 +337,7 @@ export const login = async (req, res) => {
 export const me = async (req, res) => {
   try {
     const result = await query(
-      `SELECT u.id, u.name, u.email, u.role, u.business_id, b.name as business_name, b.email as business_email, b.phone, b.address, b.tax_id
+      `SELECT u.id, u.name, u.email, u.role, u.business_id, u.totp_enabled, b.name as business_name, b.email as business_email, b.phone, b.address, b.tax_id
        FROM users u JOIN businesses b ON u.business_id = b.id WHERE u.id = $1`,
       [req.user.id]
     );
@@ -733,7 +733,7 @@ export const addIpWhitelist = async (req, res) => {
     if (!ip_address) return sendError(res, 400, 'IP address is required');
 
     const result = await query(
-      `MERGE ip_whitelist AS t USING (SELECT @p1 AS business_id, @p2 AS ip_address) AS s ON t.business_id = s.business_id AND t.ip_address = s.ip_address WHEN MATCHED THEN UPDATE SET label = @p3, is_active = 1 WHEN NOT MATCHED THEN INSERT (business_id, ip_address, label, created_by) VALUES (@p1, @p2, @p3, @p4) OUTPUT INSERTED.id, INSERTED.ip_address, INSERTED.label;`,
+      'INSERT INTO ip_whitelist (business_id, ip_address, label, created_by) VALUES ($1, $2, $3, $4) ON CONFLICT (business_id, ip_address) DO UPDATE SET label = $3, is_active = true RETURNING id, ip_address, label',
       [req.business_id, ip_address, label || '', req.user.id]
     );
     res.json(result.rows[0]);

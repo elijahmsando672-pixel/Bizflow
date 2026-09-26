@@ -35,7 +35,8 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       JWT_SECRET: ${JWT_SECRET}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
-      DB_SSL_REJECT_UNAUTHORIZED: ${DB_SSL_REJECT_UNAUTHORIZED:-}
+      DB_SSL: ${DB_SSL:-false}
+      DB_SSL_REJECT_UNAUTHORIZED: ${DB_SSL_REJECT_UNAUTHORIZED:-true}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       SMTP_USER: ${SMTP_USER}
@@ -46,6 +47,11 @@ services:
       MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY}
       MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET}
       BANK_DETAILS: ${BANK_DETAILS}
+      BACKUP_DIR: /app/backups
+      BACKUP_TIMEOUT_MS: ${BACKUP_TIMEOUT_MS:-900000}
+      PGCONNECT_TIMEOUT: ${PGCONNECT_TIMEOUT:-10}
+    volumes:
+      - backup_data:/app/backups
     ports:
       - "5000:5000"
     depends_on:
@@ -87,6 +93,7 @@ services:
 
 volumes:
   postgres_data:
+  backup_data:
 
 networks:
   bizflow-network:

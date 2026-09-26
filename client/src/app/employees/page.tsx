@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function EmployeesPage() {
-  redirect("/dashboard");
+export default function LegacyPage() {
+  redirect("/users");
 }

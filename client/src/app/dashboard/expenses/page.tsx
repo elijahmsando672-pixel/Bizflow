@@ -44,6 +44,14 @@ export default function ExpensesPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("new") === "1") {
+      setEditItem(null);
+      setForm({ description: "", amount: "", category: "General", date: new Date().toISOString().split("T")[0] });
+      setModal(true);
+    }
+  }, []);
+
   const handleSubmit = async () => {
     try {
       const payload = { description: form.description, amount: parseFloat(form.amount) || 0, category: form.category, date: form.date };

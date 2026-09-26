@@ -7,7 +7,7 @@ const router = express.Router();
 
 async function getNextTicketNumber(business_id) {
   const result = await query(
-    `SELECT COALESCE(MAX(CAST(SUBSTRING(ticket_number, 5, LEN(ticket_number)) AS INTEGER)), 0) + 1 as next_num FROM support_tickets WHERE business_id = $1`,
+    `SELECT COALESCE(MAX(CAST(SUBSTRING(ticket_number FROM 5) AS INTEGER)), 0) + 1 as next_num FROM support_tickets WHERE business_id = $1`,
     [business_id]
   );
   return `TKT-${String(result.rows[0].next_num).padStart(5, '0')}`;
@@ -37,7 +37,7 @@ router.get('/sla-configs', async (req, res) => {
       ];
       const results = await Promise.all(
         defaults.map(d => query(
-          `INSERT INTO sla_configs (business_id, category, priority, response_hours, resolution_hours) OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5)`,
+          `INSERT INTO sla_configs (business_id, category, priority, response_hours, resolution_hours) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
           [req.business_id, d.category, d.priority, d.response_hours, d.resolution_hours]
         ))
       );
@@ -53,7 +53,7 @@ router.put('/sla-configs/:id', async (req, res) => {
   try {
     const { response_hours, resolution_hours } = req.body;
     const result = await query(
-      `UPDATE sla_configs SET response_hours=$2, resolution_hours=$3 OUTPUT INSERTED.* WHERE id=$1 AND business_id=$4`,
+      `UPDATE sla_configs SET response_hours=$2, resolution_hours=$3 WHERE id=$1 AND business_id=$4 RETURNING *`,
       [req.params.id, response_hours, resolution_hours, req.business_id]
     );
     if (!result.rows.length) return sendError(res, 404, 'SLA config not found');
@@ -69,12 +69,12 @@ router.get('/dashboard-stats', async (req, res) => {
     const stats = await query(
       `SELECT 
          COUNT(*) as total_tickets,
-         COUNT(CASE WHEN status = 'open' THEN 1 END) as open_tickets,
-         COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress_tickets,
-         COUNT(CASE WHEN status = 'resolved' THEN 1 END) as resolved_tickets,
-         COUNT(CASE WHEN status = 'closed' THEN 1 END) as closed_tickets,
-         COUNT(CASE WHEN sla_deadline < NOW() AND status IN ('open','in_progress') THEN 1 END) as breached_tickets,
-         COUNT(CASE WHEN priority = 'critical' THEN 1 END) as critical_tickets
+         COUNT(*) FILTER (WHERE status = 'open') as open_tickets,
+         COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress_tickets,
+         COUNT(*) FILTER (WHERE status = 'resolved') as resolved_tickets,
+         COUNT(*) FILTER (WHERE status = 'closed') as closed_tickets,
+         COUNT(*) FILTER (WHERE sla_deadline < NOW() AND status IN ('open','in_progress')) as breached_tickets,
+         COUNT(*) FILTER (WHERE priority = 'critical') as critical_tickets
        FROM support_tickets WHERE business_id = $1`,
       [req.business_id]
     );
@@ -85,7 +85,7 @@ router.get('/dashboard-stats', async (req, res) => {
        FROM support_tickets t
        LEFT JOIN customers c ON t.customer_id = c.id
        WHERE t.business_id = $1
-       ORDER BY t.created_at DESC OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY`,
+       ORDER BY t.created_at DESC LIMIT 10`,
       [req.business_id]
     );
 
@@ -102,7 +102,7 @@ router.post('/', async (req, res) => {
     const ticketNumber = await getNextTicketNumber(req.business_id);
 
     const slaResult = await query(
-      `SELECT TOP 1 resolution_hours FROM sla_configs WHERE business_id = $1 AND category = $2 AND priority = $3 AND is_active = true`,
+      `SELECT resolution_hours FROM sla_configs WHERE business_id = $1 AND category = $2 AND priority = $3 AND is_active = true LIMIT 1`,
       [req.business_id, category || 'general', priority || 'medium']
     );
 
@@ -112,7 +112,7 @@ router.post('/', async (req, res) => {
 
     const result = await query(
       `INSERT INTO support_tickets (business_id, customer_id, ticket_number, subject, description, priority, category, assigned_to, sla_deadline, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) OUTPUT INSERTED.*`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [req.business_id, customer_id, ticketNumber, subject, description, priority, category, assigned_to, slaDeadline.toISOString(), req.user.id]
     );
     const ticket = result.rows[0];
@@ -208,7 +208,7 @@ router.put('/:id', async (req, res) => {
     if (status === 'closed') { updates.push(`closed_at=CURRENT_TIMESTAMP`); }
 
     const result = await query(
-      `UPDATE support_tickets SET ${updates.join(', ')} OUTPUT INSERTED.* WHERE id=$1 AND business_id=$2`,
+      `UPDATE support_tickets SET ${updates.join(', ')} WHERE id=$1 AND business_id=$2 RETURNING *`,
       params
     );
     if (!result.rows.length) return sendError(res, 404, 'Ticket not found');
@@ -224,7 +224,7 @@ router.post('/:id/replies', async (req, res) => {
     const { message, is_internal } = req.body;
     const result = await query(
       `INSERT INTO ticket_replies (business_id, ticket_id, message, is_internal, created_by)
-       VALUES ($1, $2, $3, $4, $5) OUTPUT INSERTED.*`,
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [req.business_id, req.params.id, message, is_internal || false, req.user.id]
     );
     const reply = result.rows[0];

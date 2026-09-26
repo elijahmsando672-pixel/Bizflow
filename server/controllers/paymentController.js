@@ -21,8 +21,8 @@ export const createAgent = async (req, res) => {
       return sendError(res, 400, 'Name, phone, and M-Pesa number are required');
     }
     const result = await query(
-      `INSERT INTO mpesa_agents (business_id, name, phone, mpesa_number, commission_rate) OUTPUT INSERTED.*
-       VALUES ($1, $2, $3, $4, $5)`,
+      `INSERT INTO mpesa_agents (business_id, name, phone, mpesa_number, commission_rate)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [req.business_id, name, phone, mpesa_number, commission_rate || 0]
     );
     res.status(201).json(result.rows[0]);
@@ -39,7 +39,7 @@ export const updateAgent = async (req, res) => {
       `UPDATE mpesa_agents SET name = COALESCE($1, name), phone = COALESCE($2, phone),
        mpesa_number = COALESCE($3, mpesa_number), commission_rate = COALESCE($4, commission_rate),
        is_active = COALESCE($5, is_active)
-       OUTPUT INSERTED.* WHERE id = $6 AND business_id = $7`,
+       WHERE id = $6 AND business_id = $7 RETURNING *`,
       [name, phone, mpesa_number, commission_rate, is_active, req.params.id, req.business_id]
     );
     if (result.rows.length === 0) return sendError(res, 404, 'Agent not found');
@@ -53,7 +53,7 @@ export const updateAgent = async (req, res) => {
 export const deleteAgent = async (req, res) => {
   try {
     const result = await query(
-      'DELETE FROM mpesa_agents OUTPUT DELETED.id WHERE id = $1 AND business_id = $2',
+      'DELETE FROM mpesa_agents WHERE id = $1 AND business_id = $2 RETURNING id',
       [req.params.id, req.business_id]
     );
     if (result.rows.length === 0) return sendError(res, 404, 'Agent not found');
@@ -83,7 +83,7 @@ export const getTransactions = async (req, res) => {
       sql += ` AND (description ILIKE $${idx} OR reference ILIKE $${idx} OR category ILIKE $${idx})`;
       params.push(`%${search}%`);
     }
-    sql += ' ORDER BY created_at DESC OFFSET 0 ROWS FETCH NEXT 200 ROWS ONLY';
+    sql += ' ORDER BY created_at DESC LIMIT 200';
     const result = await query(sql, params);
     const totalIn = result.rows.filter(r => r.entry_type === 'inflow').reduce((s, r) => s + parseFloat(r.amount || 0), 0);
     const totalOut = result.rows.filter(r => r.entry_type === 'outflow').reduce((s, r) => s + parseFloat(r.amount || 0), 0);
@@ -99,21 +99,21 @@ export const getReports = async (req, res) => {
     const { period } = req.query;
     const days = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : 30;
     const result = await query(
-      `SELECT CAST(date AS DATE) as day, entry_type, SUM(amount) as total FROM cashflow_entries
-       WHERE business_id = $1 AND payment_method = 'mpesa' AND date >= DATEADD(day, -@p2, CAST(GETDATE() AS DATE))
-       GROUP BY CAST(date AS DATE), entry_type ORDER BY day`,
+      `SELECT DATE(date) as day, entry_type, SUM(amount) as total FROM cashflow_entries
+       WHERE business_id = $1 AND payment_method = 'mpesa' AND date >= CURRENT_DATE - $2
+       GROUP BY day, entry_type ORDER BY day`,
       [req.business_id, days]
     );
     const summary = await query(
       `SELECT entry_type, COUNT(*) as count, SUM(amount) as total FROM cashflow_entries
-       WHERE business_id = $1 AND payment_method = 'mpesa' AND date >= DATEADD(day, -@p2, CAST(GETDATE() AS DATE))
+       WHERE business_id = $1 AND payment_method = 'mpesa' AND date >= CURRENT_DATE - $2
        GROUP BY entry_type`,
       [req.business_id, days]
     );
     const topCategories = await query(
       `SELECT category, SUM(amount) as total FROM cashflow_entries
        WHERE business_id = $1 AND payment_method = 'mpesa' AND category IS NOT NULL AND category != ''
-       GROUP BY category ORDER BY total DESC OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY`,
+       GROUP BY category ORDER BY total DESC LIMIT 10`,
       [req.business_id]
     );
     res.json({ daily: result.rows, summary: summary.rows, top_categories: topCategories.rows });

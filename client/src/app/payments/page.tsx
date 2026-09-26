@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function PaymentsPage() {
-  redirect("/dashboard");
+export default function LegacyPage() {
+  redirect("/dashboard/payments");
 }

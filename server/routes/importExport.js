@@ -94,7 +94,7 @@ router.post('/:resource', async (req, res) => {
         const allPlaceholders = ['$1', ...placeholders.map((_, i) => `$${i + 2}`)];
 
         const result = await query(
-          `INSERT INTO ${config.table} (${allColumns.join(', ')}) OUTPUT INSERTED.id VALUES (${allPlaceholders.join(', ')})`,
+          `INSERT INTO ${config.table} (${allColumns.join(', ')}) VALUES (${allPlaceholders.join(', ')}) RETURNING id`,
           allValues
         );
         results.success++;
@@ -163,7 +163,7 @@ router.post('/csv/:resource', async (req, res) => {
         const allPlaceholders = ['$1', ...placeholders.map((_, i) => `$${i + 2}`)];
 
         const result = await query(
-          `INSERT INTO ${config.table} (${allColumns.join(', ')}) OUTPUT INSERTED.id VALUES (${allPlaceholders.join(', ')})`,
+          `INSERT INTO ${config.table} (${allColumns.join(', ')}) VALUES (${allPlaceholders.join(', ')}) RETURNING id`,
           allValues
         );
         results.success++;
@@ -192,7 +192,7 @@ router.get('/:resource', async (req, res) => {
 
   try {
     const result = await query(
-      `SELECT TOP (@p2) ${config.columns.join(', ')} FROM ${config.table} WHERE business_id = $1`,
+      `SELECT ${config.columns.join(', ')} FROM ${config.table} WHERE business_id = $1 LIMIT $2`,
       [req.business_id, limit]
     );
 

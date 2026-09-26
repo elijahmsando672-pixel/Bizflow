@@ -7,12 +7,14 @@
   "scripts": {
     "dev": "npm --prefix client run dev",
     "server": "node server/index.js",
+    "db:init": "npm --prefix server run db:init",
     "dev:all": "concurrently \"npm --prefix client run dev\" \"npm run server\"",
-    "postinstall": "npm --prefix client install",
+    "postinstall": "npm --prefix client install && npm --prefix server install",
     "build": "npm --prefix client run build",
     "start": "npm --prefix client run start",
     "lint": "npm --prefix client run lint",
     "validate": "node scripts/validate-endpoints.js",
+    "backup": "node server/scripts/backup.js",
     "version:sync": "node -e \"const v=require('./package.json').version; const p=require('./client/package.json'); p.version=v; require('fs').writeFileSync('./client/package.json', JSON.stringify(p, null, 2)+'\\n'); console.log('Synced client version to '+v);\""
   },
   "dependencies": {

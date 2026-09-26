@@ -29,7 +29,7 @@ export const addJob = (name, data, handler, options = {}) => {
   const job = new Job(name, data, handler);
   if (options.maxAttempts) job.maxAttempts = options.maxAttempts;
   if (options.delay) {
-    setTimeout(() => { queue.push(job); processQueue(); }, options.delay);
+    setTimeout(() => { queue.push(job); processQueue(); }, options.delay).unref?.();
   } else {
     queue.push(job);
   }
@@ -66,7 +66,7 @@ const processQueue = () => {
       job.error = err.message;
       if (job.attempts < job.maxAttempts) {
         const delay = Math.min(5000 * Math.pow(2, job.attempts - 1), 60000);
-        setTimeout(() => { queue.unshift(job); processQueue(); }, delay);
+        setTimeout(() => { queue.unshift(job); processQueue(); }, delay).unref?.();
       } else {
         job.status = JOB_STATUS.FAILED;
         job.completedAt = new Date();
@@ -97,6 +97,9 @@ export const addRepeatableJob = (name, data, handler, cronMs) => {
   };
   run();
   const interval = setInterval(run, cronMs);
+  // Serverless instances are recycled, so a repeating job must not keep the
+  // process alive on its own. Trigger repeatable work from a scheduler instead.
+  interval.unref?.();
   REPEATABLE_JOBS.set(name, interval);
 };
 

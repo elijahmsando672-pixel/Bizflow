@@ -108,7 +108,7 @@ router.post('/accept', async (req, res) => {
 
     const userResult = await query(
       `INSERT INTO users (business_id, name, email, password, role)
-       VALUES ($1, $2, $3, $4, $5) OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.role, INSERTED.business_id`,
+       VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role, business_id`,
       [invite.business_id, name, invite.email, hashedPassword, invite.role]
     );
 
@@ -148,7 +148,7 @@ router.get('/invitations', async (req, res) => {
 router.delete('/invitations/:id', async (req, res) => {
   try {
     const result = await query(
-      `DELETE FROM team_invitations OUTPUT DELETED.id WHERE id = $1 AND business_id = $2`,
+      `DELETE FROM team_invitations WHERE id = $1 AND business_id = $2 RETURNING id`,
       [req.params.id, req.business_id]
     );
     if (result.rows.length === 0) {
@@ -170,7 +170,7 @@ router.put('/:id/role', async (req, res) => {
     }
 
     const result = await query(
-      `UPDATE users SET role = $1 OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.role WHERE id = $2 AND business_id = $3`,
+      `UPDATE users SET role = $1 WHERE id = $2 AND business_id = $3 RETURNING id, name, email, role`,
       [role, req.params.id, req.business_id]
     );
 
@@ -189,7 +189,7 @@ router.patch('/:id', async (req, res) => {
   try {
     const { is_active } = req.body;
     const result = await query(
-      `UPDATE users SET is_active = $1 OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.is_active WHERE id = $2 AND business_id = $3`,
+      `UPDATE users SET is_active = $1 WHERE id = $2 AND business_id = $3 RETURNING id, name, email, is_active`,
       [is_active, req.params.id, req.business_id]
     );
     if (result.rows.length === 0) {

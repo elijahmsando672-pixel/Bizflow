@@ -3,7 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { MainLayout } from "@/components/layout/MainLayout";
+import { AppFrame } from "@/components/layout/app-frame";
 import { Loader2 } from "lucide-react";
 
 const emptySubscribe = () => () => {};
@@ -42,5 +42,5 @@ export function LoginContent({ children }: { children: React.ReactNode }) {
     return children;
   }
 
-  return <MainLayout>{children}</MainLayout>;
+  return <AppFrame>{children}</AppFrame>;
 }

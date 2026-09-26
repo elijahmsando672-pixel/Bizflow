@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function CreditorsPage() {
-  redirect("/dashboard");
+export default function LegacyPage() {
+  redirect("/dashboard/credit");
 }

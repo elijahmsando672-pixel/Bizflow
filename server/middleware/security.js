@@ -103,6 +103,10 @@ const rateLimitCleanupInterval = setInterval(() => {
   }
 }, 10 * 60 * 1000);
 
+// Never hold the process open for housekeeping: serverless instances must be able
+// to freeze and resume without a pending timer keeping them alive.
+rateLimitCleanupInterval.unref?.();
+
 // Allow the interval to be cleared on shutdown
 export const stopRateLimitCleanup = () => clearInterval(rateLimitCleanupInterval);
 

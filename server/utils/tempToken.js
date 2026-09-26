@@ -18,8 +18,8 @@ export const consumeTempToken = async (rawToken) => {
   const hash = crypto.createHash('sha256').update(rawToken).digest('hex');
   const result = await query(
     `UPDATE temp_tokens SET used = true
-     OUTPUT INSERTED.user_id
-     WHERE token_hash = $1 AND purpose = 'totp_preauth' AND used = false AND expires_at > NOW()`,
+     WHERE token_hash = $1 AND purpose = 'totp_preauth' AND used = false AND expires_at > NOW()
+     RETURNING user_id`,
     [hash]
   );
   return result.rows[0] || null;

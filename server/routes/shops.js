@@ -43,7 +43,7 @@ router.post('/', async (req, res) => {
 
     const result = await query(
       `INSERT INTO shops (business_id, name, location, phone, email, manager_name, opening_time, closing_time)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) OUTPUT INSERTED.*`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [req.business_id, sanitize(name), sanitize(location), sanitize(phone), sanitize(email),
        sanitize(manager_name), opening_time, closing_time]
     );
@@ -68,7 +68,7 @@ router.put('/:id', async (req, res) => {
         opening_time = COALESCE($7, opening_time),
         closing_time = COALESCE($8, closing_time),
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $9 AND business_id = $10 OUTPUT INSERTED.*`,
+       WHERE id = $9 AND business_id = $10 RETURNING *`,
       [sanitize(name), sanitize(location), sanitize(phone), sanitize(email),
        status, sanitize(manager_name), opening_time, closing_time,
        req.params.id, req.business_id]
@@ -84,7 +84,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const result = await query(
-      'DELETE FROM shops OUTPUT DELETED.id WHERE id = $1 AND business_id = $2',
+      'DELETE FROM shops WHERE id = $1 AND business_id = $2 RETURNING id',
       [req.params.id, req.business_id]
     );
     if (result.rows.length === 0) return sendError(res, 404, 'Shop not found');

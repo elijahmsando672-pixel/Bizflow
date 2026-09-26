@@ -4,9 +4,9 @@ import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
-async function getNextPONumber(business_id) {
-  const result = await query(
-    `SELECT COALESCE(MAX(CAST(SUBSTRING(po_number, 4, LEN(po_number)) AS INTEGER)), 0) + 1 as next_num FROM purchase_orders WHERE business_id = $1`,
+async function getNextPONumber(business_id, executor = query) {
+  const result = await executor(
+    `SELECT COALESCE(MAX(CAST(SUBSTRING(po_number FROM 4) AS INTEGER)), 0) + 1 as next_num FROM purchase_orders WHERE business_id = $1`,
     [business_id]
   );
   return `PO-${String(result.rows[0].next_num).padStart(5, '0')}`;
@@ -18,8 +18,7 @@ router.post('/vendors', async (req, res) => {
     const { name, email, phone, address, contact_person, payment_terms, notes } = req.body;
     const result = await query(
       `INSERT INTO vendors (business_id, name, email, phone, address, contact_person, payment_terms, notes)
-       OUTPUT INSERTED.*
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [req.business_id, name, email, phone, address, contact_person, payment_terms, notes]
     );
     res.status(201).json(result.rows[0]);
@@ -63,7 +62,7 @@ router.put('/vendors/:id', async (req, res) => {
       `UPDATE vendors SET name=COALESCE($2,name), email=COALESCE($3,email), phone=COALESCE($4,phone),
        address=COALESCE($5,address), contact_person=COALESCE($6,contact_person), payment_terms=COALESCE($7,payment_terms),
        rating=COALESCE($8,rating), notes=COALESCE($9,notes), updated_at=CURRENT_TIMESTAMP
-       WHERE id=$1 AND business_id=$10 OUTPUT INSERTED.*`,
+       WHERE id=$1 AND business_id=$10 RETURNING *`,
       [req.params.id, name, email, phone, address, contact_person, payment_terms, rating, notes, req.business_id]
     );
     if (!result.rows.length) return sendError(res, 404, 'Vendor not found');
@@ -85,49 +84,53 @@ router.delete('/vendors/:id', async (req, res) => {
 
 // Purchase Orders
 router.post('/purchase-orders', async (req, res) => {
+  const { vendor_id, expected_delivery, notes, items } = req.body;
+  if (!Array.isArray(items)) {
+    return sendError(res, 400, 'Items must be an array');
+  }
+
+  const subtotal = items.reduce((sum, item) => sum + (Number(item.qty) * Number(item.unit_price)), 0);
+  const taxAmount = subtotal * 0.16;
+  const total = subtotal + taxAmount;
+
+  let client;
   try {
-    const { vendor_id, expected_delivery, notes, items } = req.body;
-    const poNumber = await getNextPONumber(req.business_id);
+    client = await pool.connect();
+    await client.query('BEGIN');
 
-    const subtotal = items.reduce((sum, item) => sum + (item.qty * item.unit_price), 0);
-    const taxAmount = subtotal * 0.16;
-    const total = subtotal + taxAmount;
+    // Serialize purchase order numbering per business
+    await client.query('SELECT id FROM businesses WHERE id = $1 FOR UPDATE', [req.business_id]);
+    const poNumber = await getNextPONumber(req.business_id, client.query.bind(client));
 
-    const poResult = await query(
+    const poResult = await client.query(
       `INSERT INTO purchase_orders (business_id, po_number, vendor_id, expected_delivery, subtotal, tax_amount, total, notes, created_by)
-       OUTPUT INSERTED.*
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
       [req.business_id, poNumber, vendor_id, expected_delivery, subtotal, taxAmount, total, notes, req.user.id]
     );
 
     const poId = poResult.rows[0].id;
 
-    if (items && items.length > 0) {
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        await Promise.all(
-          items.map(item => client.query(
-            `INSERT INTO po_items (business_id, po_id, product_id, product_name, qty, unit_price, total)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [req.business_id, poId, item.product_id, item.product_name, item.qty, item.unit_price, item.qty * item.unit_price]
-          ))
-        );
-        await client.query('COMMIT');
-        client.release();
-      } catch (txErr) {
-        await client.query('ROLLBACK');
-        client.release();
-        throw txErr;
-      }
+    for (const item of items) {
+      await client.query(
+        `INSERT INTO po_items (business_id, po_id, product_id, product_name, qty, unit_price, total)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [req.business_id, poId, item.product_id, item.product_name, item.qty, item.unit_price, Number(item.qty) * Number(item.unit_price)]
+      );
     }
 
-    const fullResult = await query(`SELECT * FROM purchase_orders WHERE id = $1 AND business_id = $2`, [poId, req.business_id]);
-    const poItems = await query(`SELECT * FROM po_items WHERE po_id = $1 AND business_id = $2`, [poId, req.business_id]);
-    res.status(201).json({ ...fullResult.rows[0], items: poItems.rows });
+    const poItems = await client.query(
+      'SELECT * FROM po_items WHERE po_id = $1 AND business_id = $2',
+      [poId, req.business_id]
+    );
+
+    await client.query('COMMIT');
+    res.status(201).json({ ...poResult.rows[0], items: poItems.rows });
   } catch (error) {
+    if (client) await client.query('ROLLBACK').catch(() => {});
     console.error('Create PO error:', error);
     sendError(res, 500, 'Failed to create purchase order');
+  } finally {
+    client?.release();
   }
 });
 
@@ -175,7 +178,7 @@ router.put('/purchase-orders/:id', async (req, res) => {
     const { status, expected_delivery, notes } = req.body;
     const result = await query(
       `UPDATE purchase_orders SET status=COALESCE($2,status), expected_delivery=COALESCE($3,expected_delivery),
-       notes=COALESCE($4,notes), updated_at=CURRENT_TIMESTAMP OUTPUT INSERTED.* WHERE id=$1 AND business_id=$5`,
+       notes=COALESCE($4,notes), updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND business_id=$5 RETURNING *`,
       [req.params.id, status, expected_delivery, notes, req.business_id]
     );
     if (!result.rows.length) return sendError(res, 404, 'Purchase order not found');
@@ -186,13 +189,26 @@ router.put('/purchase-orders/:id', async (req, res) => {
 });
 
 router.delete('/purchase-orders/:id', async (req, res) => {
+  let client;
   try {
-    await query(`DELETE FROM po_items WHERE po_id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
-    const result = await query(`DELETE FROM purchase_orders WHERE id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
-    if (!result.rowCount) return sendError(res, 404, 'Purchase order not found');
+    client = await pool.connect();
+    await client.query('BEGIN');
+
+    await client.query('DELETE FROM po_items WHERE po_id = $1 AND business_id = $2', [req.params.id, req.business_id]);
+    const result = await client.query('DELETE FROM purchase_orders WHERE id = $1 AND business_id = $2', [req.params.id, req.business_id]);
+    if (!result.rowCount) {
+      await client.query('ROLLBACK');
+      return sendError(res, 404, 'Purchase order not found');
+    }
+
+    await client.query('COMMIT');
     res.json({ message: 'Purchase order deleted' });
   } catch (error) {
+    if (client) await client.query('ROLLBACK').catch(() => {});
+    console.error('Delete purchase order error:', error);
     sendError(res, 500, 'Failed to delete purchase order');
+  } finally {
+    client?.release();
   }
 });
 

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function CategoriesPage() {
-  redirect("/dashboard");
+export default function LegacyPage() {
+  redirect("/dashboard/categories");
 }

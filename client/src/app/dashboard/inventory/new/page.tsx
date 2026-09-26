@@ -1,15 +1,5 @@
-"use client";
-
-import { Package } from "lucide-react";
+import { redirect } from "next/navigation";
 
 export default function NewItemPage() {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="bg-gradient-to-br from-cyan-500 to-teal-500 p-4 rounded-2xl mb-4">
-        <Package className="w-8 h-8 text-white" />
-      </div>
-      <h2 className="text-xl font-bold text-foreground mb-2">New Item</h2>
-      <p className="text-muted-foreground text-sm">Manage new item.</p>
-    </div>
-  );
+  redirect("/dashboard/products?new=1");
 }

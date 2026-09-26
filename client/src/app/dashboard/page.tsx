@@ -1,300 +1,301 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { fetchDashboardData, formatCurrency } from "@/lib/data";
-import api from "@/lib/api";
-import type { DashboardData } from "@/types";
-import DashboardLoading from "./loading";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
-  DollarSign, TrendingDown, TrendingUp, Users, CreditCard, Package,
-  Landmark, BarChart3, ShoppingCart, FileText, UserPlus, Bell, List,
+  BarChart3,
+  CircleDollarSign,
+  CreditCard,
+  Package,
+  Receipt,
+  RefreshCw,
+  ScanLine,
+  TrendingDown,
+  TrendingUp,
+  UserPlus,
+  Wallet,
 } from "lucide-react";
+import api from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
+import { formatCurrency, formatNumber, formatPercent, toNumber } from "@/lib/format";
+import type { DashboardData, FrequentCustomer, LowStockItem, RestockBudgetData, TopProduct } from "@/types";
+import { SalesOverview } from "@/components/dashboard/sales-overview";
+import {
+  CustomerSnapshotPanel,
+  ExpenseBreakdownPanel,
+  InventoryAlertsPanel,
+  RecentTransactionsPanel,
+  TopProductsPanel,
+  type ExpenseSlice,
+} from "@/components/dashboard/dashboard-panels";
+import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/empty-state";
+import { StatCard } from "@/components/ui/stat-card";
+import { Panel, PanelBody } from "@/components/ui/panel";
 
-const quickActions = [
-  { label: "New Sale", icon: ShoppingCart, route: "/dashboard/sales/new", color: "#10b981" },
-  { label: "Add Product", icon: Package, route: "/dashboard/inventory/new", color: "#3b82f6" },
-  { label: "Record Expense", icon: TrendingDown, route: "/dashboard/expenses/new", color: "#ef4444" },
-  { label: "Create Invoice", icon: FileText, route: "/dashboard/invoices/new", color: "#8b5cf6" },
-  { label: "Add Customer", icon: UserPlus, route: "/dashboard/customers/new", color: "#f59e0b" },
-  { label: "Receive Payment", icon: CreditCard, route: "/dashboard/payments", color: "#06b6d4" },
+const QUICK_ACTIONS = [
+  { label: "New Sale", href: "/dashboard/sales/new", icon: ScanLine },
+  { label: "Add Customer", href: "/dashboard/customers/new", icon: UserPlus },
+  { label: "Add Product", href: "/dashboard/inventory/new", icon: Package },
+  { label: "Record Expense", href: "/dashboard/expenses/new", icon: TrendingDown },
+  { label: "Create Invoice", href: "/dashboard/payments", icon: Receipt },
+  { label: "View Reports", href: "/dashboard/reports", icon: BarChart3 },
 ];
 
-const weekData = [
-  { day: "Mon", value: 70 },
-  { day: "Tue", value: 85 },
-  { day: "Wed", value: 55 },
-  { day: "Thu", value: 90 },
-  { day: "Fri", value: 95 },
-  { day: "Sat", value: 65 },
-  { day: "Sun", value: 40 },
-];
+interface ProfitSummary {
+  revenue: number;
+  expenses: number;
+  profit: number;
+  profitMargin: number | string;
+}
 
-const kpiIcons = [
-  DollarSign, TrendingDown, TrendingUp, Users,
-  CreditCard, Package, Landmark, BarChart3,
-];
+function greeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
 
-const kpiColors = [
-  "#4caf50",
-  "#f5a623",
-  "#e44d7b",
-  "#4dd0e1",
-  "#e44d7b",
-  "#f5a623",
-  "#4caf50",
-  "#4dd0e1",
-];
+function today(): string {
+  return new Date().toLocaleDateString("en-KE", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
 
-export default function Dashboard() {
+export default function DashboardPage() {
+  const { user, selectedShop } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
+  const [restockBudget, setRestockBudget] = useState<RestockBudgetData | null>(null);
+  const [customers, setCustomers] = useState<FrequentCustomer[]>([]);
+  const [expenseSlices, setExpenseSlices] = useState<ExpenseSlice[]>([]);
+  const [profit, setProfit] = useState<ProfitSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
-  const router = useRouter();
 
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
-
-  const loadData = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [dashResult, notifs] = await Promise.all([
-        fetchDashboardData(),
-        api.notifications.getAll().catch(() => null),
+      const [stats, top, low, restock, frequent, expenses, profitSummary] = await Promise.all([
+        api.dashboard.getStats() as Promise<DashboardData>,
+        api.dashboard.getTopProducts("30").catch(() => [] as TopProduct[]),
+        api.dashboard.getLowStockDetails().catch(() => [] as LowStockItem[]),
+        api.dashboard.getRestockBudget(2).catch(() => null),
+        api.dashboard.getFrequentCustomers("30").catch(() => [] as FrequentCustomer[]),
+        api.dashboard.getExpensesChart().catch(() => [] as ExpenseSlice[]),
+        api.dashboard.getProfitSummary().catch(() => null),
       ]);
-      setData(dashResult);
-      const notifObject = notifs && typeof notifs === "object" && !Array.isArray(notifs) ? (notifs as any) : null;
-      const systemNotifs: any[] = Array.isArray(notifObject?.systemNotifications) ? notifObject.systemNotifications : [];
-      const alertNotifs: any[] = [
-        ...(notifObject?.overdueSales ?? []).map((s: any) => ({
-          message: `Overdue payment: ${s.customer_name || "Customer"}`,
-          type: "alert",
-          created_at: s.due_date || s.sale_date,
-        })),
-        ...(notifObject?.lowStockProducts ?? []).map((p: any) => ({
-          message: `Low stock: ${p.name || "Product"}`,
-          type: "warning",
-          created_at: new Date().toISOString(),
-        })),
-      ];
-      setNotifications([...alertNotifs, ...systemNotifs]);
+
+      setData(stats);
+      setTopProducts(Array.isArray(top) ? top : []);
+      setLowStock(Array.isArray(low) ? low : []);
+      setRestockBudget((restock as RestockBudgetData | null) ?? null);
+      setCustomers(Array.isArray(frequent) ? frequent : []);
+      setExpenseSlices(Array.isArray(expenses) ? expenses : []);
+      setProfit((profitSummary as ProfitSummary | null) ?? null);
     } catch {
-      setError("Could not load dashboard data.");
+      setError("We could not load your dashboard. Please try again.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    load();
+  }, [load]);
 
   const stats = data?.stats;
-
-  const totalRevenue = stats?.totalRevenue ?? 0;
-  const totalExpenses = stats?.totalExpenses ?? 0;
-  const netProfit = totalRevenue - totalExpenses;
-  const profitMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : "0.0";
-
-  const kpiCards = [
-    { label: "Total Revenue", value: formatCurrency(totalRevenue), change: `Inflow ${formatCurrency(stats?.totalInflow ?? 0)}` },
-    { label: "Total Expenses", value: formatCurrency(totalExpenses), change: `${data?.recentExpenses?.length ?? 0} recent entries` },
-    { label: "Net Profit", value: formatCurrency(netProfit), change: `${profitMargin}% margin` },
-    { label: "Customers", value: String(stats?.totalCustomers ?? 0), change: "Registered clients" },
-    { label: "Pending Payments", value: formatCurrency(stats?.pendingPayments ?? 0), change: `${stats?.activeInvoices ?? 0} active invoices` },
-    { label: "Low Stock Items", value: String(stats?.lowStockProducts ?? 0), change: stats?.lowStockProducts ? "Needs reorder" : "All stocked" },
-    { label: "Cash Balance", value: formatCurrency((stats?.totalInflow ?? 0) - (stats?.totalOutflow ?? 0)), change: "Net cash flow" },
-    { label: "Budget Usage", value: totalRevenue > 0 ? `${Math.min(100, Math.round((totalExpenses / totalRevenue) * 100))}%` : "N/A", change: `${formatCurrency(Math.max(0, totalRevenue - totalExpenses))} remaining` },
-  ];
-
-  const notifList = notifications.length > 0
-    ? notifications.slice(0, 5).map((n: any) => ({
-        text: n.message || n.title || n.text || "Notification",
-        type: n.type === "alert" ? "warning" : n.type || "info",
-        time: n.created_at ? new Date(n.created_at).toLocaleDateString() : n.time || "",
-      }))
-    : [];
-
-  const recentSales = data?.recentSales ?? [];
-  const recentExpenses = data?.recentExpenses ?? [];
-
-  const activities = [
-    ...recentSales.slice(0, 3).map((s: any) => ({
-      text: `Sale: ${s.customer_name || "Walk-in"}`,
-      amount: formatCurrency(s.total || 0),
-      time: s.sale_date ? new Date(s.sale_date).toLocaleDateString() : "",
-    })),
-    ...recentExpenses.slice(0, 2).map((e: any) => ({
-      text: `Expense: ${e.description || "Untitled"}`,
-      amount: formatCurrency(e.amount || 0),
-      time: e.date ? new Date(e.date).toLocaleDateString() : "",
-    })),
-  ];
-
-  if (loading) return <DashboardLoading />;
+  const revenue = toNumber(stats?.totalRevenue) ?? 0;
+  const expenses = toNumber(stats?.totalExpenses) ?? 0;
+  const netProfit = profit ? toNumber(profit.profit) ?? revenue - expenses : revenue - expenses;
+  const margin = profit ? toNumber(profit.profitMargin) : revenue > 0 ? (netProfit / revenue) * 100 : 0;
+  const cashBalance = (toNumber(stats?.totalInflow) ?? 0) - (toNumber(stats?.totalOutflow) ?? 0);
 
   return (
-    <>
-      {error && (
-        <div className="bg-destructive/10 border border-destructive/30 rounded-lg px-4 py-3 mb-4 text-destructive text-xs">
-          {error}
+    <div className="space-y-5">
+      <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground lg:text-2xl">
+            {greeting()}
+            {user?.name ? `, ${user.name.split(" ")[0]}` : ""}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {today()}
+            {selectedShop ? ` · ${selectedShop.name}` : ""} — here is how your business is doing.
+          </p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild>
+            <Link href="/dashboard/sales/new">
+              <ScanLine className="h-4 w-4" aria-hidden />
+              New Sale
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/reports">
+              <BarChart3 className="h-4 w-4" aria-hidden />
+              Reports
+            </Link>
+          </Button>
+        </div>
+      </header>
+
+      <section aria-label="Quick actions">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+          {QUICK_ACTIONS.map((action) => (
+            <Button
+              key={action.href}
+              variant="outline"
+              asChild
+              className="h-auto justify-start gap-2.5 px-3 py-2.5 text-left"
+            >
+              <Link href={action.href}>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-accent-foreground">
+                  <action.icon className="h-4 w-4" aria-hidden />
+                </span>
+                <span className="min-w-0 truncate text-sm font-medium">{action.label}</span>
+              </Link>
+            </Button>
+          ))}
+        </div>
+      </section>
+
+      {error ? (
+        <ErrorState title="Dashboard unavailable" description={error} onRetry={load} retrying={loading} />
+      ) : (
+        <>
+          <section aria-label="Key metrics" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              label="Total Revenue"
+              value={formatCurrency(revenue)}
+              icon={TrendingUp}
+              tone="success"
+              href="/dashboard/reports"
+              hint="Paid sales all time"
+              loading={loading}
+            />
+            <StatCard
+              label="Total Expenses"
+              value={formatCurrency(expenses)}
+              icon={TrendingDown}
+              tone="warning"
+              href="/dashboard/expenses"
+              hint="Recorded all time"
+              loading={loading}
+            />
+            <StatCard
+              label="Net Profit"
+              value={formatCurrency(netProfit)}
+              icon={CircleDollarSign}
+              tone={netProfit >= 0 ? "primary" : "danger"}
+              hint={`${formatPercent(margin ?? 0)} margin`}
+              loading={loading}
+            />
+            <StatCard
+              label="Pending Payments"
+              value={formatCurrency(stats?.pendingPayments)}
+              icon={CreditCard}
+              tone="info"
+              href="/dashboard/payments"
+              hint={`${formatNumber(stats?.activeInvoices)} active invoices`}
+              loading={loading}
+            />
+          </section>
+
+          <section className="grid gap-4 lg:grid-cols-3">
+            <SalesOverview />
+            <TopProductsPanel products={topProducts} loading={loading} />
+          </section>
+
+          <section className="grid gap-4 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <RecentTransactionsPanel
+                sales={data?.recentSales ?? []}
+                expenses={data?.recentExpenses ?? []}
+                loading={loading}
+              />
+            </div>
+            <InventoryAlertsPanel
+              items={lowStock}
+              restockBudget={restockBudget}
+              loading={loading}
+            />
+          </section>
+
+          <section className="grid gap-4 lg:grid-cols-2">
+            <CustomerSnapshotPanel
+              customers={customers}
+              totalCustomers={toNumber(stats?.totalCustomers) ?? 0}
+              loading={loading}
+            />
+            <ExpenseBreakdownPanel
+              slices={expenseSlices}
+              loading={loading}
+              margin={margin ?? null}
+            />
+          </section>
+
+          <section aria-label="Business snapshot" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Panel>
+              <PanelBody className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Customers</p>
+                  <p className="mt-1 text-xl font-semibold text-foreground">
+                    {loading ? "—" : formatNumber(stats?.totalCustomers)}
+                  </p>
+                </div>
+                <UserPlus className="h-5 w-5 text-muted-foreground" aria-hidden />
+              </PanelBody>
+            </Panel>
+            <Panel>
+              <PanelBody className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Active invoices</p>
+                  <p className="mt-1 text-xl font-semibold text-foreground">
+                    {loading ? "—" : formatNumber(stats?.activeInvoices)}
+                  </p>
+                </div>
+                <Receipt className="h-5 w-5 text-muted-foreground" aria-hidden />
+              </PanelBody>
+            </Panel>
+            <Panel>
+              <PanelBody className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Low stock items</p>
+                  <p className="mt-1 text-xl font-semibold text-foreground">
+                    {loading ? "—" : formatNumber(stats?.lowStockProducts)}
+                  </p>
+                </div>
+                <Package className="h-5 w-5 text-muted-foreground" aria-hidden />
+              </PanelBody>
+            </Panel>
+            <Panel>
+              <PanelBody className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Cash balance</p>
+                  <p className="mt-1 text-xl font-semibold text-foreground">
+                    {loading ? "—" : formatCurrency(cashBalance)}
+                  </p>
+                </div>
+                <Wallet className="h-5 w-5 text-muted-foreground" aria-hidden />
+              </PanelBody>
+            </Panel>
+          </section>
+        </>
       )}
 
-      <div
-        className="grid gap-3.5 mb-6"
-        style={{ gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)" }}
-      >
-        {kpiCards.map((kpi, idx) => {
-          const Icon = kpiIcons[idx];
-          return (
-            <div
-              key={idx}
-              className="bg-card rounded-md p-5 border border-border shadow-sm transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
-            >
-              <div className="flex justify-between items-start mb-3">
-                <div
-                  className="w-10 h-10 rounded-md flex items-center justify-center"
-                  style={{ backgroundColor: `${kpiColors[idx]}1f`, color: kpiColors[idx] }}
-                >
-                  <Icon className="h-5 w-5" />
-                </div>
-                <span className="text-[11px] text-muted-foreground font-medium bg-muted px-2 py-0.5 rounded-md">
-                  {kpi.change}
-                </span>
-              </div>
-              <div className="text-xl font-bold text-foreground mb-1 tracking-tight">
-                {kpi.value}
-              </div>
-              <div className="text-xs text-muted-foreground font-medium">
-                {kpi.label}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div
-        className="grid gap-4 mb-6"
-        style={{ gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr" }}
-      >
-        <div className="bg-card rounded-md border border-border p-5 shadow-sm">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-sm font-semibold text-foreground m-0">Sales This Week</h3>
-            <button onClick={() => router.push("/dashboard/sales")} className="text-xs text-primary bg-none border-none cursor-pointer font-medium hover:underline">
-              View All →
-            </button>
-          </div>
-          <div className="flex items-end gap-2 h-40 pt-2">
-            {weekData.map((d, idx) => (
-              <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end">
-                <div
-                  className="w-full max-w-[40px] rounded-t-md bg-primary min-h-[12px]"
-                  style={{ height: `${d.value}%` }}
-                />
-                <span className="text-[10px] text-muted-foreground mt-1.5 font-medium">{d.day}</span>
-              </div>
-            ))}
-          </div>
+      {!error && !loading ? (
+        <div className="flex justify-end">
+          <Button variant="ghost" size="sm" onClick={load} className="text-muted-foreground">
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+            Refresh data
+          </Button>
         </div>
-
-        <div className="bg-card rounded-md border border-border p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-foreground mb-3">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {quickActions.map((action, idx) => {
-              const ActionIcon = action.icon;
-              return (
-                <button
-                  key={idx}
-                  onClick={() => router.push(action.route)}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border bg-card cursor-pointer text-xs font-medium text-foreground transition-all duration-150 hover:border-current hover:bg-accent"
-                  style={{ borderColor: "var(--border)" }}
-                  onMouseEnter={e => { const el = e.currentTarget; el.style.borderColor = action.color; el.style.backgroundColor = `${action.color}12`; }}
-                  onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = "var(--border)"; el.style.backgroundColor = ""; }}
-                >
-                  <ActionIcon className="h-4 w-4" style={{ color: action.color }} />
-                  {action.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      <div
-        className="grid gap-4 mb-6"
-        style={{ gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr" }}
-      >
-        <div className="bg-card rounded-md border border-border shadow-sm">
-          <div className="px-5 py-4 border-b border-border flex justify-between items-center">
-            <h3 className="text-sm font-semibold text-foreground m-0 flex items-center gap-2">
-              <Bell className="h-4 w-4 text-muted-foreground" />
-              Notifications
-            </h3>
-            <button onClick={() => router.push("/notifications")} className="text-xs text-primary bg-none border-none cursor-pointer font-medium hover:underline">
-              View All →
-            </button>
-          </div>
-          <div className="py-1">
-            {notifList.length === 0 ? (
-              <div className="py-6 text-center text-muted-foreground text-xs">No notifications</div>
-            ) : (
-              notifList.map((n: any, idx: number) => (
-                <div key={idx} className={`flex items-center gap-3 px-5 py-2.5 ${idx < notifList.length - 1 ? "border-b border-muted" : ""}`}>
-                  <span className="flex-shrink-0">
-                    {n.type === "error" ? "🔴" : n.type === "warning" ? "🟡" : n.type === "success" ? "🟢" : "🔵"}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs text-foreground truncate">{n.text}</div>
-                    <div className="text-[11px] text-muted-foreground">{n.time}</div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="bg-card rounded-md border border-border shadow-sm">
-          <div className="px-5 py-4 border-b border-border flex items-center gap-2">
-            <List className="h-4 w-4 text-muted-foreground" />
-            <h3 className="text-sm font-semibold text-foreground m-0">Recent Activity</h3>
-          </div>
-          <div className="py-1">
-            {activities.length === 0 ? (
-              <div className="py-6 text-center text-muted-foreground text-xs">No recent activity</div>
-            ) : (
-              activities.map((a: any, idx: number) => (
-                <div key={idx} className={`flex items-center justify-between px-5 py-2.5 ${idx < activities.length - 1 ? "border-b border-muted" : ""}`}>
-                  <div className="min-w-0">
-                    <div className="text-xs text-foreground font-medium truncate">{a.text}</div>
-                    <div className="text-[11px] text-muted-foreground">{a.time}</div>
-                  </div>
-                  {a.amount && <div className="text-xs font-semibold text-success flex-shrink-0 ml-3">{a.amount}</div>}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="text-center text-[11px] text-muted-foreground py-4 border-t border-border">
-        BizFlow &copy; 2026 &middot; Enterprise Dashboard
-      </div>
-
-      <button
-        onClick={loadData}
-        className="fixed bottom-5 right-5 px-4 py-2.5 border border-border bg-card rounded-lg cursor-pointer text-xs font-medium text-muted-foreground shadow-lg z-50 hover:bg-accent transition-colors"
-      >
-        <BarChart3 className="h-3.5 w-3.5 inline mr-1.5" />
-        Refresh
-      </button>
-    </>
+      ) : null}
+    </div>
   );
 }

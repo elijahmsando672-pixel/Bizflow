@@ -1,7 +1,17 @@
+import pg from 'pg';
 import dotenv from 'dotenv';
-import { pool } from '../config/db.js';
 
 dotenv.config();
+
+const { Pool } = pg;
+
+const pool = new Pool({
+  host: process.env.DB_HOST || 'localhost',
+  port: process.env.DB_PORT || 5432,
+  database: process.env.DB_NAME || 'bizflow',
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres',
+});
 
 const query = async (text, params) => pool.query(text, params);
 
@@ -23,13 +33,13 @@ async function seedDemo() {
     const existingUser = await query(`SELECT id FROM users WHERE email = 'elijah@bizflow.com'`);
     if (existingUser.rows.length === 0) {
       const bizResult = await query(
-        `INSERT INTO businesses (name, email, status) OUTPUT INSERTED.id VALUES ('BizFlow Demo', 'admin@bizflow.com', 'active')`
+        `INSERT INTO businesses (name, email, status) VALUES ('BizFlow Demo', 'admin@bizflow.com', 'active') RETURNING id`
       );
       BUSINESS_ID = bizResult.rows[0].id;
       const { hashPassword } = await import('../utils/password.js');
       const hashedPassword = await hashPassword('test123');
       const userResult = await query(
-        `INSERT INTO users (business_id, name, email, password, role) OUTPUT INSERTED.id VALUES ($1, 'Elijah', 'elijah@bizflow.com', $2, 'owner')`,
+        `INSERT INTO users (business_id, name, email, password, role) VALUES ($1, 'Elijah', 'elijah@bizflow.com', $2, 'owner') RETURNING id`,
         [BUSINESS_ID, hashedPassword]
       );
       USER_ID = userResult.rows[0].id;
@@ -57,7 +67,7 @@ async function seedDemo() {
     const customerIds = {};
     for (const c of customers) {
       const r = await query(
-        `INSERT INTO customers (business_id, name, email, phone, company, address, credit_limit, created_at) OUTPUT INSERTED.id VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        `INSERT INTO customers (business_id, name, email, phone, company, address, credit_limit, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
         [BUSINESS_ID, c.name, c.email, c.phone, c.company, c.address, c.credit_limit, d(Math.floor(Math.random() * 60))]
       );
       customerIds[c.name] = r.rows[0].id;
@@ -69,7 +79,7 @@ async function seedDemo() {
     const categoryIds = {};
     for (const cat of categories) {
       const r = await query(
-        `INSERT INTO categories (business_id, name, description) OUTPUT INSERTED.id VALUES ($1,$2,$3)`,
+        `INSERT INTO categories (business_id, name, description) VALUES ($1,$2,$3) RETURNING id`,
         [BUSINESS_ID, cat, `${cat} products`]
       );
       categoryIds[cat] = r.rows[0].id;
@@ -96,7 +106,7 @@ async function seedDemo() {
     for (const p of products) {
       const catId = categoryIds[p.category];
       const r = await query(
-        `INSERT INTO products (business_id, sku, name, category_id, cost_price, selling_price, stock_qty, reorder_level, created_at) OUTPUT INSERTED.id VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        `INSERT INTO products (business_id, sku, name, category_id, cost_price, selling_price, stock_qty, reorder_level, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
         [BUSINESS_ID, p.sku, p.name, catId, p.cost_price, p.selling_price, p.stock_qty, p.reorder_level, d(Math.floor(Math.random() * 90))]
       );
       productIds[p.sku] = r.rows[0].id;
@@ -107,7 +117,7 @@ async function seedDemo() {
     const expCats = ['Office Supplies', 'Utilities', 'Transport', 'Marketing', 'Software Subscriptions', 'Rent'];
     for (const cat of expCats) {
       const existing = await query(
-        `SELECT TOP 1 id FROM expense_categories WHERE business_id = $1 AND name = $2`,
+        `SELECT id FROM expense_categories WHERE business_id = $1 AND name = $2 LIMIT 1`,
         [BUSINESS_ID, cat]
       );
       if (existing.rows.length === 0) {
@@ -164,8 +174,7 @@ async function seedDemo() {
 
       const sale = await query(
         `INSERT INTO sales (business_id, customer_id, invoice_number, status, sale_date, subtotal, tax_amount, total, amount_paid, created_by)
-         OUTPUT INSERTED.id
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
         [BUSINESS_ID, custId, invNum, s.status, d(Math.floor(Math.random() * 30)), subtotal, tax, total, s.status === 'paid' ? total : 0, USER_ID]
       );
       const saleId = sale.rows[0].id;
@@ -198,7 +207,7 @@ async function seedDemo() {
     const leadIds = {};
     for (const l of leads) {
       const r = await query(
-        `INSERT INTO leads (business_id, first_name, last_name, email, company, source, status, estimated_value, created_by) OUTPUT INSERTED.id VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        `INSERT INTO leads (business_id, first_name, last_name, email, company, source, status, estimated_value, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
         [BUSINESS_ID, l.first_name, l.last_name, l.email, l.company, l.source, l.status, l.estimated_value, USER_ID]
       );
       leadIds[l.first_name + l.last_name] = r.rows[0].id;
@@ -217,7 +226,7 @@ async function seedDemo() {
     const stageIds = {};
     for (const s of stages) {
       const r = await query(
-        `INSERT INTO deal_stages (business_id, name, order_index, win_probability, color) OUTPUT INSERTED.id VALUES ($1,$2,$3,$4,$5)`,
+        `INSERT INTO deal_stages (business_id, name, order_index, win_probability, color) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
         [BUSINESS_ID, s.name, s.order_index, s.win_probability, s.color]
       );
       stageIds[s.name] = r.rows[0].id;
@@ -269,8 +278,7 @@ async function seedDemo() {
 
       const r = await query(
         `INSERT INTO support_tickets (business_id, customer_id, ticket_number, subject, description, priority, status, category, sla_deadline, created_by)
-         OUTPUT INSERTED.id
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
         [BUSINESS_ID, custId, `TKT-${tktCounter}`, t.subject, t.description, t.priority, t.status, t.category, slaDeadline.toISOString(), USER_ID]
       );
       ticketIds[t.subject] = r.rows[0].id;
@@ -311,7 +319,7 @@ async function seedDemo() {
     for (const p of projects) {
       const custId = p.customer ? customerIds[p.customer] : null;
       const r = await query(
-        `INSERT INTO projects (business_id, name, description, status, budget, customer_id, start_date, end_date, created_by) OUTPUT INSERTED.id VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        `INSERT INTO projects (business_id, name, description, status, budget, customer_id, start_date, end_date, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
         [BUSINESS_ID, p.name, p.description, p.status, p.budget, custId, p.start_date, p.end_date, USER_ID]
       );
       projectIds[p.name] = r.rows[0].id;
@@ -384,7 +392,7 @@ async function seedDemo() {
     const vendorIds = {};
     for (const v of vendors) {
       const r = await query(
-        `INSERT INTO vendors (business_id, name, email, phone, contact_person, payment_terms, address) OUTPUT INSERTED.id VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        `INSERT INTO vendors (business_id, name, email, phone, contact_person, payment_terms, address) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
         [BUSINESS_ID, v.name, v.email, v.phone, v.contact_person, v.payment_terms, v.address]
       );
       vendorIds[v.name] = r.rows[0].id;
@@ -410,8 +418,7 @@ async function seedDemo() {
 
       const r = await query(
         `INSERT INTO purchase_orders (business_id, po_number, vendor_id, status, order_date, subtotal, tax_amount, total, created_by)
-         OUTPUT INSERTED.id
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
         [BUSINESS_ID, `PO-${poCounter}`, vendorId, po.status, po.date, subtotal, tax, total, USER_ID]
       );
       const poId = r.rows[0].id;

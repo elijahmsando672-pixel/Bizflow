@@ -9,7 +9,7 @@ router.post('/', async (req, res) => {
     const { user_id, project_id, task_id, customer_id, description, date, start_time, end_time, duration_minutes, is_billable } = req.body;
     const result = await query(
       `INSERT INTO time_entries (business_id, user_id, project_id, task_id, customer_id, description, date, start_time, end_time, duration_minutes, is_billable)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) OUTPUT INSERTED.*`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
       [req.business_id, user_id || req.user.id, project_id, task_id, customer_id, description, date || new Date().toISOString().split('T')[0], start_time, end_time, duration_minutes, is_billable !== false]
     );
     res.status(201).json(result.rows[0]);
@@ -62,8 +62,8 @@ router.get('/summary', async (req, res) => {
       `SELECT 
          COUNT(*) as total_entries,
          COALESCE(SUM(t.duration_minutes), 0) / 60.0 as total_hours,
-         COALESCE(SUM(CASE WHEN t.is_billable = true THEN t.duration_minutes END), 0) / 60.0 as billable_hours,
-         COALESCE(SUM(CASE WHEN t.is_billable = false THEN t.duration_minutes END), 0) / 60.0 as non_billable_hours,
+         COALESCE(SUM(t.duration_minutes) FILTER (WHERE t.is_billable = true), 0) / 60.0 as billable_hours,
+         COALESCE(SUM(t.duration_minutes) FILTER (WHERE t.is_billable = false), 0) / 60.0 as non_billable_hours,
          COALESCE(SUM(t.billed_amount), 0) as total_billed
        FROM time_entries t WHERE ${conditions.join(' AND ')}`,
       params
@@ -102,7 +102,7 @@ router.put('/:id', async (req, res) => {
       `UPDATE time_entries SET description=COALESCE($2,description), duration_minutes=COALESCE($3,duration_minutes),
        is_billable=COALESCE($4,is_billable), billed_amount=COALESCE($5,billed_amount),
        start_time=COALESCE($6,start_time), end_time=COALESCE($7,end_time)
-       WHERE id=$1 AND business_id=$8 OUTPUT INSERTED.*`,
+       WHERE id=$1 AND business_id=$8 RETURNING *`,
       [req.params.id, description, duration_minutes, is_billable, billed_amount, start_time, end_time, req.business_id]
     );
     if (!result.rows.length) return sendError(res, 404, 'Time entry not found');

@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
       `SELECT s.*, c.name as customer_name, c.email as customer_email
        FROM sales s 
        LEFT JOIN customers c ON s.customer_id = c.id
-       WHERE s.business_id = $1 AND s.status IN ('pending', 'sent') AND s.due_date < DATEADD(day, -3, GETDATE())`,
+       WHERE s.business_id = $1 AND s.status IN ('pending', 'sent') AND s.due_date < NOW() - INTERVAL '3 days'`,
       [businessId]
     );
     
@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
     );
     
     const systemNotifications = await query(
-      'SELECT * FROM notifications WHERE business_id = $1 AND (read_at IS NULL OR read_at > DATEADD(day, -7, GETDATE())) ORDER BY created_at DESC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY',
+      'SELECT * FROM notifications WHERE business_id = $1 AND (read_at IS NULL OR read_at > NOW() - INTERVAL \'7 days\') ORDER BY created_at DESC LIMIT 20',
       [businessId]
     );
     

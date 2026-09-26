@@ -11,7 +11,7 @@ function sanitize(str) {
 
 async function generateQuotationNumber(businessId) {
   const result = await query(
-    `SELECT COALESCE(MAX(CAST(SUBSTRING(quotation_number, 5, LEN(quotation_number)) AS INTEGER)), 0) + 1 as next_num
+    `SELECT COALESCE(MAX(CAST(SUBSTRING(quotation_number FROM 5) AS INTEGER)), 0) + 1 as next_num
      FROM quotations WHERE business_id = $1`,
     [businessId]
   );
@@ -55,7 +55,7 @@ router.post('/', async (req, res) => {
 
     const result = await query(
       `INSERT INTO quotations (business_id, customer_id, customer_name, quotation_number, status, subtotal, tax_amount, discount_amount, total, valid_until, notes, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) OUTPUT INSERTED.*`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
       [req.business_id, customer_id, sanitize(customer_name), quotationNumber, status || 'draft', subtotal || 0, tax_amount || 0, discount_amount || 0, total || 0, valid_until, sanitize(notes), req.user.id]
     );
     res.status(201).json(result.rows[0]);
@@ -80,7 +80,7 @@ router.put('/:id', async (req, res) => {
         valid_until = COALESCE($8, valid_until),
         notes = COALESCE($9, notes),
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $10 AND business_id = $11 OUTPUT INSERTED.*`,
+       WHERE id = $10 AND business_id = $11 RETURNING *`,
       [customer_id, sanitize(customer_name), status, subtotal, tax_amount, discount_amount, total, valid_until, sanitize(notes), req.params.id, req.business_id]
     );
     if (result.rows.length === 0) return sendError(res, 404, 'Quotation not found');
@@ -94,7 +94,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const result = await query(
-      'DELETE FROM quotations OUTPUT DELETED.id WHERE id = $1 AND business_id = $2',
+      'DELETE FROM quotations WHERE id = $1 AND business_id = $2 RETURNING id',
       [req.params.id, req.business_id]
     );
     if (result.rows.length === 0) return sendError(res, 404, 'Quotation not found');

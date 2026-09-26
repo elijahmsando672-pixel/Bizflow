@@ -18,7 +18,7 @@ export const createCategory = async (req, res) => {
   try {
     const { name, description, parent_id } = req.body;
     const result = await query(
-      'INSERT INTO categories (business_id, name, description, parent_id) OUTPUT INSERTED.* VALUES ($1, $2, $3, $4)',
+      'INSERT INTO categories (business_id, name, description, parent_id) VALUES ($1, $2, $3, $4) RETURNING *',
       [req.business_id, name, description, parent_id]
     );
     res.status(201).json(result.rows[0]);
@@ -65,7 +65,7 @@ export const create = async (req, res) => {
     const { name, sku, barcode, description, category_id, unit, cost_price, selling_price, stock_qty, reorder_level, image_url } = req.body;
     const result = await query(
       `INSERT INTO products (business_id, name, sku, barcode, description, category_id, unit, cost_price, selling_price, stock_qty, reorder_level, image_url)
-       OUTPUT INSERTED.* VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
       [req.business_id, name, sku, barcode, description, category_id, unit || 'piece', cost_price || 0, selling_price || 0, stock_qty || 0, reorder_level || 10, image_url]
     );
 
@@ -91,7 +91,7 @@ export const update = async (req, res) => {
 
     const { name, sku, barcode, description, category_id, unit, cost_price, selling_price, stock_qty, reorder_level, is_active, image_url } = req.body;
 
-    const current = await client.query('SELECT stock_qty FROM products WITH (UPDLOCK, ROWLOCK) WHERE id=$1 AND business_id=$2', [req.params.id, req.business_id]);
+    const current = await client.query('SELECT stock_qty FROM products WHERE id=$1 AND business_id=$2 FOR UPDATE', [req.params.id, req.business_id]);
     if (current.rows.length === 0) {
       await client.query('ROLLBACK');
       return sendError(res, 404, 'Product not found');
@@ -104,7 +104,7 @@ export const update = async (req, res) => {
     const result = await client.query(
       `UPDATE products SET name=$1, sku=$2, barcode=$3, description=$4, category_id=$5, unit=$6, cost_price=$7, selling_price=$8,
        stock_qty=$9, reorder_level=$10, is_active=$11, image_url=$12, updated_at=NOW()
-       OUTPUT INSERTED.* WHERE id=$13 AND business_id=$14`,
+       WHERE id=$13 AND business_id=$14 RETURNING *`,
       [name, sku, barcode, description, category_id, unit, cost_price, selling_price, newQty, reorder_level, is_active, image_url, req.params.id, req.business_id]
     );
 
@@ -129,7 +129,7 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
-    const result = await query('DELETE FROM products OUTPUT DELETED.id WHERE id=$1 AND business_id=$2', [req.params.id, req.business_id]);
+    const result = await query('DELETE FROM products WHERE id=$1 AND business_id=$2 RETURNING id', [req.params.id, req.business_id]);
     if (result.rows.length === 0) return sendError(res, 404, 'Not found');
     res.json({ message: 'Deleted' });
   } catch (err) {

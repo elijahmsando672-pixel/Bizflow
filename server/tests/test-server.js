@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { initDatabase } from '../config/db.js';
 import { authenticate } from '../middleware/auth.js';
+import { authenticateApiKey } from '../middleware/apiKey.js';
 
 export const app = express();
 app.use(cors());
@@ -14,6 +15,15 @@ import productRoutes from '../routes/products.js';
 import invoiceRoutes from '../routes/invoices.js';
 import expenseRoutes from '../routes/expenses.js';
 import dashboardRoutes from '../routes/dashboard.js';
+import procurementRoutes from '../routes/procurement.js';
+import apiKeyRoutes from '../routes/apiKeys.js';
+
+const authenticateApiKeyOrJwt = (req, res, next) => {
+  authenticateApiKey(req, res, () => {
+    if (req.business_id) return next();
+    return authenticate(req, res, next);
+  });
+};
 
 app.use('/api/auth', authRoutes);
 app.use('/api/customers', authenticate, customerRoutes);
@@ -21,6 +31,8 @@ app.use('/api/products', authenticate, productRoutes);
 app.use('/api/invoices', authenticate, invoiceRoutes);
 app.use('/api/expenses', authenticate, expenseRoutes);
 app.use('/api/dashboard', authenticate, dashboardRoutes);
+app.use('/api/procurement', authenticateApiKeyOrJwt, procurementRoutes);
+app.use('/api/api-keys', authenticateApiKeyOrJwt, apiKeyRoutes);
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });

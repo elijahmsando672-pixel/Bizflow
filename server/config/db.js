@@ -1,322 +1,1350 @@
+import pg from 'pg';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import sql from 'mssql';
-import { SCHEMA_SQL } from './schema.tsql.js';
 
 dotenv.config();
 
-// ========================================
-// SQL Server connection config
-// ========================================
+const { Pool, Client } = pg;
 
-const hasConnectionString = Boolean(process.env.DB_CONNECTION_STRING);
+// Runtime and provider detection -------------------------------------------------
 
-const dbConfig = hasConnectionString
-  ? process.env.DB_CONNECTION_STRING
-  : {
-      user: process.env.DB_USER || 'sa',
-      password: process.env.DB_PASSWORD || '',
-      server: process.env.DB_SERVER || 'localhost',
-      port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : undefined,
-      database: process.env.DB_NAME || 'bizflow',
-      pool: {
-        max: parseInt(process.env.DB_POOL_MAX || '20', 10),
-        min: 0,
-        idleTimeoutMillis: 30000,
-      },
-      options: {
-        encrypt: process.env.DB_ENCRYPT === 'true',
-        trustServerCertificate: process.env.DB_TRUST_SERVER_CERT !== 'false',
-        enableArithAbort: true,
-      },
-    };
+const SERVERLESS_MARKERS = ['VERCEL', 'AWS_LAMBDA_FUNCTION_NAME', 'NETLIFY', 'FUNCTIONS_WORKER_RUNTIME'];
+const SUPABASE_HOST = /(^|\.)(pooler\.)?supabase\.(co|com)$/i;
 
-const dbName = hasConnectionString
-  ? (process.env.DB_NAME || 'bizflow')
-  : (process.env.DB_NAME || 'bizflow');
+export const isServerless = (env = process.env) =>
+  SERVERLESS_MARKERS.some((key) => Boolean(env[key]));
 
-// ========================================
-// SQL dialect translation (PostgreSQL -> T-SQL)
-// ========================================
+const connectionString = (env) => env.DATABASE_URL || env.SUPABASE_POOLER_URL || env.SUPABASE_DB_URL || '';
 
-export const translateSql = (text) => String(text)
-  .replace(/\$(\d+)/g, (_, n) => `@p${n}`)
-  .replace(/\bnow\(\)/gi, 'GETDATE()')
-  .replace(/\bCURRENT_DATE\b/gi, 'CAST(GETDATE() AS DATE)')
-  .replace(/\bILIKE\b/gi, 'LIKE')
-  .replace(/\bLENGTH\(/gi, 'LEN(')
-  .replace(/(?<!['"])\btrue\b/gi, '1')
-  .replace(/(?<!['"])\bfalse\b/gi, '0');
-
-// ========================================
-// Parameter binding
-// ========================================
-
-const bindParam = (request, name, value) => {
-  if (value === null || value === undefined) {
-    request.input(name, sql.NVarChar(sql.MAX), null);
-    return;
+export const isSupabase = (env = process.env) => {
+  const value = connectionString(env);
+  if (!value) return false;
+  try {
+    return SUPABASE_HOST.test(new URL(value).hostname);
+  } catch {
+    return false;
   }
-  if (typeof value === 'boolean') {
-    request.input(name, sql.Bit, value ? 1 : 0);
-    return;
-  }
-  if (typeof value === 'bigint') {
-    request.input(name, sql.BigInt, value.toString());
-    return;
-  }
-  if (typeof value === 'number') {
-    if (Number.isInteger(value) && Math.abs(value) < 2147483647) {
-      request.input(name, sql.Int, value);
-    } else if (Number.isInteger(value)) {
-      request.input(name, sql.BigInt, value.toString());
-    } else {
-      request.input(name, sql.Decimal(18, 4), value);
-    }
-    return;
-  }
-  if (value instanceof Date) {
-    request.input(name, sql.DateTime2, value);
-    return;
-  }
-  if (typeof value === 'string') {
-    request.input(name, sql.NVarChar(sql.MAX), value);
-    return;
-  }
-  if (typeof value === 'object') {
-    request.input(name, sql.NVarChar(sql.MAX), JSON.stringify(value));
-    return;
-  }
-  request.input(name, value);
 };
 
-const bindParams = (request, params) => {
-  if (!Array.isArray(params)) return;
-  params.forEach((value, index) => bindParam(request, `p${index + 1}`, value));
+// Supavisor's transaction mode (port 6543) hands each transaction to a different
+// backend, so session state such as advisory locks or temp tables is unsafe there.
+export const isTransactionPooler = (env = process.env) => {
+  const value = connectionString(env);
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.port === '6543' || url.searchParams.get('pgbouncer') === 'true';
+  } catch {
+    return false;
+  }
 };
 
-const toResult = (result) => ({
-  rows: Array.isArray(result.recordset) ? result.recordset : [],
-  rowCount: Array.isArray(result.rowsAffected) && result.rowsAffected.length
-    ? result.rowsAffected[0]
-    : (Array.isArray(result.recordset) ? result.recordset.length : 0),
+const buildSsl = (env) => {
+  const supabase = isSupabase(env);
+  if (env.DB_SSL !== 'true' && !supabase) return undefined;
+  // Supabase's certificates are not chained to a public root, so verification is
+  // off unless it is explicitly requested.
+  const rejectUnauthorized = env.DB_SSL_REJECT_UNAUTHORIZED
+    ? env.DB_SSL_REJECT_UNAUTHORIZED === 'true'
+    : !supabase;
+  return {
+    rejectUnauthorized,
+    ...(env.DB_SSL_CA ? { ca: fs.readFileSync(env.DB_SSL_CA) } : {}),
+  };
+};
+
+const applyConnectionTarget = (config, env) => {
+  if (env.DATABASE_URL) {
+    config.connectionString = env.DATABASE_URL;
+    return config;
+  }
+  return Object.assign(config, {
+    host: env.DB_HOST || 'localhost',
+    port: Number.parseInt(env.DB_PORT || '5432', 10),
+    database: env.DB_NAME || 'bizflow',
+    user: env.DB_USER || 'postgres',
+    password: env.DB_PASSWORD || 'postgres',
+  });
+};
+
+const numberFrom = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+// Serverless instances are created and destroyed constantly, so each one may hold a
+// single pooled connection. The transaction pooler can be used, but never for DDL.
+export const buildPoolConfig = (env = process.env) => {
+  const serverless = isServerless(env);
+  const config = {
+    max: numberFrom(env.DB_POOL_MAX, serverless ? 1 : 20),
+    idleTimeoutMillis: numberFrom(env.DB_POOL_IDLE_TIMEOUT_MS, serverless ? 1000 : 30000),
+    connectionTimeoutMillis: numberFrom(env.DB_CONNECT_TIMEOUT_MS, 10000),
+    application_name: env.DB_APPLICATION_NAME || `bizflow-api${serverless ? '-serverless' : ''}`,
+    allowExitOnIdle: env.NODE_ENV === 'test' || env.DB_ALLOW_EXIT_ON_IDLE === 'true',
+    ssl: buildSsl(env),
+  };
+
+  if (isTransactionPooler(env)) {
+    config.options = '-c statement_cache_size=0';
+  }
+
+  return applyConnectionTarget(config, env);
+};
+
+// Schema creation needs a real session, so it runs on its own connection.
+export const buildInitConfig = (env = process.env) => {
+  if (isTransactionPooler(env) && !env.DB_INIT_URL) {
+    throw new Error(
+      'DB_INIT_URL is required when DATABASE_URL points at the Supabase transaction pooler (port 6543). ' +
+      'Use the direct connection or the session pooler so advisory locks and DDL work.',
+    );
+  }
+
+  const config = {
+    application_name: 'bizflow-db-init',
+    ssl: buildSsl(env),
+  };
+  return applyConnectionTarget(config, env.DB_INIT_URL ? { ...env, DATABASE_URL: env.DB_INIT_URL } : env);
+};
+
+export const pool = new Pool(buildPoolConfig());
+
+pool.on('error', (err) => {
+  console.error('Unexpected pool error:', err.message);
 });
-
-// ========================================
-// Compat client (transacted) - mirrors pg client from pool.connect()
-// ========================================
-
-class CompatClient {
-  constructor(pool) {
-    this._pool = pool;
-    this._tx = null;
-  }
-
-  async _run(text, params) {
-    const upper = text.trim().toUpperCase();
-    if (upper.startsWith('BEGIN')) {
-      if (!this._tx) {
-        const connection = await this._pool._ensure();
-        this._tx = new sql.Transaction(connection);
-        await this._tx.begin();
-      }
-      return { rows: [], rowCount: 0 };
-    }
-    if (upper.startsWith('COMMIT')) {
-      if (this._tx) {
-        await this._tx.commit();
-        this._tx = null;
-      }
-      return { rows: [], rowCount: 0 };
-    }
-    if (upper.startsWith('ROLLBACK')) {
-      if (this._tx) {
-        await this._tx.rollback();
-        this._tx = null;
-      }
-      return { rows: [], rowCount: 0 };
-    }
-
-    const request = this._tx ? new sql.Request(this._tx) : new sql.Request(await this._pool._ensure());
-    bindParams(request, params);
-    const result = await request.query(translateSql(text));
-    return toResult(result);
-  }
-
-  async query(text, params) {
-    return this._run(text, params);
-  }
-
-  async connect() {
-    return this;
-  }
-
-  release() {
-    // Pooled in mssql; nothing to release.
-  }
-
-  end() {
-    // No-op for compatibility.
-  }
-}
-
-// ========================================
-// Compat pool - mirrors the pg Pool API
-// ========================================
-
-class CompatPool {
-  constructor() {
-    this._pool = null;
-    this._connecting = null;
-    this._errorHandlers = [];
-  }
-
-  async _ensure() {
-    if (this._pool && this._pool.connected) return this._pool;
-
-    if (!this._pool) {
-      this._pool = new sql.ConnectionPool(dbConfig);
-      this._pool.on('error', (err) => {
-        console.error('Unexpected pool error:', err.message);
-        this._errorHandlers.forEach((fn) => {
-          try { fn(err); } catch { /* ignore handler errors */ }
-        });
-      });
-    }
-
-    if (!this._pool.connected) {
-      if (!this._connecting) {
-        this._connecting = this._pool.connect().finally(() => {
-          this._connecting = null;
-        });
-      }
-      await this._connecting;
-    }
-
-    return this._pool;
-  }
-
-  async query(text, params) {
-    const connection = await this._ensure();
-    const request = connection.request();
-    bindParams(request, params);
-    const result = await request.query(translateSql(text));
-    return toResult(result);
-  }
-
-  async connect() {
-    await this._ensure();
-    return new CompatClient(this);
-  }
-
-  async end() {
-    if (this._pool && this._pool.connected) {
-      await this._pool.close();
-    }
-  }
-
-  on(event, handler) {
-    if (event === 'error') this._errorHandlers.push(handler);
-    return this;
-  }
-
-  removeListener(event, handler) {
-    if (event === 'error') this._errorHandlers = this._errorHandlers.filter((fn) => fn !== handler);
-  }
-}
-
-export const pool = new CompatPool();
 
 export const query = (text, params) => pool.query(text, params);
 
-// ========================================
-// Database initialization (schema + migrations)
-// ========================================
-
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-const createDatabaseIfMissing = async () => {
-  if (hasConnectionString) return;
-  const masterConfig = typeof dbConfig === 'object'
-    ? { ...dbConfig, database: 'master' }
-    : dbConfig;
-
-  const master = new sql.ConnectionPool(masterConfig);
-  try {
-    await master.connect();
-    const check = await master.request().query(
-      `SELECT DB_ID(N'${String(dbName).replace(/'/g, "''")}') AS dbid`
-    );
-    if (!check.recordset[0] || !check.recordset[0].dbid) {
-      await master.request().query(
-        `CREATE DATABASE [${String(dbName).replace(/]/g, ']]')}]`
-      );
-      console.log(`Created database ${dbName}`);
-    }
-  } catch (err) {
-    console.error(`Could not ensure database exists (${err.message})`);
-  } finally {
-    try { await master.close(); } catch { /* ignore */ }
-  }
-};
+const MIGRATION_LOCK_ID = '727184930';
 
 export const initDatabase = async (retries = 10, baseDelay = 3000) => {
   for (let attempt = 1; attempt <= retries; attempt++) {
+    let client;
     try {
-      await createDatabaseIfMissing();
+      // Test the connection before running schema
+      client = new Client(buildInitConfig());
+      await client.connect();
+      try {
+        await client.query('SELECT pg_advisory_lock($1::bigint)', [MIGRATION_LOCK_ID]);
+        console.log(`DB connection established (attempt ${attempt})`);
 
-      // Test connection before running schema
-      await pool.query('SELECT 1');
-      console.log(`DB connection established (attempt ${attempt})`);
+        // gen_random_uuid() is built in from PostgreSQL 13, so pgcrypto is optional.
+        // Managed providers often refuse CREATE EXTENSION, and that must not be fatal.
+        await client
+          .query('CREATE EXTENSION IF NOT EXISTS "pgcrypto"')
+          .catch((extErr) => console.warn(`Skipping pgcrypto extension: ${extErr.message}`));
 
-      await pool.query(SCHEMA_SQL);
-      console.log('Database schema initialized successfully');
+        const schema = `
+    -- ========================================
+    -- Core Tables (must be first due to FK)
+    -- ========================================
 
-      // Run pending migrations
-      await pool.query(`
-        IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NULL
-        CREATE TABLE dbo.schema_migrations (
-          version NVARCHAR(255) PRIMARY KEY,
-          name NVARCHAR(255) NOT NULL,
-          applied_at DATETIME2 DEFAULT GETDATE()
-        )
-      `);
+    CREATE TABLE IF NOT EXISTS businesses (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255) UNIQUE NOT NULL,
+      phone VARCHAR(50),
+      address TEXT,
+      registration_number VARCHAR(100),
+      tax_id VARCHAR(100),
+      logo_url TEXT,
+      status VARCHAR(20) DEFAULT 'pending',
+      timezone VARCHAR(50) DEFAULT 'Africa/Nairobi',
+      currency VARCHAR(10) DEFAULT 'KES',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
 
-      const __dirname = path.dirname(fileURLToPath(import.meta.url));
-      const migrationsDir = path.join(__dirname, '..', 'migrations');
-      if (fs.existsSync(migrationsDir)) {
-        const files = fs.readdirSync(migrationsDir)
-          .filter((f) => f.endsWith('.sql'))
-          .sort();
+    CREATE TABLE IF NOT EXISTS users (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255),
+      role VARCHAR(20) DEFAULT 'staff',
+      is_active BOOLEAN DEFAULT true,
+      email_verified BOOLEAN DEFAULT false,
+      totp_secret VARCHAR(255),
+      totp_enabled BOOLEAN DEFAULT false,
+      last_login TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
 
-        for (const file of files) {
-          const version = file.replace(/\.sql$/, '');
-          const existing = await query(
-            'SELECT 1 FROM schema_migrations WHERE version = @p1',
-            [version]
-          );
-          if (existing.rows.length > 0) continue;
+    CREATE TABLE IF NOT EXISTS social_accounts (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      provider VARCHAR(50) NOT NULL,
+      provider_id VARCHAR(255) NOT NULL,
+      email VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(provider, provider_id)
+    );
 
-          const migrationSql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
-          await query(migrationSql);
-          await query(
-            'INSERT INTO schema_migrations (version, name) VALUES (@p1, @p2)',
-            [version, file]
-          );
-          console.log(`  Migration applied: ${file}`);
+    -- ========================================
+    -- MODULE 1: Customers
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS customers (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255),
+      phone VARCHAR(50),
+      address TEXT,
+      company VARCHAR(255),
+      notes TEXT,
+      credit_limit DECIMAL(12,2) DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ========================================
+    -- MODULE 2: Products / Inventory
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS categories (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      description TEXT,
+      parent_id UUID REFERENCES categories(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS products (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      sku VARCHAR(100),
+      barcode VARCHAR(100),
+      name VARCHAR(255) NOT NULL,
+      description TEXT,
+      category_id UUID REFERENCES categories(id),
+      unit VARCHAR(20) DEFAULT 'piece',
+      cost_price DECIMAL(12,2) DEFAULT 0,
+      selling_price DECIMAL(12,2) DEFAULT 0,
+      stock_qty INTEGER DEFAULT 0,
+      reorder_level INTEGER DEFAULT 10,
+      is_active BOOLEAN DEFAULT true,
+      image_url TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS stock_movements (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+      qty_before INTEGER NOT NULL,
+      qty_change INTEGER NOT NULL,
+      qty_after INTEGER NOT NULL,
+      reason VARCHAR(50) NOT NULL,
+      reference_type VARCHAR(50),
+      reference_id UUID,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ========================================
+    -- MODULE 3: Sales / Invoicing
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS sales (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+      invoice_number VARCHAR(50) UNIQUE NOT NULL,
+      status VARCHAR(20) DEFAULT 'draft',
+      sale_date DATE DEFAULT CURRENT_DATE,
+      due_date DATE,
+      subtotal DECIMAL(12,2) DEFAULT 0,
+      tax_amount DECIMAL(12,2) DEFAULT 0,
+      discount_amount DECIMAL(12,2) DEFAULT 0,
+      total DECIMAL(12,2) DEFAULT 0,
+      amount_paid DECIMAL(12,2) DEFAULT 0,
+      paid_date TIMESTAMP,
+      notes TEXT,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS sale_items (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      sale_id UUID REFERENCES sales(id) ON DELETE CASCADE,
+      product_id UUID REFERENCES products(id) ON DELETE SET NULL,
+      product_name VARCHAR(255) NOT NULL,
+      qty INTEGER NOT NULL DEFAULT 1,
+      unit_price DECIMAL(12,2) NOT NULL,
+      discount DECIMAL(12,2) DEFAULT 0,
+      total DECIMAL(12,2) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS receipts (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      sale_id UUID REFERENCES sales(id) ON DELETE CASCADE,
+      receipt_number VARCHAR(50) UNIQUE NOT NULL,
+      customer_name VARCHAR(255),
+      customer_phone VARCHAR(50),
+      items JSONB NOT NULL,
+      subtotal DECIMAL(12,2) DEFAULT 0,
+      discount_amount DECIMAL(12,2) DEFAULT 0,
+      tax_amount DECIMAL(12,2) DEFAULT 0,
+      total DECIMAL(12,2) DEFAULT 0,
+      payment_method VARCHAR(20) DEFAULT 'cash',
+      receipt_html TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_receipts_sale ON receipts(sale_id);
+    CREATE INDEX IF NOT EXISTS idx_receipts_business ON receipts(business_id);
+
+    CREATE TABLE IF NOT EXISTS invoices (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+      invoice_number VARCHAR(50) UNIQUE NOT NULL,
+      status VARCHAR(20) DEFAULT 'draft',
+      invoice_date DATE DEFAULT CURRENT_DATE,
+      due_date DATE,
+      subtotal DECIMAL(12,2) DEFAULT 0,
+      discount_amount DECIMAL(12,2) DEFAULT 0,
+      total DECIMAL(12,2) DEFAULT 0,
+      amount_paid DECIMAL(12,2) DEFAULT 0,
+      paid_date DATE,
+      notes TEXT,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS invoice_items (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
+      product_id UUID REFERENCES products(id) ON DELETE SET NULL,
+      product_name VARCHAR(255) NOT NULL,
+      qty INTEGER NOT NULL DEFAULT 1,
+      unit_price DECIMAL(12,2) NOT NULL,
+      discount DECIMAL(12,2) DEFAULT 0,
+      total DECIMAL(12,2) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ========================================
+    -- MODULE 4: Expenses
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS expense_categories (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      description TEXT,
+      icon VARCHAR(50),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS expenses (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      category_id UUID REFERENCES expense_categories(id),
+      description VARCHAR(255) NOT NULL,
+      amount DECIMAL(12,2) NOT NULL,
+      date DATE DEFAULT CURRENT_DATE,
+      vendor VARCHAR(255),
+      reference VARCHAR(100),
+      is_receipt_attached BOOLEAN DEFAULT false,
+      notes TEXT,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ========================================
+    -- MODULE 5: Creditors / Suppliers
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS creditors (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255),
+      phone VARCHAR(50),
+      address TEXT,
+      opening_balance DECIMAL(12,2) DEFAULT 0,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS creditor_payments (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      creditor_id UUID REFERENCES creditors(id),
+      amount DECIMAL(12,2) NOT NULL,
+      date DATE DEFAULT CURRENT_DATE,
+      reference VARCHAR(100),
+      notes TEXT,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS creditor_purchases (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      creditor_id UUID REFERENCES creditors(id),
+      reference VARCHAR(50) NOT NULL,
+      amount DECIMAL(12,2) NOT NULL,
+      due_date DATE,
+      is_paid BOOLEAN DEFAULT false,
+      date DATE DEFAULT CURRENT_DATE,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ========================================
+    -- MODULE 6: Cashflow
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS cashflow_entries (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      entry_type VARCHAR(10) NOT NULL,
+      amount DECIMAL(12,2) NOT NULL,
+      date DATE DEFAULT CURRENT_DATE,
+      description VARCHAR(255),
+      source_type VARCHAR(50),
+      source_id UUID,
+      category VARCHAR(50),
+      payment_method VARCHAR(20),
+      reference VARCHAR(100),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ========================================
+    -- MODULE 7: Notifications
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      user_id UUID REFERENCES users(id),
+      title VARCHAR(255) NOT NULL,
+      message TEXT,
+      type VARCHAR(20) DEFAULT 'info',
+      is_read BOOLEAN DEFAULT false,
+      read_at TIMESTAMP,
+      link VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ========================================
+    -- Password Reset
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS password_resets (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      email VARCHAR(255) NOT NULL,
+      token VARCHAR(255) NOT NULL,
+      expires_at TIMESTAMP NOT NULL,
+      used BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS refresh_tokens (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      token VARCHAR(255) NOT NULL UNIQUE,
+      expires_at TIMESTAMP NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS otp_codes (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      email VARCHAR(255),
+      phone VARCHAR(50),
+      otp VARCHAR(6) NOT NULL,
+      purpose VARCHAR(50) NOT NULL DEFAULT 'login',
+      attempts INT DEFAULT 0,
+      used BOOLEAN DEFAULT false,
+      expires_at TIMESTAMP NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_otp_codes_email_purpose ON otp_codes(email, purpose);
+
+    -- ========================================
+    -- Security: Failed Login Tracking & Account Lockout
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS login_attempts (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      email VARCHAR(255) NOT NULL,
+      ip_address INET NOT NULL,
+      success BOOLEAN NOT NULL,
+      attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_login_attempts_email_ip ON login_attempts(email, ip_address, attempted_at);
+
+    -- ========================================
+    -- INDEXES
+    -- ========================================
+
+    CREATE INDEX IF NOT EXISTS idx_customers_business ON customers(business_id);
+    CREATE INDEX IF NOT EXISTS idx_products_business ON products(business_id);
+    CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
+    CREATE INDEX IF NOT EXISTS idx_sales_business ON sales(business_id);
+    CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
+    CREATE INDEX IF NOT EXISTS idx_invoices_business ON invoices(business_id);
+    CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
+    CREATE INDEX IF NOT EXISTS idx_expenses_business ON expenses(business_id);
+    CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category_id);
+    CREATE INDEX IF NOT EXISTS idx_creditors_business ON creditors(business_id);
+    CREATE INDEX IF NOT EXISTS idx_cashflow_business ON cashflow_entries(business_id, date);
+    CREATE INDEX IF NOT EXISTS idx_notifications_business ON notifications(business_id, is_read);
+    CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON stock_movements(product_id, created_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_products_business_sku ON products(business_id, sku);
+    CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
+    CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token);
+
+    -- ========================================
+    -- Audit Logging: Track sensitive operations
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+      action VARCHAR(100) NOT NULL,
+      resource_type VARCHAR(50),
+      resource_id UUID,
+      details JSONB,
+      ip_address INET,
+      user_agent TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_business ON audit_logs(business_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+
+    -- ========================================
+    -- FEATURE 1: Team Management & Invitations
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS team_invitations (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      email VARCHAR(255) NOT NULL,
+      role VARCHAR(20) DEFAULT 'staff',
+      token VARCHAR(255) NOT NULL UNIQUE,
+      invited_by UUID REFERENCES users(id),
+      status VARCHAR(20) DEFAULT 'pending',
+      expires_at TIMESTAMP NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+      CREATE INDEX IF NOT EXISTS idx_team_invitations_business ON team_invitations(business_id);
+    CREATE INDEX IF NOT EXISTS idx_team_invitations_token ON team_invitations(token);
+
+    -- ========================================
+    -- FEATURE: Email Verification
+    -- ========================================
+
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT false;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret VARCHAR(255);
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN DEFAULT false;
+
+    CREATE TABLE IF NOT EXISTS verification_tokens (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      email VARCHAR(255) NOT NULL,
+      token VARCHAR(255) NOT NULL,
+      type VARCHAR(50) NOT NULL DEFAULT 'email_verification',
+      expires_at TIMESTAMP NOT NULL,
+      used BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_verification_tokens_email ON verification_tokens(email, type);
+
+    -- ========================================
+    -- FEATURE: TOTP Backup Codes
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS totp_backup_codes (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      code VARCHAR(10) NOT NULL,
+      used BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_totp_backup_codes_user ON totp_backup_codes(user_id);
+
+    -- ========================================
+    -- FEATURE: IP Whitelist
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS ip_whitelist (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      ip_address INET NOT NULL,
+      label VARCHAR(100),
+      is_active BOOLEAN DEFAULT true,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(business_id, ip_address)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ip_whitelist_business ON ip_whitelist(business_id);
+
+    -- ========================================
+    -- FEATURE: Device Management
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS user_devices (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      device_name VARCHAR(255),
+      device_type VARCHAR(50),
+      browser VARCHAR(100),
+      os VARCHAR(100),
+      ip_address INET,
+      last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      is_current BOOLEAN DEFAULT false,
+      is_trusted BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_user_devices_user ON user_devices(user_id);
+
+    -- ========================================
+    -- FEATURE 4: Employee / Payroll Management
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS employees (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+      first_name VARCHAR(100) NOT NULL,
+      last_name VARCHAR(100) NOT NULL,
+      email VARCHAR(255),
+      phone VARCHAR(50),
+      position VARCHAR(100),
+      department VARCHAR(100),
+      hire_date DATE NOT NULL,
+      termination_date DATE,
+      status VARCHAR(20) DEFAULT 'active',
+      salary DECIMAL(12,2) DEFAULT 0,
+      salary_type VARCHAR(20) DEFAULT 'monthly',
+      bank_name VARCHAR(100),
+      bank_account VARCHAR(50),
+      id_number VARCHAR(50),
+      address TEXT,
+      emergency_contact_name VARCHAR(100),
+      emergency_contact_phone VARCHAR(50),
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_employees_business ON employees(business_id);
+
+    CREATE TABLE IF NOT EXISTS attendance (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      employee_id UUID REFERENCES employees(id) ON DELETE CASCADE,
+      date DATE NOT NULL,
+      clock_in TIMESTAMP,
+      clock_out TIMESTAMP,
+      status VARCHAR(20) DEFAULT 'present',
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_attendance_employee ON attendance(employee_id, date);
+    CREATE INDEX IF NOT EXISTS idx_attendance_business ON attendance(business_id, date);
+
+    CREATE TABLE IF NOT EXISTS payroll (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      employee_id UUID REFERENCES employees(id) ON DELETE CASCADE,
+      period_start DATE NOT NULL,
+      period_end DATE NOT NULL,
+      gross_salary DECIMAL(12,2) NOT NULL,
+      deductions DECIMAL(12,2) DEFAULT 0,
+      bonuses DECIMAL(12,2) DEFAULT 0,
+      overtime_hours DECIMAL(10,2) DEFAULT 0,
+      overtime_pay DECIMAL(12,2) DEFAULT 0,
+      tax_amount DECIMAL(12,2) DEFAULT 0,
+      net_salary DECIMAL(12,2) NOT NULL,
+      status VARCHAR(20) DEFAULT 'pending',
+      pay_date DATE,
+      notes TEXT,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_payroll_business ON payroll(business_id, period_start);
+
+    CREATE TABLE IF NOT EXISTS payroll_items (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      payroll_id UUID REFERENCES payroll(id) ON DELETE CASCADE,
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      description VARCHAR(255) NOT NULL,
+      amount DECIMAL(12,2) NOT NULL,
+      type VARCHAR(20) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ========================================
+    -- FEATURE 5: (reserved)
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS payment_history (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      amount DECIMAL(10,2) NOT NULL,
+      currency VARCHAR(10) DEFAULT 'KES',
+      status VARCHAR(20) DEFAULT 'pending',
+      payment_method VARCHAR(50),
+      transaction_id VARCHAR(255),
+      invoice_url TEXT,
+      paid_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_payment_history ON payment_history(business_id);
+
+    CREATE TABLE IF NOT EXISTS mpesa_agents (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      phone VARCHAR(20) NOT NULL,
+      mpesa_number VARCHAR(20) NOT NULL,
+      commission_rate DECIMAL(5,2) DEFAULT 0,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ========================================
+    -- FEATURE 2: Invoice PDF / Templates
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS invoice_templates (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      template_config JSONB NOT NULL,
+      is_default BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_invoice_templates ON invoice_templates(business_id);
+
+    -- ========================================
+    -- FEATURE 3: Accounts Receivable / Debtors
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS debtors (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255),
+      phone VARCHAR(50),
+      address TEXT,
+      opening_balance DECIMAL(12,2) DEFAULT 0,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS debtor_payments (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      debtor_id UUID REFERENCES debtors(id),
+      amount DECIMAL(12,2) NOT NULL,
+      date DATE DEFAULT CURRENT_DATE,
+      reference VARCHAR(100),
+      notes TEXT,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS debtor_invoices (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      debtor_id UUID REFERENCES debtors(id),
+      reference VARCHAR(50) NOT NULL,
+      amount DECIMAL(12,2) NOT NULL,
+      due_date DATE,
+      is_paid BOOLEAN DEFAULT false,
+      date DATE DEFAULT CURRENT_DATE,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_debtors_business ON debtors(business_id);
+
+    -- ========================================
+    -- FEATURE 6: Saved Reports & Report Schedules
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS report_schedules (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      report_type VARCHAR(50) NOT NULL,
+      schedule VARCHAR(20) DEFAULT 'weekly',
+      email_recipients JSONB DEFAULT '[]',
+      filters JSONB,
+      last_run_at TIMESTAMP,
+      next_run_at TIMESTAMP,
+      is_active BOOLEAN DEFAULT true,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_report_schedules ON report_schedules(business_id);
+
+    -- ========================================
+    -- FEATURE 7: AI Insights History
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS ai_insights (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      insight_type VARCHAR(50) NOT NULL,
+      content JSONB NOT NULL,
+      summary TEXT,
+      is_read BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ai_insights ON ai_insights(business_id, created_at DESC);
+
+    -- ========================================
+    -- PHASE 1: CRM - Lead & Opportunity Management
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS leads (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      first_name VARCHAR(100) NOT NULL,
+      last_name VARCHAR(100) NOT NULL,
+      email VARCHAR(255),
+      phone VARCHAR(50),
+      company VARCHAR(255),
+      job_title VARCHAR(100),
+      source VARCHAR(50),
+      status VARCHAR(20) DEFAULT 'new',
+      lead_score INTEGER DEFAULT 0,
+      estimated_value DECIMAL(12,2) DEFAULT 0,
+      assigned_to UUID REFERENCES users(id),
+      notes TEXT,
+      converted_customer_id UUID REFERENCES customers(id),
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_leads_business ON leads(business_id, status);
+
+    CREATE TABLE IF NOT EXISTS customer_activities (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      customer_id UUID REFERENCES customers(id) ON DELETE CASCADE,
+      activity_type VARCHAR(50) NOT NULL,
+      subject VARCHAR(255),
+      description TEXT,
+      scheduled_at TIMESTAMP,
+      completed_at TIMESTAMP,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_customer_activities ON customer_activities(customer_id, created_at DESC);
+
+    -- ========================================
+    -- PHASE 1: Sales Pipeline
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS deal_stages (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      order_index INTEGER DEFAULT 0,
+      win_probability INTEGER DEFAULT 0,
+      color VARCHAR(7) DEFAULT '#6366f1',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS deals (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+      lead_id UUID REFERENCES leads(id) ON DELETE SET NULL,
+      name VARCHAR(255) NOT NULL,
+      stage_id UUID REFERENCES deal_stages(id) ON DELETE SET NULL,
+      value DECIMAL(12,2) DEFAULT 0,
+      priority VARCHAR(20) DEFAULT 'medium',
+      expected_close_date DATE,
+      actual_close_date DATE,
+      assigned_to UUID REFERENCES users(id),
+      outcome VARCHAR(20),
+      loss_reason TEXT,
+      notes TEXT,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_deals_business ON deals(business_id, stage_id);
+    CREATE INDEX IF NOT EXISTS idx_deals_stage ON deals(stage_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS deal_activities (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      deal_id UUID REFERENCES deals(id) ON DELETE CASCADE,
+      activity_type VARCHAR(50) NOT NULL,
+      description TEXT,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_deal_activities ON deal_activities(deal_id, created_at DESC);
+
+    -- ========================================
+    -- PHASE 1: Support / Ticketing
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS support_tickets (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+      ticket_number VARCHAR(50) UNIQUE NOT NULL,
+      subject VARCHAR(255) NOT NULL,
+      description TEXT,
+      priority VARCHAR(20) DEFAULT 'medium',
+      status VARCHAR(20) DEFAULT 'open',
+      category VARCHAR(50),
+      assigned_to UUID REFERENCES users(id),
+      sla_deadline TIMESTAMP,
+      resolved_at TIMESTAMP,
+      closed_at TIMESTAMP,
+      resolution_notes TEXT,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tickets_business ON support_tickets(business_id, status);
+
+    CREATE TABLE IF NOT EXISTS ticket_replies (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      ticket_id UUID REFERENCES support_tickets(id) ON DELETE CASCADE,
+      message TEXT NOT NULL,
+      is_internal BOOLEAN DEFAULT false,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ticket_replies ON ticket_replies(ticket_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS sla_configs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      category VARCHAR(50) NOT NULL,
+      priority VARCHAR(20) NOT NULL,
+      response_hours INTEGER DEFAULT 24,
+      resolution_hours INTEGER DEFAULT 48,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ========================================
+    -- PHASE 2: Project Management
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS projects (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      description TEXT,
+      status VARCHAR(20) DEFAULT 'active',
+      start_date DATE,
+      end_date DATE,
+      budget DECIMAL(12,2),
+      customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+      assigned_to UUID REFERENCES users(id),
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_projects_business ON projects(business_id, status);
+
+    CREATE TABLE IF NOT EXISTS project_tasks (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+      title VARCHAR(255) NOT NULL,
+      description TEXT,
+      status VARCHAR(20) DEFAULT 'todo',
+      priority VARCHAR(20) DEFAULT 'medium',
+      assignee_id UUID REFERENCES users(id),
+      due_date DATE,
+      estimated_hours DECIMAL(10,2),
+      actual_hours DECIMAL(10,2),
+      completed_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_project_tasks ON project_tasks(project_id, status);
+
+    CREATE TABLE IF NOT EXISTS time_entries (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      user_id UUID REFERENCES users(id),
+      project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+      task_id UUID REFERENCES project_tasks(id) ON DELETE SET NULL,
+      customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+      description TEXT,
+      date DATE DEFAULT CURRENT_DATE,
+      start_time TIMESTAMP,
+      end_time TIMESTAMP,
+      duration_minutes INTEGER,
+      is_billable BOOLEAN DEFAULT true,
+      billed_amount DECIMAL(10,2) DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_time_entries ON time_entries(user_id, date);
+    CREATE INDEX IF NOT EXISTS idx_time_entries_project ON time_entries(project_id);
+
+    -- ========================================
+    -- PHASE 2: Procurement & Purchase Orders
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS vendors (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255),
+      phone VARCHAR(50),
+      address TEXT,
+      contact_person VARCHAR(100),
+      payment_terms VARCHAR(50),
+      rating DECIMAL(2,1),
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_vendors_business ON vendors(business_id);
+
+    CREATE TABLE IF NOT EXISTS purchase_orders (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      po_number VARCHAR(50) UNIQUE NOT NULL,
+      vendor_id UUID REFERENCES vendors(id) ON DELETE SET NULL,
+      status VARCHAR(20) DEFAULT 'draft',
+      order_date DATE DEFAULT CURRENT_DATE,
+      expected_delivery DATE,
+      subtotal DECIMAL(12,2) DEFAULT 0,
+      tax_amount DECIMAL(12,2) DEFAULT 0,
+      total DECIMAL(12,2) DEFAULT 0,
+      notes TEXT,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_po_business ON purchase_orders(business_id, status);
+
+    CREATE TABLE IF NOT EXISTS po_items (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      po_id UUID REFERENCES purchase_orders(id) ON DELETE CASCADE,
+      product_id UUID REFERENCES products(id) ON DELETE SET NULL,
+      product_name VARCHAR(255) NOT NULL,
+      qty INTEGER NOT NULL,
+      unit_price DECIMAL(12,2) NOT NULL,
+      total DECIMAL(12,2) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ========================================
+    -- PHASE 4: Granular Permissions
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS permissions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      role_name VARCHAR(50) NOT NULL,
+      resource VARCHAR(50) NOT NULL,
+      can_create BOOLEAN DEFAULT false,
+      can_read BOOLEAN DEFAULT true,
+      can_update BOOLEAN DEFAULT false,
+      can_delete BOOLEAN DEFAULT false,
+      UNIQUE(business_id, role_name, resource),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_permissions ON permissions(business_id, role_name);
+
+    -- ========================================
+    -- MODULE 14: Shops
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS shops (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      location TEXT,
+      phone VARCHAR(50),
+      email VARCHAR(255),
+      status VARCHAR(20) DEFAULT 'active',
+      manager_name VARCHAR(255),
+      opening_time TIME DEFAULT '08:00',
+      closing_time TIME DEFAULT '18:00',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS reviews (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+      customer_name VARCHAR(255),
+      product_id UUID REFERENCES products(id) ON DELETE SET NULL,
+      product_name VARCHAR(255),
+      rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+      comment TEXT,
+      status VARCHAR(20) DEFAULT 'published',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS messages (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      sender_name VARCHAR(255),
+      sender_email VARCHAR(255),
+      subject VARCHAR(255),
+      body TEXT,
+      is_read BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS quotations (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+      customer_name VARCHAR(255),
+      quotation_number VARCHAR(50) NOT NULL,
+      status VARCHAR(20) DEFAULT 'pending',
+      subtotal DECIMAL(12,2) DEFAULT 0,
+      tax_amount DECIMAL(12,2) DEFAULT 0,
+      discount_amount DECIMAL(12,2) DEFAULT 0,
+      total DECIMAL(12,2) DEFAULT 0,
+      valid_until DATE,
+      notes TEXT,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(business_id, quotation_number)
+    );
+
+    -- ========================================
+    -- System: Action Logs (audit trail for user actions)
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS action_logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+      action VARCHAR(100) NOT NULL,
+      result VARCHAR(20) NOT NULL DEFAULT 'success',
+      resource_type VARCHAR(50),
+      resource_id UUID,
+      details JSONB,
+      ip_address INET,
+      browser VARCHAR(200),
+      device VARCHAR(200),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_action_logs_business ON action_logs(business_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_action_logs_user ON action_logs(user_id);
+
+    -- ========================================
+    -- System: Login History (user access tracking)
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS login_history (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      ip_address INET NOT NULL,
+      user_agent TEXT,
+      browser VARCHAR(200),
+      os VARCHAR(200),
+      device VARCHAR(200),
+      location VARCHAR(255),
+      success BOOLEAN NOT NULL DEFAULT true,
+      failure_reason VARCHAR(100),
+      session_id VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_login_history_user ON login_history(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_login_history_business ON login_history(business_id, created_at DESC);
+
+    -- ========================================
+    -- System: Webhooks
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS webhooks (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      url VARCHAR(500) NOT NULL,
+      secret VARCHAR(255),
+      event VARCHAR(100) NOT NULL,
+      is_active BOOLEAN DEFAULT true,
+      last_triggered_at TIMESTAMP,
+      failure_count INTEGER DEFAULT 0,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_webhooks_business ON webhooks(business_id, event);
+
+    -- ========================================
+    -- System: API Keys
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      key_hash VARCHAR(255) NOT NULL UNIQUE,
+      key_prefix VARCHAR(20) NOT NULL,
+      scopes JSONB DEFAULT '["read"]',
+      permissions JSONB DEFAULT '{}',
+      ip_whitelist INET[],
+      rate_limit INTEGER DEFAULT 100,
+      is_active BOOLEAN DEFAULT true,
+      last_used_at TIMESTAMP,
+      expires_at TIMESTAMP,
+      created_by UUID REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_api_keys_business ON api_keys(business_id);
+    CREATE INDEX IF NOT EXISTS idx_api_keys_prefix ON api_keys(key_prefix);
+
+    -- ========================================
+    -- System: Push Notification Subscriptions
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh_key TEXT NOT NULL,
+      auth_key TEXT NOT NULL,
+      device_name VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id);
+
+    -- ========================================
+    -- Security: Temp Tokens (opaque short-lived, e.g. TOTP pre-auth)
+    -- ========================================
+
+    CREATE TABLE IF NOT EXISTS temp_tokens (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      token_hash VARCHAR(255) NOT NULL UNIQUE,
+      purpose VARCHAR(50) NOT NULL DEFAULT 'totp_preauth',
+      expires_at TIMESTAMP NOT NULL,
+      used BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_temp_tokens_hash ON temp_tokens(token_hash);
+    CREATE INDEX IF NOT EXISTS idx_temp_tokens_user ON temp_tokens(user_id);
+  `;
+
+        await client.query(schema);
+        console.log('Database schema initialized successfully');
+
+        // Run pending migrations
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS schema_migrations (
+            version VARCHAR(255) PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+
+        const __dirname = path.dirname(fileURLToPath(import.meta.url));
+        const migrationsDir = path.join(__dirname, '..', 'migrations');
+        if (fs.existsSync(migrationsDir)) {
+          const files = fs.readdirSync(migrationsDir)
+            .filter(f => f.endsWith('.sql'))
+            .sort();
+
+          for (const file of files) {
+            const version = file.replace(/\.sql$/, '');
+            const existing = await client.query(
+              'SELECT 1 FROM schema_migrations WHERE version = $1',
+              [version]
+            );
+            if (existing.rows.length > 0) continue;
+
+            const migrationSql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
+            await client.query('BEGIN');
+            try {
+              await client.query(migrationSql);
+              await client.query(
+                'INSERT INTO schema_migrations (version, name) VALUES ($1, $2)',
+                [version, file]
+              );
+              await client.query('COMMIT');
+            } catch (migrationError) {
+              await client.query('ROLLBACK').catch(() => {});
+              throw migrationError;
+            }
+            console.log(`  Migration applied: ${file}`);
+          }
         }
+        return;
+      } finally {
+        await client.query('SELECT pg_advisory_unlock($1::bigint)', [MIGRATION_LOCK_ID]).catch(() => {});
+        await client.end().catch(() => {});
       }
-      return;
     } catch (err) {
       const isLast = attempt === retries;
+      const detail = [err?.code, err?.detail, err?.hint, err?.where].filter(Boolean).join(' | ');
+      const reason = err.message + (detail ? ` => ${detail}` : '');
       if (isLast) {
-        console.error(`DB init failed after ${retries} attempts:`, err.message);
+        console.error(`DB init failed after ${retries} attempts:`, reason);
         throw err;
       }
       const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 30000);
-      console.warn(`DB init attempt ${attempt}/${retries} failed: ${err.message}. Retrying in ${delay}ms...`);
+      console.warn(`DB init attempt ${attempt}/${retries} failed: ${reason}. Retrying in ${delay}ms...`);
       await sleep(delay);
     }
   }

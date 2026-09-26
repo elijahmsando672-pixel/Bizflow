@@ -45,6 +45,78 @@ Visit http://localhost:3000
 docker compose up --build
 ```
 
+### Database Backups
+```bash
+# Requires the PostgreSQL client (pg_dump) on PATH
+pg_dump --version
+npm run backup -- manual   # labels: manual | daily | weekly | monthly
+```
+Dumps are written to `BACKUP_DIR` (default `server/backups`), rotated after each
+successful run, and never include credentials on the command line.
+
+### Legacy SQL Server Migration
+One-off tooling for moving the original SQL Server database into PostgreSQL lives in
+`migration/` and is not used at runtime. See [`migration/README.md`](migration/README.md)
+for the plan/migrate/verify commands, type mapping, and the cutover runbook. The
+application itself is PostgreSQL-only.
+
+### Deploying to Vercel + Supabase
+The frontend is a Next.js app and the API is an Express app deployed as a Vercel
+function on the same origin, so `/api/*` never leaves the domain and cookie auth
+needs no CORS.
+
+`api/index.js` and `api/[...path].js` are the function entry points. They import
+`server/app.js`, which builds the Express app without opening a port, running DDL,
+or calling `process.exit()` — a serverless instance has to stay alive to answer the
+request it was invoked for. `server/index.js` is only a bootstrap for long-running
+hosts (Docker, Render, a VM) and does nothing when it is merely imported.
+
+Supabase connection notes:
+- Point `DATABASE_URL` at the **connection pooler**, not the direct connection.
+  Vercel has no IPv6, so `db.<project>.supabase.co` is unreachable from a function.
+  Use port `6543` (transaction mode) for the API and `5432` on the pooler host
+  (session mode) wherever a real session is needed.
+- TLS is enabled automatically for `*.supabase.co` and `*.supabase.com` hosts.
+  Certificate verification defaults to off for them because Supabase's chain is not
+  issued by a public root; set `DB_SSL_REJECT_UNAUTHORIZED=true` to require it.
+- Serverless instances are short lived, so the pool defaults to one connection per
+  instance, detected automatically from `VERCEL`. Override with `DB_POOL_MAX`.
+- Schema creation is a deployment step, not a boot step. Set `DB_AUTO_INIT=false`
+  and run it once from a machine that can reach the database directly:
+  ```bash
+  DB_INIT_URL=postgresql://postgres.<ref>:<password>@db.<ref>.supabase.co:5432/postgres npm run db:init
+  ```
+  `db:init` refuses to run through the transaction pooler, because advisory locks
+  and DDL need a session.
+
+Required Vercel environment variables:
+```
+DATABASE_URL          transaction pooler URL (port 6543)
+DB_INIT_URL           direct or session connection, used by db:init only
+DB_AUTO_INIT          false
+JWT_SECRET            openssl rand -base64 64
+APP_URL               https://your-app.vercel.app
+NEXT_PUBLIC_API_URL   /api
+CORS_ORIGINS          https://your-app.vercel.app
+```
+
+Serverless limitations worth knowing before going live:
+- **Rate limits are per instance.** Counters live in memory, so the effective limit
+  grows with the number of concurrent instances. Use a shared store (for example
+  Upstash Redis) if the limits must be global.
+- **Scheduled jobs do not self-trigger.** `addRepeatableJob` still works, but a
+  frozen instance will not run it on time. Drive it from Vercel Cron or another
+  scheduler.
+- **Request bodies are capped at 4.5 MB** by the platform, below the 10 MB the
+  import endpoint accepts. Oversized requests are rejected with `413` and a clear
+  message.
+- **Long-running work can exceed the function timeout** (`maxDuration` is 30s).
+  Video processing and similar jobs should stay on a long-running host.
+- **Argon2 needs a prebuilt binary.** If the runtime has no compatible native build,
+  password hashing falls back to bcrypt automatically and logs a warning.
+- **Backups are not scheduled on Vercel.** `npm run backup` needs a cron trigger or
+  a long-running host; Supabase also offers its own managed backups and PITR.
+
 ## Login Credentials
 Register a new account at `/signup`, or use the seed demo account:
 - Email: `elijah@bizflow.com`
@@ -131,6 +203,9 @@ Bizflow/
 | `GOOGLE_CLIENT_*` | Google OAuth credentials (optional) |
 | `APPLE_*` | Apple Sign In credentials (optional) |
 | `NEXT_PUBLIC_API_URL` | Backend URL for the frontend |
+| `BACKUP_DIR` | Directory for `pg_dump` output (default `server/backups`) |
+| `BACKUP_TIMEOUT_MS` | Maximum backup duration before it is aborted (default `900000`) |
+| `PGCONNECT_TIMEOUT` | Seconds libpq waits for a database connection during backups |
 
 ### Client (`client/.env.local`)
 | Variable | Description |

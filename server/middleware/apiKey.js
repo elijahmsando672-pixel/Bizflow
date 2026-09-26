@@ -5,23 +5,27 @@ import { sendError } from '../utils/sendError.js';
 
 const hashKey = (key) => crypto.createHash('sha256').update(key).digest('hex');
 
+const getHashCandidates = (apiKey) => {
+  const candidates = [hashKey(apiKey)];
+  if (apiKey.startsWith('bf_')) candidates.push(hashKey(apiKey.slice(3)));
+  return candidates;
+};
+
 export const authenticateApiKey = async (req, res, next) => {
   const apiKey = req.headers['x-api-key'];
   if (!apiKey) return next();
 
-  const prefix = apiKey.substring(0, 8);
-  const keyHash = hashKey(apiKey);
+  const cacheKey = `apikey:${hashKey(apiKey)}`;
 
   try {
-    const cacheKey = `apikey:${keyHash}`;
     let keyData = cacheGet(cacheKey);
     if (!keyData) {
       const result = await query(
         `SELECT k.*, b.status as business_status
          FROM api_keys k JOIN businesses b ON k.business_id = b.id
-         WHERE k.key_hash = $1 AND k.is_active = true
+         WHERE k.key_hash = ANY($1::text[]) AND k.is_active = true
          AND (k.expires_at IS NULL OR k.expires_at > NOW())`,
-        [keyHash]
+        [getHashCandidates(apiKey)]
       );
       if (result.rows.length === 0) {
         return sendError(res, 401, 'Invalid API key');

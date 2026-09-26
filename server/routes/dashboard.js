@@ -50,7 +50,7 @@ router.get('/', async (req, res) => {
        LEFT JOIN customers c ON s.customer_id = c.id 
        WHERE s.business_id = $1 
        ORDER BY s.created_at DESC 
-       OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY`,
+       LIMIT 5`,
       [businessId]
     );
     
@@ -60,7 +60,7 @@ router.get('/', async (req, res) => {
        LEFT JOIN expense_categories ec ON e.category_id = ec.id
        WHERE e.business_id = $1 
        ORDER BY e.date DESC 
-       OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY`,
+       LIMIT 5`,
       [businessId]
     );
 
@@ -99,26 +99,26 @@ router.get('/revenue-chart', async (req, res) => {
     
     if (period === 'week') {
       sql = `
-        SELECT CAST(sale_date AS DATE) as date, SUM(total) as revenue 
+        SELECT DATE(sale_date) as date, SUM(total) as revenue
         FROM sales 
-        WHERE business_id = $1 AND status = 'paid' AND sale_date >= DATEADD(day, -7, GETDATE())
-        GROUP BY CAST(sale_date AS DATE)
+        WHERE business_id = $1 AND status = 'paid' AND sale_date >= NOW() - INTERVAL '7 days'
+        GROUP BY DATE(sale_date)
         ORDER BY date
       `;
     } else if (period === 'year') {
       sql = `
-        SELECT FORMAT(sale_date, 'yyyy-MM') as date, SUM(total) as revenue 
+        SELECT TO_CHAR(sale_date, 'YYYY-MM') as date, SUM(total) as revenue
         FROM sales 
-        WHERE business_id = $1 AND status = 'paid' AND sale_date >= DATEADD(year, -1, GETDATE())
-        GROUP BY FORMAT(sale_date, 'yyyy-MM')
+        WHERE business_id = $1 AND status = 'paid' AND sale_date >= NOW() - INTERVAL '1 year'
+        GROUP BY TO_CHAR(sale_date, 'YYYY-MM')
         ORDER BY date
       `;
     } else {
       sql = `
-        SELECT FORMAT(sale_date, 'yyyy-MM-dd') as date, SUM(total) as revenue 
+        SELECT TO_CHAR(sale_date, 'YYYY-MM-DD') as date, SUM(total) as revenue
         FROM sales 
-        WHERE business_id = $1 AND status = 'paid' AND sale_date >= DATEADD(day, -30, GETDATE())
-        GROUP BY FORMAT(sale_date, 'yyyy-MM-dd')
+        WHERE business_id = $1 AND status = 'paid' AND sale_date >= NOW() - INTERVAL '30 days'
+        GROUP BY TO_CHAR(sale_date, 'YYYY-MM-DD')
         ORDER BY date
       `;
     }
@@ -137,7 +137,7 @@ router.get('/expenses-chart', async (req, res) => {
       `SELECT ec.name as category, COALESCE(SUM(e.amount), 0) as total 
        FROM expenses e 
        LEFT JOIN expense_categories ec ON e.category_id = ec.id
-       WHERE e.business_id = $1 AND e.date >= DATEADD(day, -30, GETDATE())
+       WHERE e.business_id = $1 AND e.date >= NOW() - INTERVAL '30 days'
        GROUP BY ec.name
        ORDER BY total DESC`,
       [req.business_id]
@@ -213,10 +213,10 @@ router.get('/top-products', async (req, res) => {
        LEFT JOIN categories c ON p.category_id = c.id
        JOIN sales s ON si.sale_id = s.id
        WHERE si.business_id = $1 AND s.status != 'draft'
-         AND s.sale_date >= DATEADD(day, -@p2, CAST(GETDATE() AS DATE))
+         AND s.sale_date >= CURRENT_DATE - $2::integer
        GROUP BY p.id, p.name, p.sku, p.stock_qty, p.selling_price, c.name
        ORDER BY total_sold DESC
-       OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY`,
+       LIMIT 10`,
       [req.business_id, days]
     );
     res.json(result.rows);
@@ -240,10 +240,10 @@ router.get('/frequent-customers', async (req, res) => {
        FROM customers c
        JOIN sales s ON c.id = s.customer_id
        WHERE c.business_id = $1 AND s.status != 'draft'
-         AND s.sale_date >= DATEADD(day, -@p2, CAST(GETDATE() AS DATE))
+         AND s.sale_date >= CURRENT_DATE - $2::integer
        GROUP BY c.id, c.name, c.email, c.phone, c.company
        ORDER BY total_spent DESC, total_orders DESC
-       OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY`,
+       LIMIT 10`,
       [req.business_id, days]
     );
     res.json(result.rows);
@@ -287,7 +287,7 @@ router.post('/restock-budget', async (req, res) => {
     const { items, vendor_id, notes, multiplier = 2 } = req.body;
 
     let poCounter = 1000;
-    const counterResult = await query(`SELECT COALESCE(MAX(CAST(SUBSTRING(po_number, 4, LEN(po_number)) AS INTEGER)), 1000) as max_num FROM purchase_orders WHERE business_id = $1`, [req.business_id]);
+    const counterResult = await query(`SELECT COALESCE(MAX(CAST(SUBSTRING(po_number FROM 4) AS INTEGER)), 1000) as max_num FROM purchase_orders WHERE business_id = $1`, [req.business_id]);
     poCounter = counterResult.rows[0].max_num + 1;
 
     const poNumber = `PO-${poCounter}`;
@@ -304,8 +304,7 @@ router.post('/restock-budget', async (req, res) => {
 
     const po = await query(
       `INSERT INTO purchase_orders (business_id, po_number, vendor_id, status, order_date, subtotal, tax_amount, total, notes, created_by)
-       OUTPUT INSERTED.*
-       VALUES ($1, $2, $3, 'draft', CURRENT_DATE, $4, $5, $6, $7, $8)`,
+       VALUES ($1, $2, $3, 'draft', CURRENT_DATE, $4, $5, $6, $7, $8) RETURNING *`,
       [req.business_id, poNumber, vendor_id || null, subtotal, tax, total, notes || 'Auto-generated restock budget', req.user.id]
     );
 
