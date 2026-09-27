@@ -7,6 +7,14 @@ import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
+/**
+ * Same hierarchy the team routes use: a caller may never mint a role above its
+ * own, which is what stops a `manager` from creating an `admin` to log in as.
+ */
+const ROLE_RANK = { staff: 1, accountant: 1, manager: 2, admin: 3, owner: 4 };
+const rankOf = (role) => ROLE_RANK[role] ?? 0;
+const outranks = (actorRole, targetRole) => rankOf(actorRole) >= rankOf(targetRole);
+
 const createUserSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
   email: Joi.string().email().required(),
@@ -18,7 +26,7 @@ const createUserSchema = Joi.object({
 router.get('/', async (req, res) => {
   try {
     const requesterRole = req.user?.role;
-    if (requesterRole !== 'admin' && requesterRole !== 'manager' && requesterRole !== 'owner') {
+    if (!outranks(requesterRole, 'manager')) {
       return res.json([{
         id: req.user.id,
         name: req.user.name,
@@ -48,6 +56,10 @@ router.post('/', auditLogger('users.create'), async (req, res) => {
     if (error) return sendError(res, 400, error.details[0].message);
 
     const { name, email, password, role, is_active } = value;
+
+    if (!outranks(req.user.role, role)) {
+      return sendError(res, 403, 'You cannot grant a role above your own');
+    }
 
     const existing = await query(
       'SELECT id FROM users WHERE email = $1 AND business_id = $2',

@@ -51,8 +51,10 @@ function AcceptInviteContent() {
       <div className="flex min-h-screen items-center justify-center">
         <Card>
           <CardHeader>
-            <CardTitle>Invalid Invitation</CardTitle>
-            <CardDescription>No invitation token provided</CardDescription>
+          <CardTitle>Invalid Invitation</CardTitle>
+          <CardDescription>
+            This link is missing its invitation token. Ask whoever invited you to send it again.
+          </CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -81,26 +83,45 @@ function AcceptInviteContent() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && <div className="rounded-md bg-destructive/10 p-4 text-destructive">{error}</div>}
+            {error && (
+              <div role="alert" className="rounded-md bg-destructive/10 p-4 text-destructive">
+                {error}
+              </div>
+            )}
             <div>
-              <label className="text-sm font-medium">Full Name</label>
+              <label htmlFor="accept-name" className="text-sm font-medium">
+                Full Name
+              </label>
               <Input
+                id="accept-name"
+                name="name"
+                autoComplete="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="John Doe"
                 required
+                minLength={2}
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Password</label>
+              <label htmlFor="accept-password" className="text-sm font-medium">
+                Password
+              </label>
               <Input
+                id="accept-password"
+                name="password"
+                autoComplete="new-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Min 10 characters"
+                placeholder="At least 10 characters"
+                aria-describedby="accept-password-hint"
                 required
                 minLength={10}
               />
+              <p id="accept-password-hint" className="text-xs text-muted-foreground">
+                Use at least 10 characters.
+              </p>
             </div>
             <Button type="submit" className="w-full" disabled={submitting}>
               {submitting ? "Creating Account..." : "Accept & Create Account"}

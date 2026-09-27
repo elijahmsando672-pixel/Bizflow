@@ -105,6 +105,25 @@ export function initials(name: string | null | undefined): string {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
+/**
+ * Normalises a date to a `YYYY-MM-DD` key in **local** time.
+ * `toISOString()` is deliberately avoided because it shifts the day for
+ * anyone east or west of UTC — which would silently mis-bucket a chart.
+ */
+export function toDateKey(value: string | number | Date | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "";
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const dateOnly = /^(\d{4}-\d{2}-\d{2})/.exec(trimmed);
+    if (dateOnly) return dateOnly[1];
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 export function titleCase(value: string | null | undefined): string {
   if (!value) return "—";
   return value

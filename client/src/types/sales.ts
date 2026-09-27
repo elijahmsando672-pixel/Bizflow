@@ -16,7 +16,7 @@ export interface Sale {
   total: number;
   amount_paid?: number;
   paid_date?: string;
-  status: 'draft' | 'pending' | 'paid' | 'cancelled';
+  status: 'draft' | 'pending' | 'paid' | 'completed' | 'cancelled';
   notes?: string;
   created_at: string;
   updated_at: string;

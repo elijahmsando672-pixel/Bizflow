@@ -1,176 +1,441 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import api from "@/lib/api";
-import { formatCurrency } from "@/lib/data";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  PageHeader, Card, Btn, Badge
-} from "@/components/ui/dashboard-ui";
-import { BarChart3, TrendingUp, TrendingDown, RefreshCw, Loader2, PieChart } from "lucide-react";
+  ArrowDownRight,
+  ArrowUpRight,
+  BarChart3,
+  Download,
+  ListTree,
+  PieChart,
+  RefreshCw,
+  Scale,
+  TrendingUp,
+} from "lucide-react";
+import api from "@/lib/api";
+import { downloadCsv } from "@/lib/csv";
+import { formatCurrency, formatNumber, toDateKey, toNumber } from "@/lib/format";
+import { Button } from "@/components/ui/button";
+import { EmptyState, ErrorState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/panel";
+import { Progress } from "@/components/ui/progress";
+import { Spinner } from "@/components/ui/spinner";
+import { StatCard } from "@/components/ui/stat-card";
+import { useToast } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 
-interface DailyEntry {
+type Period = "7d" | "30d" | "90d";
+
+const PERIODS: Array<{ value: Period; label: string; days: number }> = [
+  { value: "7d", label: "7 days", days: 7 },
+  { value: "30d", label: "30 days", days: 30 },
+  { value: "90d", label: "90 days", days: 90 },
+];
+
+interface DailyRow {
+  day?: string | null;
+  entry_type?: string | null;
+  total?: number | string | null;
+}
+
+interface SummaryRow {
+  entry_type?: string | null;
+  count?: number | string | null;
+  total?: number | string | null;
+}
+
+interface CategoryRow {
+  category?: string | null;
+  total?: number | string | null;
+}
+
+interface ReportsResponse {
+  daily?: DailyRow[];
+  summary?: SummaryRow[];
+  top_categories?: CategoryRow[];
+}
+
+interface DayBucket {
   day: string;
-  entry_type: "inflow" | "outflow";
-  total: string;
+  inflow: number;
+  outflow: number;
 }
 
-interface SummaryEntry {
-  entry_type: "inflow" | "outflow";
-  count: string;
-  total: string;
+function buildBuckets(daily: DailyRow[], days: number): DayBucket[] {
+  const byDay = new Map<string, DayBucket>();
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const date = new Date();
+    date.setDate(date.getDate() - offset);
+    const key = toDateKey(date);
+    byDay.set(key, { day: key, inflow: 0, outflow: 0 });
+  }
+
+  daily.forEach((row) => {
+    const key = toDateKey(row.day);
+    if (!key) return;
+    const bucket = byDay.get(key);
+    if (!bucket) return;
+    const amount = toNumber(row.total) ?? 0;
+    if (row.entry_type === "inflow") bucket.inflow += amount;
+    else if (row.entry_type === "outflow") bucket.outflow += amount;
+  });
+
+  return [...byDay.values()];
 }
 
-interface CategoryEntry {
-  category: string;
-  total: string;
-}
-
-interface ReportData {
-  daily: DailyEntry[];
-  summary: SummaryEntry[];
-  top_categories: CategoryEntry[];
-}
-
-export default function PaymentReportsPage() {
-  const [data, setData] = useState<ReportData | null>(null);
+export default function MpesaReportsPage() {
+  const toast = useToast();
+  const [period, setPeriod] = useState<Period>("30d");
+  const [data, setData] = useState<ReportsResponse>({});
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState("30d");
+  const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(false);
     try {
-      const result = await api.payments.mpesa.getReports(period) as ReportData;
-      setData(result);
-    } catch { setData(null); } finally { setLoading(false); }
+      const result = (await api.payments.mpesa.getReports(period)) as ReportsResponse;
+      setData({
+        daily: Array.isArray(result?.daily) ? result.daily : [],
+        summary: Array.isArray(result?.summary) ? result.summary : [],
+        top_categories: Array.isArray(result?.top_categories) ? result.top_categories : [],
+      });
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }, [period]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const summaryInflow = data?.summary?.find(s => s.entry_type === "inflow");
-  const summaryOutflow = data?.summary?.find(s => s.entry_type === "outflow");
-  const inflowTotal = parseFloat(summaryInflow?.total || "0");
-  const outflowTotal = parseFloat(summaryOutflow?.total || "0");
+  const periodDays = PERIODS.find((entry) => entry.value === period)?.days ?? 30;
 
-  const maxDaily = Math.max(
-    ...(data?.daily ?? []).map(d => parseFloat(d.total || "0")),
-    1
+  const buckets = useMemo(() => buildBuckets(data.daily ?? [], periodDays), [data.daily, periodDays]);
+
+  const totals = useMemo(() => {
+    let inflow = 0;
+    let outflow = 0;
+    buckets.forEach((bucket) => {
+      inflow += bucket.inflow;
+      outflow += bucket.outflow;
+    });
+    const activeDays = buckets.filter((bucket) => bucket.inflow > 0 || bucket.outflow > 0).length;
+    return { inflow, outflow, net: inflow - outflow, activeDays };
+  }, [buckets]);
+
+  const summary = useMemo(() => {
+    const inflow = (data.summary ?? []).find((row) => row.entry_type === "inflow");
+    const outflow = (data.summary ?? []).find((row) => row.entry_type === "outflow");
+    return {
+      inflowCount: toNumber(inflow?.count) ?? 0,
+      outflowCount: toNumber(outflow?.count) ?? 0,
+    };
+  }, [data.summary]);
+
+  const categories = useMemo(
+    () =>
+      (data.top_categories ?? [])
+        .map((row) => ({ category: row.category || "Uncategorised", total: toNumber(row.total) ?? 0 }))
+        .sort((a, b) => b.total - a.total),
+    [data.top_categories]
   );
 
-  const dayLabels: Record<string, string> = {
-    "7d": "Last 7 Days",
-    "30d": "Last 30 Days",
-    "90d": "Last 90 Days",
+  const categoryMax = categories.length > 0 ? Math.max(...categories.map((row) => row.total)) : 0;
+  const chartMax = Math.max(1, ...buckets.map((bucket) => Math.max(bucket.inflow, bucket.outflow)));
+  const isEmpty = totals.inflow === 0 && totals.outflow === 0;
+
+  const exportDaily = () => {
+    if (isEmpty) {
+      toast.error("There is nothing to export yet");
+      return;
+    }
+    downloadCsv(`bizflow-mpesa-report-${period}`, buckets, [
+      { header: "Date", value: (row) => row.day },
+      { header: "Inflow (KES)", value: (row) => row.inflow },
+      { header: "Outflow (KES)", value: (row) => row.outflow },
+      { header: "Net (KES)", value: (row) => row.inflow - row.outflow },
+    ]);
   };
 
   return (
-    <div>
-      <PageHeader title="M-Pesa Reports" subtitle={dayLabels[period] || "Transaction analytics"}>
-        <div className="flex gap-2">
-          {(["7d", "30d", "90d"] as const).map(p => (
-            <Btn key={p} small outline={period !== p} color={period === p ? "var(--color-primary)" : "var(--color-muted-foreground)"} onClick={() => setPeriod(p)}>
-              {p}
-            </Btn>
-          ))}
-          <Btn outline color="var(--color-muted-foreground)" onClick={load}><RefreshCw className="h-3 w-3" /></Btn>
-        </div>
-      </PageHeader>
+    <div className="space-y-4">
+      <PageHeader
+        title="M-Pesa reports"
+        description="Where your mobile money came from and where it went."
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} aria-hidden />
+              Refresh
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportDaily} disabled={loading || isEmpty}>
+              <Download className="h-4 w-4" aria-hidden />
+              Export
+            </Button>
+          </>
+        }
+      />
 
-      {loading ? (
-        <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+      <div
+        className="flex rounded-md border border-border p-0.5"
+        role="group"
+        aria-label="Report period"
+      >
+        {PERIODS.map((entry) => (
+          <button
+            key={entry.value}
+            type="button"
+            onClick={() => setPeriod(entry.value)}
+            aria-pressed={period === entry.value}
+            className={cn(
+              "flex-1 rounded px-3 py-1.5 text-xs font-medium transition-colors",
+              period === entry.value
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {entry.label}
+          </button>
+        ))}
+      </div>
+
+      {error ? (
+        <ErrorState title="Could not load the report" onRetry={load} retrying={loading} />
+      ) : loading ? (
+        <div className="flex justify-center py-24">
+          <Spinner label="Building your report" />
+        </div>
+      ) : isEmpty ? (
+        <Panel>
+          <PanelBody className="p-0">
+            <EmptyState
+              icon={BarChart3}
+              title="Nothing to report yet"
+              description="Once M-Pesa transactions are recorded, this page will chart your inflow, outflow and net position."
+              className="m-4 border-0 bg-transparent"
+            />
+          </PanelBody>
+        </Panel>
       ) : (
         <>
-          <div className="flex flex-wrap gap-3 mb-6">
-            <Card accent="var(--color-success)" className="flex-1 min-w-[180px]">
-              <div className="flex items-center gap-3">
-                <TrendingUp className="h-8 w-8 text-success" />
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Inflow</div>
-                  <div className="text-[22px] font-extrabold text-success">{formatCurrency(inflowTotal)}</div>
-                  <div className="text-[11px] text-muted-foreground">{summaryInflow?.count ?? 0} transactions</div>
-                </div>
-              </div>
-            </Card>
-            <Card accent="var(--color-destructive)" className="flex-1 min-w-[180px]">
-              <div className="flex items-center gap-3">
-                <TrendingDown className="h-8 w-8 text-destructive" />
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Outflow</div>
-                  <div className="text-[22px] font-extrabold text-destructive">{formatCurrency(outflowTotal)}</div>
-                  <div className="text-[11px] text-muted-foreground">{summaryOutflow?.count ?? 0} transactions</div>
-                </div>
-              </div>
-            </Card>
-            <Card accent="var(--color-primary)" className="flex-1 min-w-[180px]">
-              <div className="flex items-center gap-3">
-                <PieChart className="h-8 w-8" style={{ color: "var(--color-primary)" }} />
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Net</div>
-                  <div className="text-[22px] font-extrabold" style={{ color: "var(--color-primary)" }}>{formatCurrency(inflowTotal - outflowTotal)}</div>
-                </div>
-              </div>
-            </Card>
+          <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+            <StatCard
+              label="Inflow"
+              value={formatCurrency(totals.inflow)}
+              icon={ArrowUpRight}
+              tone="success"
+              hint={`${formatNumber(summary.inflowCount)} entries`}
+            />
+            <StatCard
+              label="Outflow"
+              value={formatCurrency(totals.outflow)}
+              icon={ArrowDownRight}
+              tone="danger"
+              hint={`${formatNumber(summary.outflowCount)} entries`}
+            />
+            <StatCard
+              label="Net"
+              value={formatCurrency(totals.net)}
+              icon={Scale}
+              tone={totals.net >= 0 ? "primary" : "danger"}
+            />
+            <StatCard
+              label="Active days"
+              value={`${formatNumber(totals.activeDays)}/${formatNumber(periodDays)}`}
+              icon={TrendingUp}
+              tone="info"
+            />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-            <Card>
-              <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                Daily Trend
-              </h3>
-              {(data?.daily ?? []).length === 0 ? (
-                <div className="py-8 text-center text-muted-foreground text-xs">No data for this period</div>
-              ) : (
-                <div className="space-y-1">
-                  {(data?.daily ?? []).slice(-14).map((d, i) => {
-                    const val = parseFloat(d.total || "0");
-                    const pct = maxDaily > 0 ? (val / maxDaily) * 100 : 0;
-                    return (
-                      <div key={i} className="flex items-center gap-2 text-xs">
-                        <span className="w-24 text-muted-foreground flex-shrink-0">
-                          {new Date(d.day).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                        </span>
-                        <div className="flex-1 h-5 rounded bg-muted overflow-hidden">
-                          <div
-                            className={`h-full rounded transition-all ${d.entry_type === "inflow" ? "bg-success" : "bg-destructive"}`}
-                            style={{ width: `${Math.max(pct, 2)}%` }}
-                          />
+          <Panel>
+            <PanelHeader>
+              <PanelTitle>
+                <span className="inline-flex items-center gap-1.5">
+                  <BarChart3 className="h-4 w-4" aria-hidden />
+                  Daily movement
+                </span>
+              </PanelTitle>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-sm bg-success" aria-hidden />
+                  Inflow
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-sm bg-destructive" aria-hidden />
+                  Outflow
+                </span>
+              </div>
+            </PanelHeader>
+            <PanelBody>
+              <div
+                className="flex h-52 items-end gap-[2px] overflow-x-auto"
+                role="img"
+                aria-label={`Daily M-Pesa inflow and outflow over the last ${periodDays} days`}
+              >
+                {buckets.map((bucket) => {
+                  const inflowHeight = (bucket.inflow / chartMax) * 100;
+                  const outflowHeight = (bucket.outflow / chartMax) * 100;
+                  return (
+                    <div
+                      key={bucket.day}
+                      className="flex min-w-[6px] flex-1 flex-col justify-end gap-[2px]"
+                      title={`${bucket.day} · Inflow ${formatCurrency(bucket.inflow)} · Outflow ${formatCurrency(bucket.outflow)}`}
+                    >
+                      <div
+                        className="rounded-t-sm bg-success"
+                        style={{ height: `${inflowHeight}%` }}
+                      />
+                      <div
+                        className="rounded-b-sm bg-destructive"
+                        style={{ height: `${outflowHeight}%` }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {buckets[0]?.day} → {buckets[buckets.length - 1]?.day}
+              </p>
+
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
+                  View as table
+                </summary>
+                <div className="mt-2 max-h-64 overflow-y-auto rounded-md border border-border">
+                  <table className="w-full min-w-[420px] text-sm">
+                    <thead className="sticky top-0 bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
+                      <tr>
+                        <th scope="col" className="px-3 py-2 text-left font-medium">Date</th>
+                        <th scope="col" className="px-2 py-2 text-right font-medium">Inflow</th>
+                        <th scope="col" className="px-2 py-2 text-right font-medium">Outflow</th>
+                        <th scope="col" className="px-3 py-2 text-right font-medium">Net</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {buckets
+                        .filter((bucket) => bucket.inflow > 0 || bucket.outflow > 0)
+                        .map((bucket) => (
+                          <tr key={bucket.day}>
+                            <td className="px-3 py-1.5 text-muted-foreground">{bucket.day}</td>
+                            <td className="px-2 py-1.5 text-right tabular-nums text-success">
+                              {formatCurrency(bucket.inflow)}
+                            </td>
+                            <td className="px-2 py-1.5 text-right tabular-nums text-destructive">
+                              {formatCurrency(bucket.outflow)}
+                            </td>
+                            <td className="px-3 py-1.5 text-right font-medium tabular-nums text-foreground">
+                              {formatCurrency(bucket.inflow - bucket.outflow)}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </PanelBody>
+          </Panel>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Panel>
+              <PanelHeader>
+                <PanelTitle>
+                  <span className="inline-flex items-center gap-1.5">
+                    <PieChart className="h-4 w-4" aria-hidden />
+                    Inflow vs outflow
+                  </span>
+                </PanelTitle>
+              </PanelHeader>
+              <PanelBody className="space-y-3">
+                <div>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Inflow</span>
+                    <span className="font-medium tabular-nums text-foreground">
+                      {formatCurrency(totals.inflow)}
+                    </span>
+                  </div>
+                  <Progress value={100} className="h-2" />
+                </div>
+                <div>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Outflow</span>
+                    <span className="font-medium tabular-nums text-foreground">
+                      {formatCurrency(totals.outflow)}
+                    </span>
+                  </div>
+                  <Progress
+                    value={
+                      totals.inflow + totals.outflow > 0
+                        ? (totals.outflow / (totals.inflow + totals.outflow)) * 100
+                        : 0
+                    }
+                    className="h-2"
+                  />
+                </div>
+                <dl className="grid grid-cols-2 gap-3 border-t border-border pt-3 text-sm">
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Turnover ratio</dt>
+                    <dd className="font-medium tabular-nums text-foreground">
+                      {totals.outflow > 0
+                        ? `${(totals.inflow / totals.outflow).toFixed(2)}×`
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Average net / day</dt>
+                    <dd className="font-medium tabular-nums text-foreground">
+                      {formatCurrency(totals.net / periodDays)}
+                    </dd>
+                  </div>
+                </dl>
+              </PanelBody>
+            </Panel>
+
+            <Panel>
+              <PanelHeader>
+                <PanelTitle>
+                  <span className="inline-flex items-center gap-1.5">
+                    <ListTree className="h-4 w-4" aria-hidden />
+                    Top categories
+                  </span>
+                </PanelTitle>
+              </PanelHeader>
+              <PanelBody className="p-0">
+                {categories.length === 0 ? (
+                  <EmptyState
+                    icon={ListTree}
+                    title="No categories yet"
+                    description="Tag transactions with a category to see where your money goes."
+                    className="m-4 border-0 bg-transparent"
+                  />
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {categories.map((row) => (
+                      <li key={row.category} className="px-4 py-2.5">
+                        <div className="mb-1 flex items-center justify-between text-sm">
+                          <span className="truncate font-medium text-foreground">{row.category}</span>
+                          <span className="ml-3 shrink-0 font-medium tabular-nums text-foreground">
+                            {formatCurrency(row.total)}
+                          </span>
                         </div>
-                        <span className="w-20 text-right font-medium">{formatCurrency(val)}</span>
-                        <Badge label={d.entry_type === "inflow" ? "IN" : "OUT"} color={d.entry_type === "inflow" ? "var(--color-success)" : "var(--color-destructive)"} />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </Card>
-
-            <Card>
-              <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                <PieChart className="h-4 w-4 text-muted-foreground" />
-                Top Categories
-              </h3>
-              {(data?.top_categories ?? []).length === 0 ? (
-                <div className="py-8 text-center text-muted-foreground text-xs">No categories found</div>
-              ) : (
-                <div className="space-y-2">
-                  {(data?.top_categories ?? []).map((c, i) => {
-                    const totalCat = parseFloat(c.total || "0");
-                    const grandTotal = (data?.top_categories ?? []).reduce((s, x) => s + parseFloat(x.total || "0"), 0);
-                    const pct = grandTotal > 0 ? (totalCat / grandTotal) * 100 : 0;
-                    const colors = ["var(--color-primary)", "var(--color-success)", "var(--color-warning)", "var(--color-destructive)", "#ec4899", "#06b6d4", "#a855f7", "#f97316"];
-                    return (
-                      <div key={i} className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: colors[i % colors.length] }} />
-                        <span className="flex-1 text-xs text-foreground">{c.category}</span>
-                        <span className="text-xs font-medium">{formatCurrency(totalCat)}</span>
-                        <span className="text-xs text-muted-foreground w-10 text-right">{pct.toFixed(0)}%</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </Card>
+                        <Progress
+                          value={categoryMax > 0 ? (row.total / categoryMax) * 100 : 0}
+                          className="h-1.5"
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </PanelBody>
+            </Panel>
           </div>
+
+          <p className="text-xs text-muted-foreground">
+            Category totals cover all recorded M-Pesa activity, not only the selected period.
+          </p>
         </>
       )}
     </div>

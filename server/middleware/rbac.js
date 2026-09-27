@@ -1,7 +1,9 @@
 import { query } from '../config/db.js';
 import { sendError } from '../utils/sendError.js';
 
-const RESOURCES = ['customers', 'products', 'sales', 'expenses', 'invoices', 'leads', 'deals', 'tickets', 'projects', 'vendors', 'purchase_orders', 'employees', 'team', 'reports'];
+const RESOURCES = ['customers', 'products', 'sales', 'expenses', 'invoices', 'leads', 'deals', 'tickets', 'projects', 'vendors', 'purchase_orders', 'employees', 'team', 'users', 'reports'];
+
+export { RESOURCES };
 
 const resourceRouteMap = {
   '/api/customers': 'customers',
@@ -16,6 +18,9 @@ const resourceRouteMap = {
   '/api/procurement': 'vendors',
   '/api/employees': 'employees',
   '/api/team': 'team',
+  // Without this mapping `requirePermission` short-circuits on /api/users and
+  // user management becomes reachable by any authenticated member.
+  '/api/users': 'users',
   '/api/reports': 'reports',
   '/api/admin': 'admin',
 };

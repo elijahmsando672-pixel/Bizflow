@@ -17,6 +17,8 @@ import expenseRoutes from '../routes/expenses.js';
 import dashboardRoutes from '../routes/dashboard.js';
 import procurementRoutes from '../routes/procurement.js';
 import apiKeyRoutes from '../routes/apiKeys.js';
+import teamRoutes, { teamPublicRoutes } from '../routes/team.js';
+import usersRoutes from '../routes/users.js';
 
 const authenticateApiKeyOrJwt = (req, res, next) => {
   authenticateApiKey(req, res, () => {
@@ -33,6 +35,11 @@ app.use('/api/expenses', authenticate, expenseRoutes);
 app.use('/api/dashboard', authenticate, dashboardRoutes);
 app.use('/api/procurement', authenticateApiKeyOrJwt, procurementRoutes);
 app.use('/api/api-keys', authenticateApiKeyOrJwt, apiKeyRoutes);
+// Mirrors app.js ordering: the invitee-side accept route is public, everything
+// else on /api/team requires a session.
+app.use('/api/team', teamPublicRoutes);
+app.use('/api/team', authenticate, teamRoutes);
+app.use('/api/users', authenticate, usersRoutes);
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });

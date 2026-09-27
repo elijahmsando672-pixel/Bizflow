@@ -4,7 +4,7 @@ import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
 
-const RESOURCES = ['customers', 'products', 'sales', 'expenses', 'invoices', 'leads', 'deals', 'tickets', 'projects', 'vendors', 'purchase_orders', 'employees', 'team', 'reports'];
+const RESOURCES = ['customers', 'products', 'sales', 'expenses', 'invoices', 'leads', 'deals', 'tickets', 'projects', 'vendors', 'purchase_orders', 'employees', 'team', 'users', 'reports'];
 const DEFAULT_ROLES = ['admin', 'manager', 'staff', 'viewer'];
 
 router.get('/roles', async (req, res) => {

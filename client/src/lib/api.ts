@@ -167,33 +167,104 @@ interface CategoryData {
   parent_id?: string | null;
 }
 
+/**
+ * Payload accepted by `POST /sales` and `PUT /sales/:id`.
+ * `total`, `subtotal` and `tax_amount` are derived server-side from the line
+ * items (16% VAT), so they are deliberately absent here. `PUT` only ever
+ * applies `status` and `notes`.
+ */
 interface SaleData {
   customer_id?: string;
-  customer_name?: string;
   sale_date?: string;
   due_date?: string;
   items?: Array<{ product_id?: string; product_name: string; qty: number; unit_price: number; discount?: number }>;
   notes?: string;
   discount_amount?: number;
   amount_paid?: number;
-  total?: number;
   status?: string;
 }
 
-interface InvoiceData {
-  customer_id: string;
-  items: Array<{ product_name: string; qty: number; unit_price: number; product_id?: string; discount?: number }>;
-  total: number;
-  due_date?: string;
+/**
+ * Payload accepted by `POST /invoices` and `PUT /invoices/:id`.
+ * `customer_id` must be a real customer UUID (or omitted for a walk-in) and
+ * at least one line item is required. Totals and 16% VAT are derived
+ * server-side, so `total` is not part of the contract.
+ */
+/**
+ * Payload for `POST /shops` and `PUT /shops/:id`.
+ * Nullable columns may be cleared by sending `null`. `POST` ignores `status`
+ * because the column defaults to active; only `PUT` applies it.
+ */
+interface ShopData {
+  name: string;
+  location?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  manager_name?: string | null;
+  opening_time?: string | null;
+  closing_time?: string | null;
+  status?: string;
 }
 
+
+/** Query filters accepted by `GET /payments/mpesa/transactions`. */
+interface MpesaTransactionFilters {
+  /** Filters on `entry_type` (inflow/outflow) — the server param is named `status`. */
+  status?: string;
+  search?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+type MpesaReportPeriod = "7d" | "30d" | "90d";
+
+interface MpesaAgentData {
+  name: string;
+  phone: string;
+  mpesa_number: string;
+  commission_rate?: number;
+}
+
+interface MpesaAgentUpdate extends Partial<MpesaAgentData> {
+  is_active?: boolean;
+}
+
+const mpesaTransactionQuery = (filters?: MpesaTransactionFilters): string => {
+  if (!filters) return "";
+  const params = new URLSearchParams();
+  if (filters.status) params.set("status", filters.status);
+  if (filters.search) params.set("search", filters.search);
+  if (filters.start_date) params.set("start_date", filters.start_date);
+  if (filters.end_date) params.set("end_date", filters.end_date);
+  const query = params.toString();
+  return query ? `?${query}` : "";
+};
+
+interface InvoiceData {
+  customer_id?: string | null;
+  items: Array<{ product_name: string; qty: number; unit_price: number; product_id?: string; discount?: number }>;
+  invoice_date?: string;
+  due_date?: string;
+  notes?: string;
+  discount_amount?: number;
+  status?: string;
+}
+
+/**
+ * Payload accepted by `POST /expenses`, `PUT /expenses/:id`.
+ * The server keys expenses off `category_id` (an `expense_categories` UUID)
+ * and returns the friendly name as `category_name`; there is no `category`
+ * string column.
+ */
 interface ExpenseData {
   description: string;
   amount: number;
-  category: string;
+  category_id?: string | null;
   date?: string;
-  status?: string;
-  receipt_url?: string;
+  vendor?: string | null;
+  reference?: string | null;
+  is_receipt_attached?: boolean | null;
+  notes?: string | null;
 }
 
 interface ExpenseCategoryData {
@@ -259,7 +330,7 @@ const api = {
     getAll: (status?: string) => fetchApi(`/invoices${status ? `?status=${status}` : ''}`),
     getById: (id: string) => fetchApi(`/invoices/${id}`),
     create: (data: InvoiceData) => fetchApi('/invoices', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: InvoiceData) => fetchApi(`/invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<InvoiceData>) => fetchApi(`/invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => fetchApi(`/invoices/${id}`, { method: 'DELETE' }),
   },
   expenses: {
@@ -420,8 +491,8 @@ const api = {
   shops: {
     getAll: () => fetchApi('/shops'),
     getById: (id: string) => fetchApi(`/shops/${id}`),
-    create: (data: { name: string; location?: string; phone?: string; email?: string; manager_name?: string; opening_time?: string; closing_time?: string }) => fetchApi('/shops', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: unknown) => fetchApi(`/shops/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    create: (data: ShopData) => fetchApi('/shops', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<ShopData>) => fetchApi(`/shops/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => fetchApi(`/shops/${id}`, { method: 'DELETE' }),
   },
   reviews: {
@@ -448,11 +519,11 @@ const api = {
   payments: {
     mpesa: {
       getAgents: () => fetchApi('/payments/mpesa/agents'),
-      createAgent: (data: { name: string; phone: string; mpesa_number: string; commission_rate?: number }) => fetchApi('/payments/mpesa/agents', { method: 'POST', body: JSON.stringify(data) }),
-      updateAgent: (id: string, data: { name?: string; phone?: string; mpesa_number?: string; commission_rate?: number; is_active?: boolean }) => fetchApi(`/payments/mpesa/agents/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      createAgent: (data: MpesaAgentData) => fetchApi('/payments/mpesa/agents', { method: 'POST', body: JSON.stringify(data) }),
+      updateAgent: (id: string, data: MpesaAgentUpdate) => fetchApi(`/payments/mpesa/agents/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
       deleteAgent: (id: string) => fetchApi(`/payments/mpesa/agents/${id}`, { method: 'DELETE' }),
-      getTransactions: (params?: string) => fetchApi(`/payments/mpesa/transactions${params ? `?${params}` : ''}`),
-      getReports: (period?: string) => fetchApi(`/payments/mpesa/reports${period ? `?period=${period}` : ''}`),
+      getTransactions: (filters?: MpesaTransactionFilters) => fetchApi(`/payments/mpesa/transactions${mpesaTransactionQuery(filters)}`),
+      getReports: (period?: MpesaReportPeriod) => fetchApi(`/payments/mpesa/reports${period ? `?period=${period}` : ''}`),
     },
   },
   importExport: {

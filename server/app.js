@@ -26,7 +26,7 @@ import expenseRoutes from './routes/expenses.js';
 import dashboardRoutes from './routes/dashboard.js';
 import notificationRoutes from './routes/notifications.js';
 import adminRoutes from './routes/admin.js';
-import teamRoutes from './routes/team.js';
+import teamRoutes, { teamPublicRoutes } from './routes/team.js';
 import employeeRoutes from './routes/employees.js';
 import debtorRoutes from './routes/debtors.js';
 import creditorRoutes from './routes/creditors.js';
@@ -210,6 +210,10 @@ const mountRoutes = (base) => {
   app.use(`${base}/dashboard`, protect, requirePermission, auditCrud('dashboard'), dashboardRoutes);
   app.use(`${base}/notifications`, protect, requirePermission, auditCrud('notifications'), notificationRoutes);
   app.use(`${base}/admin`, protect, requirePermission, auditCrud('admin'), adminRoutes);
+  // The invitee has no account yet, so acceptance must be reachable before auth.
+  // Mounted first so `POST /team/accept` is handled here rather than by the
+  // authenticated router below.
+  app.use(`${base}/team`, teamPublicRoutes);
   app.use(`${base}/team`, protect, requirePermission, auditCrud('team'), teamRoutes);
   app.use(`${base}/employees`, protect, requirePermission, auditCrud('employees'), employeeRoutes);
   app.use(`${base}/debtors`, protect, requirePermission, auditCrud('debtors'), debtorRoutes);
