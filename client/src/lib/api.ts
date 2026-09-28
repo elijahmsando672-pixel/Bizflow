@@ -527,9 +527,9 @@ const api = {
     },
   },
   importExport: {
-    importData: (resource: string, data: unknown[]) => fetchApi(`/import/import/${resource}`, { method: 'POST', body: JSON.stringify({ data, format: 'json' }) }),
-    importCsv: (resource: string, csvContent: string) => fetchApi(`/import/import-csv/${resource}`, { method: 'POST', body: JSON.stringify({ csvContent }) }),
-    exportData: (resource: string, format?: string) => fetchApi(`/export/export/${resource}${format ? `?format=${format}` : ''}`),
+    importData: (resource: string, data: unknown[]) => fetchApi(`/import/${resource}`, { method: 'POST', body: JSON.stringify({ data, format: 'json' }) }),
+    importCsv: (resource: string, csvContent: string) => fetchApi(`/import/csv/${resource}`, { method: 'POST', body: JSON.stringify({ csvContent }) }),
+    exportData: (resource: string, format?: string) => fetchApi(`/export/${resource}${format ? `?format=${format}` : ''}`),
     getTemplate: (resource: string) => fetchApi(`/import/templates/${resource}`),
   },
 };
