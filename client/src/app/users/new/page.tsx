@@ -19,15 +19,16 @@ import {
 } from "@/components/ui/select";
 
 const ROLES = [
-  { value: "manager", label: "Manager — full access to daily operations" },
-  { value: "cashier", label: "Cashier — point of sale and receipts" },
   { value: "staff", label: "Staff — limited operational access" },
+  { value: "accountant", label: "Accountant — reporting and finances" },
+  { value: "manager", label: "Manager — full access to daily operations" },
+  { value: "admin", label: "Admin — settings and user management" },
 ];
 
 export default function InviteUserPage() {
   const toast = useToast();
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("cashier");
+  const [role, setRole] = useState("staff");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -134,7 +135,7 @@ export default function InviteUserPage() {
               </li>
               <li className="flex gap-2.5">
                 <Mail className="mt-0.5 h-4 w-4 shrink-0 text-foreground" aria-hidden />
-                Owners, managers, and cashiers can send and revoke invitations.
+                Owners, admins, and managers can send and revoke invitations.
               </li>
               <li className="flex gap-2.5">
                 <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-foreground" aria-hidden />
