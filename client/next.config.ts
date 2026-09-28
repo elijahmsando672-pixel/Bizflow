@@ -29,12 +29,18 @@ const nextConfig: NextConfig = {
     ],
   },
   async rewrites() {
-    const rewrites: { source: string; destination: string }[] = [
-      {
+    const rewrites: { source: string; destination: string }[] = [];
+
+    // `/api` is the same-origin deployment mode: Vercel routes these requests
+    // to the serverless functions in the root `api/` directory. Rewriting that
+    // path to itself makes Next consume the request and return a frontend 404.
+    // Only add a proxy rewrite when the API URL points to a separate origin.
+    if (HAS_ABSOLUTE_API) {
+      rewrites.push({
         source: '/api/:path*',
         destination: `${API_URL}/:path*`,
-      },
-    ];
+      });
+    }
 
     if (HAS_ABSOLUTE_API) {
       rewrites.push({
