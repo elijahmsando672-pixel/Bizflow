@@ -2,6 +2,25 @@
 
 Modern business management dashboard built with Next.js (App Router), Express, and PostgreSQL.
 
+## Documentation
+
+Full technical reference lives in [`docs/`](./docs):
+
+| Document | Contents |
+|----------|----------|
+| [Getting started](./docs/getting-started.md) | Prerequisites, local setup, every script, test suites |
+| [Architecture](./docs/architecture.md) | Topology, request lifecycle, auth flow, multi-tenancy |
+| [Backend](./docs/backend.md) | Every route, middleware and utility in `server/` |
+| [Frontend](./docs/frontend.md) | Routing, the API client, component conventions |
+| [Database](./docs/database.md) | 67 tables, auto-migration, backups |
+| [Deployment](./docs/deployment.md) | Docker, Vercel, Railway, Render, Supabase |
+| [Auxiliary projects](./docs/auxiliary-projects.md) | `apps/api`, `packages/*`, `standalone/`, `bizflow-landing/`, `migration/` |
+
+The repository also contains several dormant projects — a NestJS rewrite, shared
+libraries, a UI prototype and a marketing site. They are not deployed and not in
+CI; see [Auxiliary projects](./docs/auxiliary-projects.md) before assuming
+something is broken.
+
 ## Quick Start
 
 ### Prerequisites
@@ -173,24 +192,33 @@ Strategies are only activated when the corresponding env vars are set.
 - **Deployment**: Vercel (frontend), Docker / Railway (backend)
 
 ## Project Structure
+
+The two live applications, plus the deploy glue that joins them:
+
 ```
 Bizflow/
 ├── client/              # Next.js frontend (port 3000)
 │   ├── src/
-│   │   ├── app/         # App Router pages
-│   │   ├── components/  # UI and layout components
-│   │   └── lib/         # Auth context, API client, utils
+│   │   ├── app/         # App Router pages (~100 routes)
+│   │   ├── components/  # layout, ui, dashboard, reports
+│   │   └── lib/         # API client, auth context, navigation
 │   └── public/          # Static assets
 ├── server/              # Express API (port 5000)
-│   ├── config/          # DB, OAuth, email config
-│   ├── controllers/     # Route handlers
-│   ├── middleware/       # Auth, CSRF, RBAC, security
-│   ├── routes/          # Express routers
-│   └── utils/           # Password hashing, email, audit
-├── scripts/             # CI/validation scripts
+│   ├── config/          # DB pool + auto-migration, OAuth
+│   ├── routes/          # 37 Express routers
+│   ├── services/        # Sale and invoice domain logic
+│   ├── middleware/      # auth, CSRF, RBAC, security
+│   └── utils/           # Password hashing, email, audit, jobs
+├── api/                 # Vercel serverless entry points
+├── scripts/             # Endpoint contract linter, keep-alive
 ├── docker-compose.yml
 └── .env.example
 ```
+
+Not part of the running product: `apps/api/` (NestJS rewrite), `packages/`
+(shared libraries), `standalone/` (UI prototype), `bizflow-landing/` (marketing
+site), `migration/` (one-off SQL Server importer). See
+[docs/auxiliary-projects.md](./docs/auxiliary-projects.md).
 
 ## Environment Variables
 
