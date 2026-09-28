@@ -3,6 +3,47 @@ const DEFAULT_TIMEOUT_MS = 30000;
 
 let refreshPromise: Promise<boolean> | null = null;
 
+/**
+ * CSRF token cache.
+ *
+ * The server sets `csrf_token` as an httpOnly cookie, so `document.cookie` can
+ * never see it and the header has to come from `GET /auth/csrf-token`, which
+ * returns the same value in its body. Caching it here means state-changing
+ * requests are accepted on the first attempt instead of relying on the 403
+ * retry below.
+ */
+let csrfToken: string | null = null;
+let csrfFetch: Promise<string | null> | null = null;
+
+async function getCsrfToken(): Promise<string | null> {
+  if (csrfToken) return csrfToken;
+  if (csrfFetch) return csrfFetch;
+
+  csrfFetch = (async () => {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/auth/csrf-token`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      csrfToken = typeof data?.csrfToken === 'string' ? data.csrfToken : null;
+      return csrfToken;
+    } catch {
+      return null;
+    } finally {
+      csrfFetch = null;
+    }
+  })();
+
+  return csrfFetch;
+}
+
+/** Drops the cached token so the next write re-fetches it (used on sign-out). */
+export function clearCsrfToken(): void {
+  csrfToken = null;
+}
+
 function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
   const { signal, ...rest } = options;
@@ -37,11 +78,9 @@ async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<u
 
   const isStateChanging = !['GET', 'HEAD'].includes(options.method || 'GET');
   if (isStateChanging) {
-    const csrfToken = typeof document !== 'undefined' 
-      ? document.cookie.split('; ').find(row => row.startsWith('csrf_token='))?.split('=')[1]
-      : null;
-    if (csrfToken) {
-      headers['X-Csrf-Token'] = csrfToken;
+    const token = await getCsrfToken();
+    if (token) {
+      headers['X-Csrf-Token'] = token;
     }
   }
 
@@ -61,8 +100,10 @@ async function fetchApi(endpoint: string, options: FetchOptions = {}): Promise<u
           { method: 'GET', credentials: 'include' }
         );
         if (csrfResponse.ok) {
-          const { csrfToken } = await csrfResponse.json();
-          headers['X-Csrf-Token'] = csrfToken;
+          const { csrfToken: fresh } = await csrfResponse.json();
+          // The server rotates the cookie, so the cached copy is now stale.
+          csrfToken = typeof fresh === 'string' ? fresh : null;
+          headers['X-Csrf-Token'] = fresh;
           const retryResponse = await fetchWithTimeout(`${API_BASE_URL}${endpoint}`, {
             ...options,
             headers,

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, POST_AUTH_ROUTE } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
@@ -24,7 +24,7 @@ export default function SignupPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (token) router.replace("/modules");
+    if (token) router.replace(POST_AUTH_ROUTE);
   }, [token, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {

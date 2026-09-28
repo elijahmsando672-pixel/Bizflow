@@ -1,19 +1,27 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { safeNextPath } from "@/lib/business-modules";
 import { Building2, ArrowRight, Store, RotateCcw, LogOut, Loader2 } from "lucide-react";
 
 export default function SelectShopPage() {
   const { shops, setSelectedShop, business, isLoading, token, fetchShops, logout } = useAuth();
   const router = useRouter();
+  const [nextPath, setNextPath] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !token) {
       router.replace("/login");
     }
   }, [isLoading, token, router]);
+
+  // The launcher sends the chosen module along so the picker returns to it.
+  // `useSearchParams` is avoided here to keep the route statically renderable.
+  useEffect(() => {
+    setNextPath(safeNextPath(new URLSearchParams(window.location.search).get("next")));
+  }, []);
 
   if (isLoading) {
     return (
@@ -87,7 +95,7 @@ export default function SelectShopPage() {
               key={shop.id}
               onClick={() => {
                 setSelectedShop(shop);
-                router.push("/dashboard");
+                router.push(nextPath ?? "/dashboard");
               }}
               className="group bg-card rounded-md p-6 shadow-sm hover:shadow-modal transition-all duration-300 transform hover:-translate-y-1 cursor-pointer border border-border text-left"
             >

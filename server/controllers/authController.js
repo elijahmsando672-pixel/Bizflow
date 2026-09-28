@@ -337,7 +337,7 @@ export const login = async (req, res) => {
 export const me = async (req, res) => {
   try {
     const result = await query(
-      `SELECT u.id, u.name, u.email, u.role, u.business_id, u.totp_enabled, b.name as business_name, b.email as business_email, b.phone, b.address, b.tax_id
+      `SELECT u.id, u.name, u.email, u.role, u.business_id, u.totp_enabled, b.name as business_name, b.email as business_email, b.phone, b.address, b.tax_id, b.logo_url
        FROM users u JOIN businesses b ON u.business_id = b.id WHERE u.id = $1`,
       [req.user.id]
     );

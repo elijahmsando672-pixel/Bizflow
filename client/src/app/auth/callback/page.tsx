@@ -3,6 +3,7 @@
 import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { POST_AUTH_ROUTE } from "@/lib/auth-context";
 
 function CallbackContent() {
   const router = useRouter();
@@ -28,7 +29,7 @@ function CallbackContent() {
         localStorage.setItem("user", JSON.stringify(user));
         localStorage.setItem("business", JSON.stringify(business));
 
-        window.location.href = "/";
+        window.location.href = POST_AUTH_ROUTE;
       } catch {
         router.push("/login?error=invalid_callback_data");
       }

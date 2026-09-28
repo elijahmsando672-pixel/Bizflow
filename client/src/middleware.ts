@@ -1,7 +1,25 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const publicPaths = ["/", "/login", "/signup", "/register", "/reset-password", "/accept-invite", "/pricing", "/features", "/about", "/contact", "/select-shop"];
+const publicPaths = [
+  "/",
+  "/login",
+  "/signup",
+  "/register",
+  "/reset-password",
+  "/accept-invite",
+  // Verification links are opened from an email by users who have no session yet,
+  // so this must stay reachable before login.
+  "/verify-email",
+  "/pricing",
+  "/features",
+  "/about",
+  "/contact",
+  "/select-shop",
+];
+
+/** Post-authentication landing route. See lib/auth-context.tsx. */
+const POST_AUTH_ROUTE = "/business";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -12,7 +30,7 @@ export function middleware(request: NextRequest) {
   }
 
   if (token && publicPaths.includes(pathname) && pathname !== "/" && pathname !== "/login" && pathname !== "/select-shop") {
-    return NextResponse.redirect(new URL("/modules", request.url));
+    return NextResponse.redirect(new URL(POST_AUTH_ROUTE, request.url));
   }
 
   return NextResponse.next();

@@ -2,9 +2,17 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { clearCsrfToken } from "@/lib/api";
 
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 min idle
 const WARNING_BEFORE_MS = 60 * 1000; // warn 1 min before
+
+/**
+ * Where every successful credential exchange lands: the business workspace
+ * launcher, which then hands off to the module the user picks. `/dashboard` is
+ * only reached once a module is chosen.
+ */
+export const POST_AUTH_ROUTE = "/business";
 
 export interface Shop {
   id: string;
@@ -183,7 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && !token && router) {
-      const publicPages = ["/", "/login", "/signup", "/register", "/reset-password", "/accept-invite", "/pricing", "/features", "/about", "/contact", "/select-shop"];
+      const publicPages = ["/", "/login", "/signup", "/register", "/reset-password", "/accept-invite", "/verify-email", "/pricing", "/features", "/about", "/contact", "/select-shop"];
       if (!publicPages.includes(window.location.pathname)) {
         router.push("/login");
       }
@@ -222,7 +230,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("user", JSON.stringify(data.user));
     localStorage.setItem("business", JSON.stringify(data.business));
 
-    router.push("/modules");
+    // Each of these responses rotates the server-side csrf_token cookie, so any
+    // cached copy from a previous session must be dropped.
+    clearCsrfToken();
+    router.push(POST_AUTH_ROUTE);
   };
 
   const loginWithOTP = async (data: { email?: string; phone?: string; otp: string }) => {
@@ -254,7 +265,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("user", JSON.stringify(result.user));
     localStorage.setItem("business", JSON.stringify(result.business));
 
-    router.push("/modules");
+    // Each of these responses rotates the server-side csrf_token cookie, so any
+    // cached copy from a previous session must be dropped.
+    clearCsrfToken();
+    router.push(POST_AUTH_ROUTE);
   };
 
   const register = async (name: string, email: string, password: string, businessName: string, phone?: string) => {
@@ -284,7 +298,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("user", JSON.stringify(data.user));
     localStorage.setItem("business", JSON.stringify(data.business));
 
-    router.push("/modules");
+    // Each of these responses rotates the server-side csrf_token cookie, so any
+    // cached copy from a previous session must be dropped.
+    clearCsrfToken();
+    router.push(POST_AUTH_ROUTE);
   };
 
   // ── Session idle timeout ──
@@ -318,6 +335,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("business");
     localStorage.removeItem("selectedShop");
     removeTokenCookie();
+    clearCsrfToken();
     router.push("/login");
   }, [router, clearIdleTimers]);
 

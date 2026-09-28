@@ -14,11 +14,12 @@ const PUBLIC_ROUTES = new Set([
   "/accept-invite",
   "/verify-email",
   "/select-shop",
-  "/modules",
   "/features",
   "/about",
   "/pricing",
   "/contact",
+  // Post-authentication launcher: full-bleed glass layout, so no sidebar.
+  "/business",
 ]);
 
 function isPublicRoute(pathname: string): boolean {

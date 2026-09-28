@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, POST_AUTH_ROUTE } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
@@ -39,7 +39,7 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (token) router.replace("/modules");
+    if (token) router.replace(POST_AUTH_ROUTE);
   }, [token, router]);
 
   useEffect(() => {
@@ -99,7 +99,7 @@ export default function LoginPage() {
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("business", JSON.stringify(data.business));
       if (data.shops) localStorage.setItem("shops", JSON.stringify(data.shops));
-      window.location.href = "/modules";
+      window.location.href = POST_AUTH_ROUTE;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
       setRequireCaptcha(false);
