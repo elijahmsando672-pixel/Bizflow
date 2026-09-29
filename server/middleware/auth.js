@@ -10,6 +10,13 @@ const getJwtSecret = () => {
 };
 
 export const authenticate = async (req, res, next) => {
+  // An API key is a credential in its own right: authenticateApiKey has already
+  // resolved it, or rejected the request outright. There is no bearer token to
+  // verify, and requiring one would 401 every key-authenticated call. What the
+  // key may actually do is decided in requirePermission, from its scopes and
+  // the current role of the user who minted it.
+  if (req.apiKey) return next();
+
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

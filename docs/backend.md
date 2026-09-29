@@ -98,16 +98,59 @@ Double-submit cookie. Compares the `csrf_token` cookie against the
 ### `server/middleware/rbac.js` → `requirePermission`
 
 See [Architecture](./architecture.md#the-permission-matrix). Exports
-`requirePermission`, `canAccessResource`, `RESOURCES`.
+`requirePermission`, `resolvePermissionResource`, `resourceRouteMap`,
+`RESOURCES`.
 
-> **A route whose base URL is missing from `resourceRouteMap` gets no
-> permission check** — the guard returns `next()`. When you mount a new router,
-> add its prefix there or it is open to any authenticated member.
+The guard **fails closed**: a request whose base URL is missing from
+`resourceRouteMap`, or whose HTTP method has no entry in `actionMap`, is
+denied with 403 rather than allowed through. When you mount a new router,
+add its prefix to `resourceRouteMap` or every non-owner role is refused on it.
+
+`admin` and `permissions` are rejected by name before the table is consulted.
+They are deliberately unseedable, so "no matching row" would be the only thing
+between a manager and a self-promotion — and the rows are writable through
+`/api/permissions` itself.
+
+API-key callers are resolved against the **current role of the user who minted
+the key**, joined to `users` in the same query, plus the key's own `scopes`
+(see below). Both must pass, so a key can never exceed its creator.
 
 ### `server/middleware/apiKey.js` → `authenticateApiKey`
 
 Accepts `X-API-Key` in place of a JWT, honouring per-key scopes and the
-optional `ip_whitelist` on the `api_keys` row.
+optional `ip_whitelist` on the `api_keys` row. An invalid, revoked or expired
+key is rejected here, before any JWT is read, so a bad key is never silently
+ignored in favour of a session token.
+
+Authorization for a key is decided in `requirePermission`, not here:
+
+| Layer | Source | Effect |
+|-------|--------|--------|
+| Identity | `api_keys.key_hash` | Which business the call acts for |
+| Standing | creator's **current** `users.role` | The same matrix a session gets |
+| Brake | `api_keys.scopes` | `read` / `write` / `*`, both must allow |
+
+Because standing is read live rather than frozen onto the key at creation, a
+member demoted from manager to staff has their existing keys lose manager
+reach on the next request.
+
+A key never takes the `isPrivileged` bypass — `req.user.role` is the synthetic
+`'api'`, so even an owner-created `['*']` key resolves through the table rather
+than around it. A consequence worth knowing before you integrate: **no key can
+reach `/api/admin` or `/api/permissions`, whoever minted it**, because those
+two resources are rejected by name ahead of the lookup. That is deliberate — a
+leaked key cannot mint further keys or rewrite the permission matrix — but it
+means key-based automation cannot administer the account it belongs to.
+
+`apiKeyAllowsAction` fails closed: `scopes` is JSONB, so anything that is not
+an array of strings grants nothing. A bare `"read"` string would otherwise
+satisfy a substring check. `POST /api/api-keys` rejects malformed scopes with
+400 rather than minting a key that authenticates and then 403s on everything.
+
+CSRF is skipped for key calls. The double-submit cookie defends against a
+browser attaching ambient cookies cross-site; an `X-API-Key` header is not
+ambient, and a browser cannot set one cross-origin without passing a CORS
+preflight first.
 
 ### `server/middleware/errorHandler.js`
 
@@ -130,7 +173,7 @@ client beyond the message.
 All routers are mounted at **both** `/api/<prefix>` and `/api/v1/<prefix>`
 (`server/app.js:251-252`). Paths below are relative to either.
 
-Every router except `apiKeys`, `sessions` and `push` is wrapped in
+Every router except `sessions` and `push` is wrapped in
 `protect → requirePermission → auditCrud(<resource>)`.
 
 ### Core

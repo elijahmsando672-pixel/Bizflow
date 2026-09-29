@@ -5,6 +5,27 @@ import { sendError } from '../utils/sendError.js';
 
 const hashKey = (key) => crypto.createHash('sha256').update(key).digest('hex');
 
+/** Scope names a key may carry. `read` covers safe methods, `write` the rest. */
+export const API_KEY_SCOPES = ['read', 'write', '*'];
+
+/**
+ * True when a key's scopes permit `permissionKey`.
+ *
+ * `scopes` is JSONB, so the driver hands back a parsed array. Anything that is
+ * not an array of strings grants nothing: a bare string such as `"read"` would
+ * otherwise satisfy a substring check, and a key with no scopes at all must not
+ * read. Fails closed deliberately, since this is the only brake on a key whose
+ * creator holds the role being delegated.
+ */
+export const apiKeyAllowsAction = (apiKey, permissionKey) => {
+  const scopes = apiKey?.scopes;
+  if (!Array.isArray(scopes)) return false;
+  const granted = scopes.filter((scope) => typeof scope === 'string');
+  if (granted.includes('*')) return true;
+  if (permissionKey === 'can_read') return granted.includes('read');
+  return granted.includes('write');
+};
+
 const getHashCandidates = (apiKey) => {
   const candidates = [hashKey(apiKey)];
   if (apiKey.startsWith('bf_')) candidates.push(hashKey(apiKey.slice(3)));
@@ -55,15 +76,6 @@ export const authenticateApiKey = async (req, res, next) => {
     console.error('API key auth error:', err);
     return sendError(res, 500, 'Authentication error');
   }
-};
-
-export const requireApiKeyScope = (scope) => {
-  return (req, res, next) => {
-    if (!req.apiKey) return next();
-    const scopes = req.apiKey.scopes || [];
-    if (scopes.includes('*') || scopes.includes(scope)) return next();
-    return sendError(res, 403, `API key missing required scope: ${scope}`);
-  };
 };
 
 export const generateApiKey = () => {

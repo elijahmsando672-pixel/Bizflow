@@ -87,7 +87,9 @@ const auditCrud = (resource) => (req, res, next) => {
       action,
       resourceType: resource,
       resourceId: req.params?.id || null,
-      details: { path: req.originalUrl },
+      // Recorded so a write made through a leaked key is distinguishable from
+      // one made by the member's own session.
+      details: { path: req.originalUrl, via: req.apiKey ? 'api_key' : 'session' },
       ip: getClientIp(req),
       userAgent: req.get('User-Agent'),
     }).catch(console.error);

@@ -63,6 +63,15 @@ export const validateCsrf = (req, res, next) => {
     return next();
   }
 
+  // Skip for API key callers. CSRF exists because a browser attaches cookies
+  // to a cross-site request on its own; an X-API-Key header is not ambient, and
+  // a browser cannot set one cross-origin without passing a CORS preflight
+  // first. Requiring the token would only break legitimate server-to-server
+  // calls, which have no cookie to pair it with.
+  if (req.apiKey) {
+    return next();
+  }
+
   // Skip if not authenticated (unauthenticated endpoints)
   if (!req.user) {
     return next();

@@ -188,6 +188,12 @@ Supporting auth features:
 - **Device & IP management** — `/api/auth/devices`, `/api/auth/ip-whitelist`.
 - **API keys** — `authenticateApiKey` accepts an `X-API-Key` header in place of
   a JWT, with per-key scopes and an optional IP allowlist (`api_keys` table).
+  A key is a delegation, not an independent principal: it is authorized
+  against the **current role of the user who minted it**, and its `scopes`
+  (`read` / `write` / `*`) can only narrow that further. Both must permit the
+  action, so a key can never exceed its creator and a demotion takes effect on
+  the next request. CSRF is skipped for key calls, since a header credential is
+  not ambient authority. See [Backend](./backend.md#servermiddlewareapikeyjs--authenticateapikey).
 
 ## Multi-tenancy
 
