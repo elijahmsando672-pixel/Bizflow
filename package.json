@@ -12,7 +12,9 @@
     "postinstall": "npm --prefix client install && npm --prefix server install",
     "build": "npm --prefix client run build",
     "start": "npm --prefix client run start",
-    "lint": "npm --prefix client run lint",
+    "lint": "npm run lint:client && npm run lint:server",
+    "lint:client": "npm --prefix client run lint",
+    "lint:server": "eslint .",
     "validate": "node scripts/validate-endpoints.js",
     "backup": "node server/scripts/backup.js",
     "version:sync": "node -e \"const v=require('./package.json').version; const p=require('./client/package.json'); p.version=v; require('fs').writeFileSync('./client/package.json', JSON.stringify(p, null, 2)+'\\n'); console.log('Synced client version to '+v);\""
@@ -38,7 +40,10 @@
     "uuid": "^14.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "concurrently": "^8.2.2",
+    "eslint": "^9.39.5",
+    "globals": "^16.5.0",
     "turbo": "^2.9.18",
     "typescript": "^6.0.3"
   },

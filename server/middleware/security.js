@@ -112,10 +112,13 @@ export const stopRateLimitCleanup = () => clearInterval(rateLimitCleanupInterval
 
 // Strips ASCII control chars from input strings — data quality, NOT a security control.
 // SQL injection is prevented by parameterized queries; XSS by output encoding.
+// eslint-disable-next-line no-control-regex -- matching control characters is the point.
+const CONTROL_CHARS = /[\x00-\x1F\x7F]/g;
+
 export const sanitizeInput = (req, res, next) => {
   const sanitizeValue = (value) => {
     if (typeof value === 'string') {
-      return value.replace(/[\x00-\x1F\x7F]/g, '').trim();
+      return value.replace(CONTROL_CHARS, '').trim();
     }
     if (Array.isArray(value)) {
       return value.map(sanitizeValue);
@@ -136,7 +139,7 @@ export const sanitizeInput = (req, res, next) => {
   if (req.query && typeof req.query === 'object') {
     for (const [key, val] of Object.entries(req.query)) {
       if (typeof val === 'string') {
-        req.query[key] = val.replace(/[\x00-\x1F\x7F]/g, '').trim();
+        req.query[key] = val.replace(CONTROL_CHARS, '').trim();
       }
     }
   }
