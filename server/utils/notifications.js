@@ -1,4 +1,5 @@
 import { query } from '../config/db.js';
+import { PRIVILEGED_ROLES } from '../config/roles.js';
 
 export const sendNotification = async ({
   businessId,
@@ -36,8 +37,8 @@ export const notifyBusiness = async (businessId, title, message, type = 'info', 
 export const notifyAdmins = async (businessId, title, message, type = 'info', link = null) => {
   try {
     const admins = await query(
-      "SELECT id FROM users WHERE business_id = $1 AND role IN ('owner', 'admin')",
-      [businessId]
+      'SELECT id FROM users WHERE business_id = $1 AND role = ANY($2::text[])',
+      [businessId, PRIVILEGED_ROLES]
     );
     for (const admin of admins.rows) {
       await sendNotification({ businessId, userId: admin.id, title, message, type, link });

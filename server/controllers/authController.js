@@ -12,6 +12,7 @@ import { reportAccountLockout } from '../utils/securityMonitor.js';
 import { JWT_SECRET_KEY as JWT_SECRET } from '../middleware/auth.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 import { createTempToken, consumeTempToken } from '../utils/tempToken.js';
+import { ensureDefaultPermissions } from '../utils/permissions.js';
 import https from 'https';
 import { sendError } from '../utils/sendError.js';
 
@@ -177,6 +178,10 @@ export const register = async (req, res) => {
     await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [user.id, refreshToken, refreshExpiresAt]);
 
     await query(`INSERT INTO expense_categories (business_id, name) VALUES ($1, 'Rent'), ($1, 'Utilities'), ($1, 'Salaries'), ($1, 'Supplies'), ($1, 'Marketing'), ($1, 'Transport'), ($1, 'Other')`, [business_id]);
+    // Seeded up front rather than on first read: `requirePermission` denies a
+    // role that has no row, so an invited member would be locked out of the
+    // whole business until someone opened the permissions screen.
+    await ensureDefaultPermissions(business_id);
     const shopResult = await query(
       `INSERT INTO shops (business_id, name) VALUES ($1, 'Main Shop') RETURNING id`,
       [business_id]

@@ -11,7 +11,7 @@ import {
   isTransactionPooler,
   pool,
 } from '../config/db.js';
-import app, { configuration } from '../app.js';
+import app, { configuration, getAllowedOrigins } from '../app.js';
 
 const POOLER_URL = 'postgresql://postgres.projref:pw@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true';
 const SESSION_POOLER_URL = 'postgresql://postgres.projref:pw@aws-0-eu-west-1.pooler.supabase.com:5432/postgres';
@@ -37,6 +37,14 @@ describe('runtime detection', () => {
     expect(isTransactionPooler({ DATABASE_URL: POOLER_URL })).toBe(true);
     expect(isTransactionPooler({ DATABASE_URL: SESSION_POOLER_URL })).toBe(false);
     expect(isTransactionPooler({ DATABASE_URL: DIRECT_URL })).toBe(false);
+  });
+});
+
+describe('local development CORS origins', () => {
+  it('allows the Next.js fallback port when port 3000 is occupied', () => {
+    const origins = getAllowedOrigins({});
+    expect(origins).toContain('http://localhost:3001');
+    expect(origins).toContain('http://127.0.0.1:3001');
   });
 });
 

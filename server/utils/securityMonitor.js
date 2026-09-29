@@ -1,4 +1,5 @@
 import { query } from '../config/db.js';
+import { PRIVILEGED_ROLES } from '../config/roles.js';
 
 const alertCooldowns = new Map();
 
@@ -14,8 +15,8 @@ export const notifyAdminSecurity = async (businessId, title, message, type = 'se
   if (!businessId) return;
   try {
     const admins = await query(
-      "SELECT id FROM users WHERE business_id = $1 AND role IN ('owner', 'admin')",
-      [businessId]
+      'SELECT id FROM users WHERE business_id = $1 AND role = ANY($2::text[])',
+      [businessId, PRIVILEGED_ROLES]
     );
     for (const admin of admins.rows) {
       await query(

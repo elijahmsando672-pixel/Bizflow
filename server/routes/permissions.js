@@ -1,11 +1,9 @@
 import express from 'express';
 import { query } from '../config/db.js';
+import { ROLES } from '../config/roles.js';
 import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
-
-const RESOURCES = ['customers', 'products', 'sales', 'expenses', 'invoices', 'leads', 'deals', 'tickets', 'projects', 'vendors', 'purchase_orders', 'employees', 'team', 'users', 'reports'];
-const DEFAULT_ROLES = ['admin', 'manager', 'staff', 'viewer'];
 
 router.get('/roles', async (req, res) => {
   try {
@@ -14,8 +12,7 @@ router.get('/roles', async (req, res) => {
       [req.business_id]
     );
     const roles = result.rows.map(r => r.role_name);
-    const defaultRoles = DEFAULT_ROLES.filter(r => !roles.includes(r));
-    res.json([...defaultRoles, ...roles]);
+    res.json([...new Set([...ROLES, ...roles])]);
   } catch (error) {
     console.error('Fetch roles error:', error);
     sendError(res, 500, 'Failed to fetch roles');
@@ -28,29 +25,6 @@ router.get('/permissions', async (req, res) => {
       `SELECT * FROM permissions WHERE business_id = $1 ORDER BY role_name, resource`,
       [req.business_id]
     );
-    if (!result.rows.length) {
-      const defaults = [];
-      const rolePermissions = {
-        admin: { can_create: true, can_read: true, can_update: true, can_delete: true },
-        manager: { can_create: true, can_read: true, can_update: true, can_delete: false },
-        staff: { can_create: true, can_read: true, can_update: false, can_delete: false },
-        viewer: { can_create: false, can_read: true, can_update: false, can_delete: false },
-      };
-      for (const role of DEFAULT_ROLES) {
-        for (const resource of RESOURCES) {
-          defaults.push(query(
-            `INSERT INTO permissions (business_id, role_name, resource, can_create, can_read, can_update, can_delete) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-            [req.business_id, role, resource, rolePermissions[role].can_create, rolePermissions[role].can_read, rolePermissions[role].can_update, rolePermissions[role].can_delete]
-          ));
-        }
-      }
-      await Promise.all(defaults);
-      const freshResult = await query(
-        `SELECT * FROM permissions WHERE business_id = $1 ORDER BY role_name, resource`,
-        [req.business_id]
-      );
-      return res.json(freshResult.rows);
-    }
     res.json(result.rows);
   } catch (error) {
     console.error('Fetch permissions error:', error);

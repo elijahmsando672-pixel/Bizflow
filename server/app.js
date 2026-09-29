@@ -6,6 +6,7 @@ import compression from 'compression';
 import { pool, isServerless } from './config/db.js';
 import { protect } from './middleware/protect.js';
 import { requirePermission } from './middleware/rbac.js';
+import { isPrivileged } from './config/roles.js';
 import { logAudit, getClientIp } from './utils/audit.js';
 import { securityHeaders, sanitizeInput, xssPrevent, globalRateLimiter, userRateLimiter, authRateLimiter, passwordResetRateLimiter, refreshTokenRateLimiter } from './middleware/security.js';
 import { reportSuspiciousAccess } from './utils/securityMonitor.js';
@@ -94,16 +95,20 @@ const auditCrud = (resource) => (req, res, next) => {
   next();
 };
 
-export const allowedOrigins = [
-  ...(process.env.CORS_ORIGINS?.split(',').map((origin) => origin.trim()).filter(Boolean) || [
+export const getAllowedOrigins = (env = process.env) => [
+  ...(env.CORS_ORIGINS?.split(',').map((origin) => origin.trim()).filter(Boolean) || [
     'http://localhost:3000',
+    'http://localhost:3001',
     'http://localhost:5173',
     'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
     'http://127.0.0.1:5173',
   ]),
-  ...(process.env.APP_URL ? [process.env.APP_URL.replace(/\/+$/, '')] : []),
-  ...(() => { try { return process.env.NEXT_PUBLIC_API_URL ? [new URL(process.env.NEXT_PUBLIC_API_URL).origin] : []; } catch { return []; } })(),
+  ...(env.APP_URL ? [env.APP_URL.replace(/\/+$/, '')] : []),
+  ...(() => { try { return env.NEXT_PUBLIC_API_URL ? [new URL(env.NEXT_PUBLIC_API_URL).origin] : []; } catch { return []; } })(),
 ];
+
+export const allowedOrigins = getAllowedOrigins();
 
 export const app = express();
 
@@ -235,13 +240,13 @@ const mountRoutes = (base) => {
   app.use(`${base}/messages`, protect, requirePermission, auditCrud('messages'), messageRoutes);
   app.use(`${base}/quotations`, protect, requirePermission, auditCrud('quotations'), quotationRoutes);
   app.use(`${base}/payments`, protect, requirePermission, auditCrud('payments'), paymentRoutes);
-  app.use(`${base}/api-keys`, protect, auditCrud('api_keys'), apiKeyRoutes);
+  app.use(`${base}/api-keys`, protect, requirePermission, auditCrud('api_keys'), apiKeyRoutes);
   app.use(`${base}/webhooks`, protect, requirePermission, auditCrud('webhooks'), webhookRoutes);
   app.use(`${base}/sessions`, protect, auditCrud('sessions'), sessionRoutes);
   app.use(`${base}/push`, protect, pushRoutes);
 
   app.get(`${base}/queue`, protect, (req, res) => {
-    if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+    if (!isPrivileged(req.user.role)) {
       return sendError(res, 403, 'Admin access required');
     }
     res.json({ success: true, data: getQueueStats() });
@@ -289,7 +294,7 @@ app.get('/api/health', async (req, res) => {
 // System metrics — requires authentication (admin only)
 app.get('/api/metrics', protect, async (req, res, next) => {
   try {
-    if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+    if (!isPrivileged(req.user.role)) {
       return sendError(res, 403, 'Admin access required');
     }
     const metrics = await getMetrics(pool);

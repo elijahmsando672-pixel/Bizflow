@@ -5,6 +5,7 @@ import { query } from '../config/db.js';
 import { sendTeamInvitationEmail } from '../utils/email.js';
 import { hashPassword } from '../utils/password.js';
 import { generateToken } from '../middleware/auth.js';
+import { ROLES, outranks } from '../config/roles.js';
 import { sendError } from '../utils/sendError.js';
 
 const router = express.Router();
@@ -18,13 +19,7 @@ const router = express.Router();
  * remove a role at or above their own. Without it, any member who can reach
  * these endpoints could promote themselves to `owner`.
  */
-const ROLE_RANK = { staff: 1, accountant: 1, manager: 2, admin: 3, owner: 4 };
-const VALID_ROLES = Object.keys(ROLE_RANK);
-
-const rankOf = (role) => ROLE_RANK[role] ?? 0;
-
-/** True when `actorRole` is senior enough to act on a target holding `targetRole`. */
-const outranks = (actorRole, targetRole) => rankOf(actorRole) >= rankOf(targetRole);
+const VALID_ROLES = ROLES;
 
 const inviteSchema = Joi.object({
   email: Joi.string().email().required(),
