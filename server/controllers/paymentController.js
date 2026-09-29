@@ -1,4 +1,4 @@
-import { query, pool } from '../config/db.js';
+import { query } from '../config/db.js';
 import { sendError } from '../utils/sendError.js';
 
 export const getAgents = async (req, res) => {
