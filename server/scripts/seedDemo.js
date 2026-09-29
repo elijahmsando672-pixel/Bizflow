@@ -16,7 +16,6 @@ const pool = new Pool({
 const query = async (text, params) => pool.query(text, params);
 
 let BUSINESS_ID, USER_ID;
-const USER_NAME = 'Elijah';
 
 const now = new Date();
 const d = (daysAgo) => {
@@ -46,7 +45,6 @@ async function seedDemo() {
       console.log('✅ Created demo business and admin user');
     } else {
       const user = existingUser.rows[0];
-      const bizResult = await query(`SELECT id FROM users WHERE id = $1`, [user.id]);
       USER_ID = user.id;
       const bizIdResult = await query(`SELECT business_id FROM users WHERE id = $1`, [user.id]);
       BUSINESS_ID = bizIdResult.rows[0].business_id;

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import crypto from 'crypto';
 import request from 'supertest';
 import { app, setupDB } from './test-server.js';

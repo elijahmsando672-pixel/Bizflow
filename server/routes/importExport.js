@@ -234,7 +234,7 @@ router.get('/templates/:resource', (req, res) => {
 
     if (!templates[resource]) return sendError(res, 404, 'No template for this resource');
     res.json(templates[resource]);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Server error');
   }
 });

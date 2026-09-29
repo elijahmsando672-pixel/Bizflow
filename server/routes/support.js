@@ -44,7 +44,7 @@ router.get('/sla-configs', async (req, res) => {
       return res.json(results.map(r => r.rows[0]));
     }
     res.json(result.rows);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to fetch SLA configs');
   }
 });
@@ -58,7 +58,7 @@ router.put('/sla-configs/:id', async (req, res) => {
     );
     if (!result.rows.length) return sendError(res, 404, 'SLA config not found');
     res.json(result.rows[0]);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to update SLA config');
   }
 });
@@ -90,7 +90,7 @@ router.get('/dashboard-stats', async (req, res) => {
     );
 
     res.json({ stats: stats.rows[0], recent: recent.rows });
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to fetch ticket stats');
   }
 });
@@ -184,7 +184,7 @@ router.get('/:id', async (req, res) => {
     );
     if (!result.rows.length) return sendError(res, 404, 'Ticket not found');
     res.json(result.rows[0]);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to fetch ticket');
   }
 });
@@ -213,7 +213,7 @@ router.put('/:id', async (req, res) => {
     );
     if (!result.rows.length) return sendError(res, 404, 'Ticket not found');
     res.json(result.rows[0]);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to update ticket');
   }
 });
@@ -245,7 +245,7 @@ router.post('/:id/replies', async (req, res) => {
     }
 
     res.status(201).json(reply);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to create reply');
   }
 });
@@ -261,7 +261,7 @@ router.get('/:id/replies', async (req, res) => {
       [req.params.id, req.business_id]
     );
     res.json(result.rows);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to fetch replies');
   }
 });
@@ -272,7 +272,7 @@ router.delete('/:id', async (req, res) => {
     const result = await query(`DELETE FROM support_tickets WHERE id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
     if (!result.rowCount) return sendError(res, 404, 'Ticket not found');
     res.json({ message: 'Ticket deleted' });
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to delete ticket');
   }
 });

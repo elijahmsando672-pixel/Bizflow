@@ -15,11 +15,6 @@ const ROOT = path.resolve(__dirname, '..');
 let errors = 0;
 let warnings = 0;
 
-function logError(msg) {
-  console.error(`  ❌ ${msg}`);
-  errors++;
-}
-
 function logWarn(msg) {
   console.warn(`  ⚠ ${msg}`);
   warnings++;

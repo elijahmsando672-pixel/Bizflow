@@ -20,7 +20,6 @@ const APP_NAME = 'BizFlow';
 const CAPTCHA_SECRET = process.env.TURNSTILE_SECRET_KEY || '';
 const MAX_LOGIN_ATTEMPTS = 5;
 const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
-const TOTP_WINDOW = 1; // ±30s window for clock drift
 
 // ── CAPTCHA verification (Cloudflare Turnstile) ──────────────
 const verifyCaptcha = (token) => {
@@ -182,8 +181,10 @@ export const register = async (req, res) => {
     // role that has no row, so an invited member would be locked out of the
     // whole business until someone opened the permissions screen.
     await ensureDefaultPermissions(business_id);
-    const shopResult = await query(
-      `INSERT INTO shops (business_id, name) VALUES ($1, 'Main Shop') RETURNING id`,
+    // The inserted shop id is not needed here; the default shop exists so the
+    // owner has somewhere to start, not to be referenced by this response.
+    await query(
+      `INSERT INTO shops (business_id, name) VALUES ($1, 'Main Shop')`,
       [business_id]
     );
     await recordLoginAttempt(email, req.ip, true);
@@ -321,7 +322,10 @@ export const login = async (req, res) => {
     recordLoginHistory({ userId: user.id, businessId: user.business_id, ip, userAgent: req.get('User-Agent'), success: true, sessionId: sessionHash }).catch(() => {});
     recordDevice(user.id, req).catch(() => {});
 
-    const { password: _, totp_secret, ...userData } = user;
+    // Destructure-to-omit: both keys are dropped from userData so they cannot
+    // reach the response. The `_` prefix is what keeps the linter from
+    // flagging the omission itself — do not "fix" these by removing them.
+    const { password: _, totp_secret: _totpSecret, ...userData } = user;
     const shopsResult = await query('SELECT id, name, location FROM shops WHERE business_id = $1 ORDER BY name', [userData.business_id]);
     setRefreshCookie(req, res, refreshToken);
     const csrfToken = setCsrfCookie(req, res);

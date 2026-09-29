@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs';
 
 const THUMB_DIR = 'thumbs';
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
 
 const ensureDir = (dir) => { if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }); };
 

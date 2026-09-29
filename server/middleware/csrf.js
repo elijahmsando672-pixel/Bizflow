@@ -99,7 +99,7 @@ export const validateCsrf = (req, res, next) => {
     if (!req.cookies?.csrf_expiry || Date.now() > parseInt(req.cookies.csrf_expiry)) {
       return sendError(res, 403, 'CSRF protection: Token expired');
     }
-  } catch (err) {
+  } catch {
     return sendError(res, 400, 'CSRF protection: Invalid token format');
   }
   

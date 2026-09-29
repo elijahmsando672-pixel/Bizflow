@@ -1,8 +1,6 @@
 import { Router } from 'express';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from '../docs/swagger.js';
-import { protect } from '../middleware/protect.js';
-import { AppError } from '../utils/AppError.js';
 
 const router = Router();
 

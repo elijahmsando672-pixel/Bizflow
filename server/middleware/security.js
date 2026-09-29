@@ -1,6 +1,5 @@
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
-import sanitizeHtml from 'sanitize-html';
 import { sendError } from '../utils/sendError.js';
 
 const isProduction = process.env.NODE_ENV === 'production';

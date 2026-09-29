@@ -40,7 +40,7 @@ router.get('/vendors', async (req, res) => {
       [req.business_id]
     );
     res.json(result.rows);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to fetch vendors');
   }
 });
@@ -50,7 +50,7 @@ router.get('/vendors/:id', async (req, res) => {
     const result = await query(`SELECT * FROM vendors WHERE id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
     if (!result.rows.length) return sendError(res, 404, 'Vendor not found');
     res.json(result.rows[0]);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to fetch vendor');
   }
 });
@@ -67,7 +67,7 @@ router.put('/vendors/:id', async (req, res) => {
     );
     if (!result.rows.length) return sendError(res, 404, 'Vendor not found');
     res.json(result.rows[0]);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to update vendor');
   }
 });
@@ -77,7 +77,7 @@ router.delete('/vendors/:id', async (req, res) => {
     const result = await query(`DELETE FROM vendors WHERE id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
     if (!result.rowCount) return sendError(res, 404, 'Vendor not found');
     res.json({ message: 'Vendor deleted' });
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to delete vendor');
   }
 });
@@ -152,7 +152,7 @@ router.get('/purchase-orders', async (req, res) => {
       params
     );
     res.json(result.rows);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to fetch purchase orders');
   }
 });
@@ -168,7 +168,7 @@ router.get('/purchase-orders/:id', async (req, res) => {
 
     const itemsResult = await query(`SELECT * FROM po_items WHERE po_id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
     res.json({ ...poResult.rows[0], items: itemsResult.rows });
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to fetch purchase order');
   }
 });
@@ -183,7 +183,7 @@ router.put('/purchase-orders/:id', async (req, res) => {
     );
     if (!result.rows.length) return sendError(res, 404, 'Purchase order not found');
     res.json(result.rows[0]);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to update purchase order');
   }
 });

@@ -7,7 +7,8 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { JWT_SECRET_KEY as JWT_SECRET } from '../middleware/auth.js';
 
-const APP_URL = process.env.APP_URL || 'http://localhost:3000';
+// Derived from APP_URL directly rather than a shared const, because the
+// callback and the redirect origins fall back to different ports.
 const OAUTH_CALLBACK_URL = process.env.APP_URL ? process.env.APP_URL.replace(/\/+$/, '') : 'http://localhost:3001';
 
 const generateToken = (user) => {

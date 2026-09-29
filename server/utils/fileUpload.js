@@ -38,6 +38,6 @@ export const generateFileName = (originalName) => {
   return `${hash}${ext}`;
 };
 
-export const getFileExtension = (mimetype) => 'bin';
+export const getFileExtension = () => 'bin';
 
 export const ALLOWED_TYPES = [...ALLOWED_MIME_TYPES];

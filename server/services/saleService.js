@@ -132,14 +132,6 @@ async function createCashflowEntry(client, businessId, saleId, total, saleDate, 
   }
 }
 
-async function generateReceiptNumber(client, businessId) {
-  const counter = await client.query(
-    `SELECT COALESCE(MAX(CAST(SUBSTRING(receipt_number FROM 5) AS INTEGER)), 0) as max_num FROM receipts WHERE business_id = $1`,
-    [businessId]
-  );
-  return `RCP-${String(parseInt(counter.rows[0].max_num) + 1).padStart(5, '0')}`;
-}
-
 async function generateReceiptNumberStandalone(businessId) {
   const counter = await query(
     `SELECT COALESCE(MAX(CAST(SUBSTRING(receipt_number FROM 5) AS INTEGER)), 0) as max_num FROM receipts WHERE business_id = $1`,

@@ -14,7 +14,7 @@ export const getAll = async (req, res, next) => {
   try {
     const result = await query('SELECT * FROM customers WHERE business_id = $1 ORDER BY created_at DESC', [req.business_id]);
     res.json({ success: true, data: result.rows });
-  } catch (err) { next(new AppError('Server error', 500)); }
+  } catch { next(new AppError('Server error', 500)); }
 };
 
 export const getById = async (req, res, next) => {

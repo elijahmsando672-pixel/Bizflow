@@ -45,7 +45,7 @@ router.get('/', async (req, res) => {
       params
     );
     res.json(result.rows);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to fetch projects');
   }
 });
@@ -63,7 +63,7 @@ router.get('/:id', async (req, res) => {
     );
     if (!result.rows.length) return sendError(res, 404, 'Project not found');
     res.json(result.rows[0]);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to fetch project');
   }
 });
@@ -80,7 +80,7 @@ router.put('/:id', async (req, res) => {
     );
     if (!result.rows.length) return sendError(res, 404, 'Project not found');
     res.json(result.rows[0]);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to update project');
   }
 });
@@ -99,7 +99,7 @@ router.get('/:id/tasks', async (req, res) => {
       [req.params.id, req.business_id]
     );
     res.json(result.rows);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to fetch tasks');
   }
 });
@@ -113,7 +113,7 @@ router.post('/:id/tasks', async (req, res) => {
       [req.business_id, req.params.id, title, description, status || 'todo', priority, assignee_id, due_date, estimated_hours]
     );
     res.status(201).json(result.rows[0]);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to create task');
   }
 });
@@ -141,7 +141,7 @@ router.put('/tasks/:taskId', async (req, res) => {
     );
     if (!result.rows.length) return sendError(res, 404, 'Task not found');
     res.json(result.rows[0]);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to update task');
   }
 });
@@ -152,7 +152,7 @@ router.delete('/:id', async (req, res) => {
     const result = await query(`DELETE FROM projects WHERE id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
     if (!result.rowCount) return sendError(res, 404, 'Project not found');
     res.json({ message: 'Project deleted' });
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to delete project');
   }
 });

@@ -44,7 +44,7 @@ router.get('/', async (req, res) => {
       params
     );
     res.json(result.rows);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to fetch time entries');
   }
 });
@@ -90,7 +90,7 @@ router.get('/summary', async (req, res) => {
     );
 
     res.json({ summary: summary.rows[0], by_project: byProject.rows, by_user: byUser.rows });
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to fetch summary');
   }
 });
@@ -107,7 +107,7 @@ router.put('/:id', async (req, res) => {
     );
     if (!result.rows.length) return sendError(res, 404, 'Time entry not found');
     res.json(result.rows[0]);
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to update time entry');
   }
 });
@@ -117,7 +117,7 @@ router.delete('/:id', async (req, res) => {
     const result = await query(`DELETE FROM time_entries WHERE id = $1 AND business_id = $2`, [req.params.id, req.business_id]);
     if (!result.rowCount) return sendError(res, 404, 'Time entry not found');
     res.json({ message: 'Time entry deleted' });
-  } catch (error) {
+  } catch {
     sendError(res, 500, 'Failed to delete time entry');
   }
 });
