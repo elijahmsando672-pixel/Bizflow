@@ -39,6 +39,47 @@ services:
         value: https://bizflow.vercel.app
       - key: BUSINESS_NAME
         value: BizFlow
+      # FromDatabase only supplies connection details, so the schema bootstrap on
+      # first boot is what creates the tables. Keep it on for this service.
+      - key: DB_AUTO_INIT
+        value: 'true'
+      # Sync these from the dashboard; the OAuth providers only register when
+      # their credentials are all present, and the sign-in buttons fail silently
+      # when they are not.
+      - key: TURNSTILE_SECRET_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: APPLE_CLIENT_ID
+        sync: false
+      - key: APPLE_TEAM_ID
+        sync: false
+      - key: APPLE_KEY_ID
+        sync: false
+      - key: APPLE_PRIVATE_KEY
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MPESA_CONSUMER_KEY
+        sync: false
+      - key: MPESA_CONSUMER_SECRET
+        sync: false
+      - key: MPESA_SHORTCODE
+        sync: false
 
 databases:
   - name: bizflow-db

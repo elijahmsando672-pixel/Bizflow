@@ -100,13 +100,13 @@ export const getReports = async (req, res) => {
     const days = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : 30;
     const result = await query(
       `SELECT DATE(date) as day, entry_type, SUM(amount) as total FROM cashflow_entries
-       WHERE business_id = $1 AND payment_method = 'mpesa' AND date >= CURRENT_DATE - $2
+       WHERE business_id = $1 AND payment_method = 'mpesa' AND date >= CURRENT_DATE - $2::integer
        GROUP BY day, entry_type ORDER BY day`,
       [req.business_id, days]
     );
     const summary = await query(
       `SELECT entry_type, COUNT(*) as count, SUM(amount) as total FROM cashflow_entries
-       WHERE business_id = $1 AND payment_method = 'mpesa' AND date >= CURRENT_DATE - $2
+       WHERE business_id = $1 AND payment_method = 'mpesa' AND date >= CURRENT_DATE - $2::integer
        GROUP BY entry_type`,
       [req.business_id, days]
     );
