@@ -13,10 +13,6 @@ const HAS_ABSOLUTE_API = /^https?:\/\//i.test(API_URL) && API_ORIGIN.length > 0;
 
 const nextConfig: NextConfig = {
   output: process.env.VERCEL ? undefined : 'standalone',
-  // Pin the workspace root to this app. Without this, a stray lockfile in a parent
-  // directory makes Next infer a higher root, which nests the standalone output
-  // under a prefixed path and breaks the Docker `node server.js` entrypoint.
-  outputFileTracingRoot: __dirname,
   turbopack: {
     root: __dirname,
   },
