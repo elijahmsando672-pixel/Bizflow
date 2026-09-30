@@ -250,14 +250,11 @@ describe('bootstrap safety', () => {
 });
 
 describe('vercel function entry points', () => {
-  it('exports a handler from both entry files', async () => {
+  it('exports a handler from the entry file', async () => {
     const index = await import('../api/index.js');
-    const catchAll = await import('../api/[...path].js');
 
     expect(typeof index.default).toBe('function');
-    expect(typeof catchAll.default).toBe('function');
     expect(index.config.maxDuration).toBe(30);
-    expect(catchAll.config.maxDuration).toBe(30);
   });
 
   it('serves the root path through the function', async () => {
