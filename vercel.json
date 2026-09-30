@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
-  "buildCommand": "npm --prefix client run build",
+  "buildCommand": "NEXT_PUBLIC_API_URL=/api npm --prefix client run build",
   "installCommand": "npm install",
   "outputDirectory": "client/.next",
   "rewrites": [
