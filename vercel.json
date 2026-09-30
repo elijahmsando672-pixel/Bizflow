@@ -3,11 +3,6 @@
   "buildCommand": "npm --prefix client run build",
   "installCommand": "npm install",
   "outputDirectory": "client/.next",
-  "functions": {
-    "api/*.js": {
-      "maxDuration": 30
-    }
-  },
   "rewrites": [
     {
       "source": "/auth/:path*",
