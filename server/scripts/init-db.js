@@ -6,8 +6,10 @@
  *
  *   node scripts/init-db.js
  *
- * It uses DB_INIT_URL when set, otherwise DATABASE_URL. It refuses to run through
- * the Supabase transaction pooler because advisory locks and DDL need a real session.
+ * It uses DB_INIT_URL when set, otherwise the ambient connection settings
+ * (SUPABASE_POOLER_URL / SUPABASE_DB_URL, else the discrete DB_* vars). It refuses
+ * to run through the Supabase transaction pooler because advisory locks and DDL
+ * need a real session.
  */
 import dotenv from 'dotenv';
 import { initDatabase, shutdown } from '../config/db.js';

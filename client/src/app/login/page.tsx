@@ -20,8 +20,11 @@ type LoginMode = "password" | "otp";
 type ResetStep = "email" | "otp" | "password";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("elijah@bizflow.com");
-  const [password, setPassword] = useState("Test@1234");
+  // Never prefill credentials outside local development — a shipped build would
+  // hand the seeded demo account to anyone who opens the page.
+  const demoPrefill = process.env.NODE_ENV === "development";
+  const [email, setEmail] = useState(demoPrefill ? "elijah@bizflow.com" : "");
+  const [password, setPassword] = useState(demoPrefill ? "Test@1234" : "");
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");

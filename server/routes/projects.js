@@ -35,10 +35,10 @@ router.get('/', async (req, res) => {
               COUNT(pt.id) FILTER (WHERE pt.status = 'completed') as tasks_done,
               COALESCE(SUM(te.duration_minutes), 0) / 60.0 as total_hours
        FROM projects p
-       LEFT JOIN customers c ON p.customer_id = c.id
-       LEFT JOIN users u ON p.assigned_to = u.id
-       LEFT JOIN project_tasks pt ON p.id = pt.project_id
-       LEFT JOIN time_entries te ON p.id = te.project_id
+       LEFT JOIN customers c ON p.customer_id = c.id AND c.business_id = p.business_id
+       LEFT JOIN users u ON p.assigned_to = u.id AND u.business_id = p.business_id
+       LEFT JOIN project_tasks pt ON p.id = pt.project_id AND pt.business_id = p.business_id
+       LEFT JOIN time_entries te ON p.id = te.project_id AND te.business_id = p.business_id
        WHERE ${conditions.join(' AND ')}
        GROUP BY p.id, c.name, u.name
        ORDER BY p.created_at DESC`,
@@ -56,8 +56,8 @@ router.get('/:id', async (req, res) => {
       `SELECT p.*, c.name as customer_name,
               u.name as assigned_name
        FROM projects p
-       LEFT JOIN customers c ON p.customer_id = c.id
-       LEFT JOIN users u ON p.assigned_to = u.id
+       LEFT JOIN customers c ON p.customer_id = c.id AND c.business_id = p.business_id
+       LEFT JOIN users u ON p.assigned_to = u.id AND u.business_id = p.business_id
        WHERE p.id = $1 AND p.business_id = $2`,
       [req.params.id, req.business_id]
     );
@@ -91,7 +91,7 @@ router.get('/:id/tasks', async (req, res) => {
     const result = await query(
       `SELECT pt.*, u.name as assignee_name
        FROM project_tasks pt
-       LEFT JOIN users u ON pt.assignee_id = u.id
+       LEFT JOIN users u ON pt.assignee_id = u.id AND u.business_id = pt.business_id
        WHERE pt.project_id = $1 AND pt.business_id = $2
        ORDER BY 
          CASE pt.priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 END,

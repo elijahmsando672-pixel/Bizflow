@@ -3,6 +3,17 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Same guard as scripts/seedDemo.js: this file writes fixed tenant IDs, so a run
+// against production would overwrite a real business's data.
+if (process.env.NODE_ENV === 'production' && process.env.SEED_DEMO_ALLOW_PRODUCTION !== 'true') {
+  console.error(
+    'Refusing to run seed.js with NODE_ENV=production. ' +
+    'It writes fixed tenant IDs and would corrupt a live database. ' +
+    'Set SEED_DEMO_ALLOW_PRODUCTION=true only against a disposable database.'
+  );
+  process.exit(1);
+}
+
 const { Pool } = pg;
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',

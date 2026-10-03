@@ -1,5 +1,6 @@
 import { query, pool } from '../config/db.js';
 import { sendError } from '../utils/sendError.js';
+import { assertOwned } from '../utils/tenantGuard.js';
 
 export const getCategories = async (req, res) => {
   try {
@@ -17,12 +18,18 @@ export const getCategories = async (req, res) => {
 export const createCategory = async (req, res) => {
   try {
     const { name, description, parent_id } = req.body;
+
+    // The tree is read back without a join, but a parent pointing at another tenant's
+    // category still corrupts that category's subtree.
+    await assertOwned(query, 'categories', parent_id, req.business_id, 'Parent category');
+
     const result = await query(
       'INSERT INTO categories (business_id, name, description, parent_id) VALUES ($1, $2, $3, $4) RETURNING *',
       [req.business_id, name, description, parent_id]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    if (err.statusCode) return sendError(res, err.statusCode, err.message);
     console.error('Category create error:', err);
     sendError(res, 500, 'Server error');
   }
@@ -31,7 +38,7 @@ export const createCategory = async (req, res) => {
 export const getAll = async (req, res) => {
   try {
     const { low_stock, category } = req.query;
-    let sql = 'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.business_id = $1';
+    let sql = 'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id AND c.business_id = p.business_id WHERE p.business_id = $1';
     const params = [req.business_id];
 
     if (low_stock === 'true') sql += ' AND p.stock_qty <= p.reorder_level';
@@ -49,7 +56,7 @@ export const getAll = async (req, res) => {
 export const getById = async (req, res) => {
   try {
     const result = await query(
-      'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = $1 AND p.business_id = $2',
+      'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id AND c.business_id = p.business_id WHERE p.id = $1 AND p.business_id = $2',
       [req.params.id, req.business_id]
     );
     if (result.rows.length === 0) return sendError(res, 404, 'Product not found');
@@ -63,6 +70,11 @@ export const getById = async (req, res) => {
 export const create = async (req, res) => {
   try {
     const { name, sku, barcode, description, category_id, unit, cost_price, selling_price, stock_qty, reorder_level, image_url } = req.body;
+
+    // category_id is joined back on every product read, so an unvalidated value would
+    // surface another tenant's category name on this tenant's products.
+    await assertOwned(query, 'categories', category_id, req.business_id, 'Category');
+
     const result = await query(
       `INSERT INTO products (business_id, name, sku, barcode, description, category_id, unit, cost_price, selling_price, stock_qty, reorder_level, image_url)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
@@ -79,6 +91,7 @@ export const create = async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    if (err.statusCode) return sendError(res, err.statusCode, err.message);
     console.error('Product create error:', err);
     sendError(res, 500, 'Server error');
   }
@@ -101,6 +114,8 @@ export const update = async (req, res) => {
     const newQty = parseInt(stock_qty || 0);
     const qtyDiff = newQty - oldQty;
 
+    await assertOwned(client, 'categories', category_id, req.business_id, 'Category');
+
     const result = await client.query(
       `UPDATE products SET name=$1, sku=$2, barcode=$3, description=$4, category_id=$5, unit=$6, cost_price=$7, selling_price=$8,
        stock_qty=$9, reorder_level=$10, is_active=$11, image_url=$12, updated_at=NOW()
@@ -120,6 +135,7 @@ export const update = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     await client.query('ROLLBACK');
+    if (err.statusCode) return sendError(res, err.statusCode, err.message);
     console.error('Product update error:', err);
     sendError(res, 500, 'Server error');
   } finally {

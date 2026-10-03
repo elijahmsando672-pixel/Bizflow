@@ -61,7 +61,7 @@ const DEFAULT_JWT_SECRET = 'bizflow-secret-key-change-in-production';
 // calls process.exit() is killed mid-request, so the process must stay importable.
 export const configuration = (env = process.env) => {
   const required = ['JWT_SECRET'];
-  if (!env.DATABASE_URL && !env.SUPABASE_DB_URL && !env.SUPABASE_POOLER_URL) {
+  if (!env.SUPABASE_DB_URL && !env.SUPABASE_POOLER_URL && !env.DB_HOST) {
     required.push('DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD');
   }
   const missing = required.filter((key) => !env[key]);

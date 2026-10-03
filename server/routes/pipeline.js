@@ -2,6 +2,7 @@ import express from 'express';
 import { query } from '../config/db.js';
 import { sendDealCreatedEmail, sendDealWonEmail } from '../utils/email.js';
 import { sendError } from '../utils/sendError.js';
+import { assertOwned } from '../utils/tenantGuard.js';
 
 const router = express.Router();
 
@@ -83,6 +84,14 @@ router.delete('/stages/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { customer_id, lead_id, name, stage_id, value, priority, expected_close_date, assigned_to, notes } = req.body;
+
+    // stage_id and customer_id are joined back on every deal read and drive the
+    // pipeline summary aggregates, so they cannot be stored unchecked.
+    await assertOwned(query, 'customers', customer_id, req.business_id, 'Customer');
+    await assertOwned(query, 'leads', lead_id, req.business_id, 'Lead');
+    await assertOwned(query, 'deal_stages', stage_id, req.business_id, 'Stage');
+    await assertOwned(query, 'users', assigned_to, req.business_id, 'Assignee');
+
     const result = await query(
       `INSERT INTO deals (business_id, customer_id, lead_id, name, stage_id, value, priority, expected_close_date, assigned_to, notes, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
@@ -99,6 +108,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(deal);
   } catch (error) {
+    if (error.statusCode) return sendError(res, error.statusCode, error.message);
     console.error('Create deal error:', error);
     sendError(res, 500, 'Failed to create deal');
   }
@@ -118,9 +128,9 @@ router.get('/', async (req, res) => {
               c.name as customer_name,
               u.name as assigned_name
        FROM deals d
-       LEFT JOIN deal_stages ds ON d.stage_id = ds.id
-       LEFT JOIN customers c ON d.customer_id = c.id
-       LEFT JOIN users u ON d.assigned_to = u.id
+       LEFT JOIN deal_stages ds ON d.stage_id = ds.id AND ds.business_id = d.business_id
+       LEFT JOIN customers c ON d.customer_id = c.id AND c.business_id = d.business_id
+       LEFT JOIN users u ON d.assigned_to = u.id AND u.business_id = d.business_id
        WHERE ${conditions.join(' AND ')}
        ORDER BY d.expected_close_date ASC, d.created_at DESC`,
       params
@@ -141,7 +151,7 @@ router.get('/pipeline-summary', async (req, res) => {
               COALESCE(SUM(d.value), 0) as total_value,
               COALESCE(SUM(d.value * ds.win_probability / 100), 0) as weighted_value
        FROM deal_stages ds
-       LEFT JOIN deals d ON ds.id = d.stage_id AND d.outcome IS NULL
+       LEFT JOIN deals d ON ds.id = d.stage_id AND d.business_id = ds.business_id AND d.outcome IS NULL
        WHERE ds.business_id = $1
        GROUP BY ds.id
        ORDER BY ds.order_index`,
@@ -172,9 +182,9 @@ router.get('/:id', async (req, res) => {
               c.name as customer_name,
               u.name as assigned_name
        FROM deals d
-       LEFT JOIN deal_stages ds ON d.stage_id = ds.id
-       LEFT JOIN customers c ON d.customer_id = c.id
-       LEFT JOIN users u ON d.assigned_to = u.id
+       LEFT JOIN deal_stages ds ON d.stage_id = ds.id AND ds.business_id = d.business_id
+       LEFT JOIN customers c ON d.customer_id = c.id AND c.business_id = d.business_id
+       LEFT JOIN users u ON d.assigned_to = u.id AND u.business_id = d.business_id
        WHERE d.id = $1 AND d.business_id = $2`,
       [req.params.id, req.business_id]
     );

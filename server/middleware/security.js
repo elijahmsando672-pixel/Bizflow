@@ -1,8 +1,27 @@
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { sendError } from '../utils/sendError.js';
+import { UpstashRateLimitStore, upstashRateLimitConfig, warnIfRateLimitsArePerInstance } from '../utils/upstashRateLimitStore.js';
 
 const isProduction = process.env.NODE_ENV === 'production';
+
+// Auth is the only limiter worth a shared store: these counters decide whether a
+// password can be guessed, and on a serverless host per-instance memory lets an
+// attacker spread attempts across instances to multiply the budget.
+const sharedStore = upstashRateLimitConfig();
+
+if (sharedStore) {
+  console.log('[ratelimit] Using shared Upstash Redis store for auth limits');
+}
+warnIfRateLimitsArePerInstance();
+
+// express-rate-limit throws ERR_ERL_STORE_REUSE if one store instance is shared by
+// more than one limiter, so each gets its own with a distinct key prefix.
+const sharedStoreFor = (name) => (sharedStore ? new UpstashRateLimitStore({ ...sharedStore, prefix: name }) : undefined);
+
+const authStore = sharedStoreFor('auth');
+const refreshStore = sharedStoreFor('refresh');
+const passwordResetStore = sharedStoreFor('password-reset');
 
 export const securityHeaders = helmet({
   contentSecurityPolicy: {
@@ -51,6 +70,7 @@ export const authRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true, // only count failed attempts
+  store: authStore,
 });
 
 export const refreshTokenRateLimiter = rateLimit({
@@ -59,6 +79,9 @@ export const refreshTokenRateLimiter = rateLimit({
   message: { error: 'Too many refresh attempts, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  // Refresh tokens are bearer credentials, so brute forcing them deserves the same
+  // shared counter as the password endpoints.
+  store: refreshStore,
 });
 
 export const passwordResetRateLimiter = rateLimit({
@@ -67,6 +90,9 @@ export const passwordResetRateLimiter = rateLimit({
   message: { error: 'Too many password reset requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  // This is the email-sending limiter: leaving it per-instance turns it into a free
+  // way to mail arbitrary addresses.
+  store: passwordResetStore,
 });
 
 // Per-user rate limiter (for authenticated routes)

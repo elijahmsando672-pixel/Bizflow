@@ -1,6 +1,7 @@
 import express from 'express';
 import { query, pool } from '../config/db.js';
 import { sendError } from '../utils/sendError.js';
+import { assertOwned, assertAllOwned, collectIds } from '../utils/tenantGuard.js';
 
 const router = express.Router();
 
@@ -33,7 +34,7 @@ router.get('/vendors', async (req, res) => {
     const result = await query(
       `SELECT v.*, COUNT(po.id) as total_orders, COALESCE(SUM(po.total), 0) as total_spent
        FROM vendors v
-       LEFT JOIN purchase_orders po ON v.id = po.vendor_id
+       LEFT JOIN purchase_orders po ON v.id = po.vendor_id AND po.business_id = v.business_id
        WHERE v.business_id = $1
        GROUP BY v.id
        ORDER BY v.name`,
@@ -102,6 +103,11 @@ router.post('/purchase-orders', async (req, res) => {
     await client.query('SELECT id FROM businesses WHERE id = $1 FOR UPDATE', [req.business_id]);
     const poNumber = await getNextPONumber(req.business_id, client.query.bind(client));
 
+    // vendor_id and each item's product_id are joined back on every PO read and roll up
+    // into the vendor totals, so they must be this tenant's rows.
+    await assertOwned(client, 'vendors', vendor_id, req.business_id, 'Vendor');
+    await assertAllOwned(client, 'products', collectIds(items, 'product_id'), req.business_id, 'Product');
+
     const poResult = await client.query(
       `INSERT INTO purchase_orders (business_id, po_number, vendor_id, expected_delivery, subtotal, tax_amount, total, notes, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
@@ -127,6 +133,7 @@ router.post('/purchase-orders', async (req, res) => {
     res.status(201).json({ ...poResult.rows[0], items: poItems.rows });
   } catch (error) {
     if (client) await client.query('ROLLBACK').catch(() => {});
+    if (error.statusCode) return sendError(res, error.statusCode, error.message);
     console.error('Create PO error:', error);
     sendError(res, 500, 'Failed to create purchase order');
   } finally {
@@ -145,8 +152,8 @@ router.get('/purchase-orders', async (req, res) => {
     const result = await query(
       `SELECT po.*, v.name as vendor_name, u.name as created_by_name
        FROM purchase_orders po
-       LEFT JOIN vendors v ON po.vendor_id = v.id
-       LEFT JOIN users u ON po.created_by = u.id
+       LEFT JOIN vendors v ON po.vendor_id = v.id AND v.business_id = po.business_id
+       LEFT JOIN users u ON po.created_by = u.id AND u.business_id = po.business_id
        WHERE ${conditions.join(' AND ')}
        ORDER BY po.created_at DESC`,
       params
@@ -160,7 +167,7 @@ router.get('/purchase-orders', async (req, res) => {
 router.get('/purchase-orders/:id', async (req, res) => {
   try {
     const poResult = await query(
-      `SELECT po.*, v.name as vendor_name FROM purchase_orders po LEFT JOIN vendors v ON po.vendor_id = v.id
+      `SELECT po.*, v.name as vendor_name FROM purchase_orders po LEFT JOIN vendors v ON po.vendor_id = v.id AND v.business_id = po.business_id
        WHERE po.id = $1 AND po.business_id = $2`,
       [req.params.id, req.business_id]
     );

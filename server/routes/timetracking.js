@@ -1,19 +1,30 @@
 import express from 'express';
 import { query } from '../config/db.js';
 import { sendError } from '../utils/sendError.js';
+import { assertOwned } from '../utils/tenantGuard.js';
 
 const router = express.Router();
 
 router.post('/', async (req, res) => {
   try {
     const { user_id, project_id, task_id, customer_id, description, date, start_time, end_time, duration_minutes, is_billable } = req.body;
+    const resolvedUserId = user_id || req.user.id;
+
+    // All four ids are joined back on the list endpoint, so an unvalidated value here
+    // reads another tenant's user, project, task and customer names straight back out.
+    await assertOwned(query, 'users', resolvedUserId, req.business_id, 'User');
+    await assertOwned(query, 'projects', project_id, req.business_id, 'Project');
+    await assertOwned(query, 'project_tasks', task_id, req.business_id, 'Task');
+    await assertOwned(query, 'customers', customer_id, req.business_id, 'Customer');
+
     const result = await query(
       `INSERT INTO time_entries (business_id, user_id, project_id, task_id, customer_id, description, date, start_time, end_time, duration_minutes, is_billable)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-      [req.business_id, user_id || req.user.id, project_id, task_id, customer_id, description, date || new Date().toISOString().split('T')[0], start_time, end_time, duration_minutes, is_billable !== false]
+      [req.business_id, resolvedUserId, project_id, task_id, customer_id, description, date || new Date().toISOString().split('T')[0], start_time, end_time, duration_minutes, is_billable !== false]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
+    if (error.statusCode) return sendError(res, error.statusCode, error.message);
     console.error('Create time entry error:', error);
     sendError(res, 500, 'Failed to create time entry');
   }
@@ -35,10 +46,10 @@ router.get('/', async (req, res) => {
     const result = await query(
       `SELECT t.*, u.name as user_name, p.name as project_name, pt.title as task_title, c.name as customer_name
        FROM time_entries t
-       LEFT JOIN users u ON t.user_id = u.id
-       LEFT JOIN projects p ON t.project_id = p.id
-       LEFT JOIN project_tasks pt ON t.task_id = pt.id
-       LEFT JOIN customers c ON t.customer_id = c.id
+       LEFT JOIN users u ON t.user_id = u.id AND u.business_id = t.business_id
+       LEFT JOIN projects p ON t.project_id = p.id AND p.business_id = t.business_id
+       LEFT JOIN project_tasks pt ON t.task_id = pt.id AND pt.business_id = t.business_id
+       LEFT JOIN customers c ON t.customer_id = c.id AND c.business_id = t.business_id
        WHERE ${conditions.join(' AND ')}
        ORDER BY t.date DESC, t.created_at DESC`,
       params
@@ -72,7 +83,7 @@ router.get('/summary', async (req, res) => {
     const byProject = await query(
       `SELECT p.name as project_name, COALESCE(SUM(t.duration_minutes), 0) / 60.0 as hours, COUNT(*) as entries
        FROM time_entries t
-       LEFT JOIN projects p ON t.project_id = p.id
+       LEFT JOIN projects p ON t.project_id = p.id AND p.business_id = t.business_id
        WHERE ${conditions.join(' AND ')}
        GROUP BY p.name
        ORDER BY hours DESC`,
@@ -82,7 +93,7 @@ router.get('/summary', async (req, res) => {
     const byUser = await query(
       `SELECT u.name, COALESCE(SUM(t.duration_minutes), 0) / 60.0 as hours, COUNT(*) as entries
        FROM time_entries t
-       LEFT JOIN users u ON t.user_id = u.id
+       LEFT JOIN users u ON t.user_id = u.id AND u.business_id = t.business_id
        WHERE ${conditions.join(' AND ')}
        GROUP BY u.name
        ORDER BY hours DESC`,

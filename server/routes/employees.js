@@ -2,6 +2,7 @@ import express from 'express';
 import { query, pool } from '../config/db.js';
 import Joi from 'joi';
 import { sendError } from '../utils/sendError.js';
+import { assertOwned } from '../utils/tenantGuard.js';
 
 const router = express.Router();
 
@@ -49,7 +50,7 @@ router.get('/attendance', async (req, res) => {
     const { date, employee_id } = req.query;
     let sql = `SELECT a.*, e.first_name, e.last_name, e.position
                FROM attendance a
-               LEFT JOIN employees e ON a.employee_id = e.id
+               LEFT JOIN employees e ON a.employee_id = e.id AND e.business_id = a.business_id
                WHERE a.business_id = $1`;
     const params = [req.business_id];
 
@@ -70,7 +71,7 @@ router.get('/payroll', async (req, res) => {
     const { status, employee_id, period_start, period_end } = req.query;
     let sql = `SELECT p.*, e.first_name, e.last_name, e.position, e.department
                FROM payroll p
-               LEFT JOIN employees e ON p.employee_id = e.id
+               LEFT JOIN employees e ON p.employee_id = e.id AND e.business_id = p.business_id
                WHERE p.business_id = $1`;
     const params = [req.business_id];
 
@@ -279,6 +280,11 @@ router.get('/:id/attendance', async (req, res) => {
 router.post('/:id/clock-in', async (req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
+
+    // The attendance list joins employees without a tenant predicate, so an
+    // unvalidated employee id would return another business's employee name.
+    await assertOwned(query, 'employees', req.params.id, req.business_id, 'Employee');
+
     const existing = await query(
       'SELECT id FROM attendance WHERE employee_id = $1 AND date = $2 AND business_id = $3',
       [req.params.id, today, req.business_id]
@@ -295,6 +301,7 @@ router.post('/:id/clock-in', async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    if (err.statusCode) return sendError(res, err.statusCode, err.message);
     console.error('Clock in error:', err);
     sendError(res, 500, 'Server error');
   }

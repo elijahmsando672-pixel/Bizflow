@@ -1,12 +1,13 @@
 import { query, pool } from '../config/db.js';
 import { sendError } from '../utils/sendError.js';
+import { assertOwned } from '../utils/tenantGuard.js';
 
 export const getAll = async (req, res) => {
   try {
     const { category_id, start_date, end_date } = req.query;
     let sql = `SELECT e.*, ec.name as category_name
                FROM expenses e
-               LEFT JOIN expense_categories ec ON e.category_id = ec.id
+               LEFT JOIN expense_categories ec ON e.category_id = ec.id AND ec.business_id = e.business_id
                WHERE e.business_id = $1`;
     const params = [req.business_id];
 
@@ -49,6 +50,9 @@ export const create = async (req, res) => {
     client = await pool.connect();
     await client.query('BEGIN');
 
+    // category_id is joined back on the expense list, so it must be this tenant's.
+    await assertOwned(client, 'expense_categories', category_id, req.business_id, 'Category');
+
     const result = await client.query(
       `INSERT INTO expenses (business_id, category_id, description, amount, date, vendor, reference, is_receipt_attached, notes, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
@@ -68,6 +72,7 @@ export const create = async (req, res) => {
   } catch (error) {
     if (client) await client.query('ROLLBACK').catch(() => {});
     console.error('Expense create error:', error);
+    if (error.statusCode) return sendError(res, error.statusCode, error.message);
     sendError(res, 500, 'Server error');
   } finally {
     client?.release();
@@ -87,6 +92,8 @@ export const update = async (req, res) => {
       await client.query('ROLLBACK');
       return sendError(res, 404, 'Expense not found');
     }
+
+    await assertOwned(client, 'expense_categories', category_id, req.business_id, 'Category');
 
     const result = await client.query(
       `UPDATE expenses SET category_id = COALESCE($1, category_id), description = COALESCE($2, description),
@@ -117,6 +124,7 @@ export const update = async (req, res) => {
   } catch (error) {
     if (client) await client.query('ROLLBACK').catch(() => {});
     console.error('Expense update error:', error);
+    if (error.statusCode) return sendError(res, error.statusCode, error.message);
     sendError(res, 500, 'Server error');
   } finally {
     client?.release();

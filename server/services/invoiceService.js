@@ -1,5 +1,6 @@
 import { query, pool } from '../config/db.js';
 import { sendInvoiceEmail } from '../utils/email.js';
+import { assertOwned, assertAllOwned, collectIds } from '../utils/tenantGuard.js';
 
 const TAX_RATE = 0.16;
 
@@ -60,6 +61,11 @@ export async function createInvoice(businessId, userId, data) {
     const invoiceNumber = await generateInvoiceNumber(client, businessId);
     const { subtotal, taxAmount, total } = calculateTotals(items, discount_amount);
 
+    // A request-supplied customer_id is stored as-is and joined back on every read, so
+    // it has to be proven to belong to this tenant before it is written.
+    await assertOwned(client, 'customers', customer_id, businessId, 'Customer');
+    await assertAllOwned(client, 'products', collectIds(items, 'product_id'), businessId, 'Product');
+
     const invoiceResult = await client.query(
       `INSERT INTO invoices (business_id, customer_id, invoice_number, invoice_date, due_date, subtotal, tax_amount, discount_amount, total, notes, created_by, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'draft') RETURNING *`,
@@ -100,8 +106,13 @@ export async function updateInvoice(businessId, invoiceId, data) {
       throw Object.assign(new Error('Invoice not found'), { statusCode: 404 });
     }
 
+    // COALESCE below re-points the invoice's customer_id, so an unvalidated value here
+    // would move the invoice onto another tenant's customer record.
+    await assertOwned(client, 'customers', customer_id, businessId, 'Customer');
+
     let subtotal = existingInvoice.rows[0].subtotal;
     if (items && items.length > 0) {
+      await assertAllOwned(client, 'products', collectIds(items, 'product_id'), businessId, 'Product');
       await client.query('DELETE FROM invoice_items WHERE invoice_id = $1 AND business_id = $2', [invoiceId, businessId]);
       await insertInvoiceItems(client, businessId, invoiceId, items);
       subtotal = calculateTotals(items, discount_amount || existingInvoice.rows[0].discount_amount).subtotal;
@@ -146,7 +157,7 @@ export async function getInvoiceById(businessId, invoiceId) {
   const invoiceResult = await query(
     `SELECT i.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone
      FROM invoices i 
-     LEFT JOIN customers c ON i.customer_id = c.id 
+LEFT JOIN customers c ON i.customer_id = c.id AND c.business_id = i.business_id
      WHERE i.id = $1 AND i.business_id = $2`,
     [invoiceId, businessId]
   );
@@ -160,7 +171,7 @@ export async function getInvoiceById(businessId, invoiceId) {
 }
 
 export async function getInvoices(businessId, status) {
-  let sql = `SELECT i.*, c.name as customer_name FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id WHERE i.business_id = $1`;
+  let sql = `SELECT i.*, c.name as customer_name FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id AND c.business_id = i.business_id WHERE i.business_id = $1`;
   const params = [businessId];
 
   if (status) {

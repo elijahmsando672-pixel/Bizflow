@@ -16,48 +16,107 @@ const SUPABASE_HOST = /(^|\.)(pooler\.)?supabase\.(co|com)$/i;
 export const isServerless = (env = process.env) =>
   SERVERLESS_MARKERS.some((key) => Boolean(env[key]));
 
-const connectionString = (env) => env.DATABASE_URL || env.SUPABASE_POOLER_URL || env.SUPABASE_DB_URL || '';
+// Precedence: the Supabase-specific names win, then the discrete DB_* vars, and
+// DATABASE_URL is kept last purely as a compatibility fallback. Deployments that
+// predate the SUPABASE_* names still have DATABASE_URL set in their environment, and
+// silently ignoring it would point the pool at localhost instead of failing loudly.
+const connectionString = (env) => env.SUPABASE_POOLER_URL || env.SUPABASE_DB_URL || env.DATABASE_URL || '';
 
-export const isSupabase = (env = process.env) => {
-  const value = connectionString(env);
-  if (!value) return false;
+const hostFrom = (url) => {
+  if (!url) return '';
   try {
-    return SUPABASE_HOST.test(new URL(value).hostname);
+    return new URL(url).hostname;
   } catch {
-    return false;
+    return '';
   }
 };
+
+/**
+ * Hostname of the configured target. This must mirror the precedence used by
+ * `applyConnectionTarget`, which connects via the connection string whenever one is
+ * present. Reading DB_HOST first instead would let a stale `DB_HOST=localhost`
+ * alongside a valid SUPABASE_POOLER_URL hide the Supabase hostname, and every
+ * TLS decision below is keyed off this value.
+ */
+const targetHost = (env) => hostFrom(connectionString(env)) || env.DB_HOST || '';
+
+export const isSupabase = (env = process.env) => SUPABASE_HOST.test(targetHost(env));
 
 // Supavisor's transaction mode (port 6543) hands each transaction to a different
 // backend, so session state such as advisory locks or temp tables is unsafe there.
 export const isTransactionPooler = (env = process.env) => {
   const value = connectionString(env);
-  if (!value) return false;
-  try {
-    const url = new URL(value);
-    return url.port === '6543' || url.searchParams.get('pgbouncer') === 'true';
-  } catch {
-    return false;
+  if (value) {
+    try {
+      const url = new URL(value);
+      return url.port === '6543' || url.searchParams.get('pgbouncer') === 'true';
+    } catch {
+      return false;
+    }
   }
+  return env.DB_PORT === '6543';
 };
 
-const buildSsl = (env) => {
-  const supabase = isSupabase(env);
+// Supabase serves Postgres with its own CA (prod-ca-2021.crt), not one chained to a
+// public root, so verifying it needs that CA pinned. Verification is therefore the
+// default everywhere: a Supabase target with no CA configured cannot be verified, and
+// in production that is a hard failure rather than a silent downgrade.
+const readCa = (env) => {
+  if (env.DB_SSL_CA_PEM) return env.DB_SSL_CA_PEM;
+  if (env.DB_SSL_CA) return fs.readFileSync(env.DB_SSL_CA);
+  return undefined;
+};
+
+// The pool is built once per process, but initDatabase may call buildSsl again, so this
+// keeps the advisory to a single line per process instead of one per attempt.
+let warnedUnverifiedTls = false;
+
+const buildSsl = (env, url = '', label = 'database') => {
+  const supabase = url ? SUPABASE_HOST.test(hostFrom(url)) : isSupabase(env);
   if (env.DB_SSL !== 'true' && !supabase) return undefined;
-  // Supabase's certificates are not chained to a public root, so verification is
-  // off unless it is explicitly requested.
-  const rejectUnauthorized = env.DB_SSL_REJECT_UNAUTHORIZED
-    ? env.DB_SSL_REJECT_UNAUTHORIZED === 'true'
-    : !supabase;
+
+  const ca = readCa(env);
+  const explicit = env.DB_SSL_REJECT_UNAUTHORIZED;
+  const requested = explicit ? explicit === 'true' : true;
+  // A Supabase host can only be verified when its CA is pinned; without it the request
+  // degrades to unverified TLS, which the check below already warned about or rejected.
+  const verifiable = !supabase || Boolean(ca);
+
+  if (supabase && requested && !ca) {
+    const message =
+      `${label} connects to Supabase, whose certificate is not chained to a public root, ` +
+      'so TLS cannot be verified without its CA. Download prod-ca-2021.crt from Supabase ' +
+      'Dashboard > Database > SSL Configuration and set it as either:\n' +
+      '  DB_SSL_CA=/absolute/path/to/prod-ca-2021.crt   (a file on disk)\n' +
+      '  DB_SSL_CA_PEM=-----BEGIN CERTIFICATE-----... (the PEM text, for serverless env vars)';
+
+    if (env.NODE_ENV === 'production') {
+      throw new Error(`${message}\n\nRefusing to start with an unverified database connection.`);
+    }
+
+    if (!warnedUnverifiedTls) {
+      console.warn(
+        `[db] WARNING: ${message}\n[db] Falling back to unverified TLS. ` +
+        'Set DB_SSL_REJECT_UNAUTHORIZED=false to silence this.'
+      );
+      warnedUnverifiedTls = true;
+    }
+  }
+
   return {
-    rejectUnauthorized,
-    ...(env.DB_SSL_CA ? { ca: fs.readFileSync(env.DB_SSL_CA) } : {}),
+    rejectUnauthorized: requested && verifiable,
+    ...(ca ? { ca } : {}),
   };
 };
 
-const applyConnectionTarget = (config, env) => {
-  if (env.DATABASE_URL) {
-    config.connectionString = env.DATABASE_URL;
+const applyConnectionTarget = (config, env, overrideUrl = '') => {
+  if (overrideUrl) {
+    config.connectionString = overrideUrl;
+    return config;
+  }
+  const value = connectionString(env);
+  if (value) {
+    config.connectionString = value;
     return config;
   }
   return Object.assign(config, {
@@ -84,7 +143,7 @@ export const buildPoolConfig = (env = process.env) => {
     connectionTimeoutMillis: numberFrom(env.DB_CONNECT_TIMEOUT_MS, 10000),
     application_name: env.DB_APPLICATION_NAME || `bizflow-api${serverless ? '-serverless' : ''}`,
     allowExitOnIdle: env.NODE_ENV === 'test' || env.DB_ALLOW_EXIT_ON_IDLE === 'true',
-    ssl: buildSsl(env),
+    ssl: buildSsl(env, '', 'The connection pool'),
   };
 
   if (isTransactionPooler(env)) {
@@ -98,16 +157,16 @@ export const buildPoolConfig = (env = process.env) => {
 export const buildInitConfig = (env = process.env) => {
   if (isTransactionPooler(env) && !env.DB_INIT_URL) {
     throw new Error(
-      'DB_INIT_URL is required when DATABASE_URL points at the Supabase transaction pooler (port 6543). ' +
+      'DB_INIT_URL is required when the pool points at the Supabase transaction pooler (port 6543). ' +
       'Use the direct connection or the session pooler so advisory locks and DDL work.',
     );
   }
 
   const config = {
     application_name: 'bizflow-db-init',
-    ssl: buildSsl(env),
+    ssl: buildSsl(env, env.DB_INIT_URL || '', 'Schema initialization'),
   };
-  return applyConnectionTarget(config, env.DB_INIT_URL ? { ...env, DATABASE_URL: env.DB_INIT_URL } : env);
+  return applyConnectionTarget(config, env, env.DB_INIT_URL || '');
 };
 
 export const pool = new Pool(buildPoolConfig());

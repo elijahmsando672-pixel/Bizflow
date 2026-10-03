@@ -2,6 +2,7 @@ import express from 'express';
 import Joi from 'joi';
 import { query, pool } from '../config/db.js';
 import { sendError } from '../utils/sendError.js';
+import { assertOwned } from '../utils/tenantGuard.js';
 
 const router = express.Router();
 
@@ -40,8 +41,8 @@ router.get('/', async (req, res) => {
   try {
     const { status } = req.query;
     let sql = `SELECT d.*,
-      COALESCE((SELECT SUM(amount) FROM debtor_invoices WHERE debtor_id = d.id), 0) as total_owed,
-      COALESCE((SELECT SUM(amount) FROM debtor_payments WHERE debtor_id = d.id), 0) as total_paid
+      COALESCE((SELECT SUM(amount) FROM debtor_invoices WHERE debtor_id = d.id AND business_id = d.business_id), 0) as total_owed,
+      COALESCE((SELECT SUM(amount) FROM debtor_payments WHERE debtor_id = d.id AND business_id = d.business_id), 0) as total_paid
       FROM debtors d WHERE d.business_id = $1`;
 
     const params = [req.business_id];
@@ -124,6 +125,10 @@ router.post('/:id/invoices', validate(debtorInvoiceSchema), async (req, res) => 
 
     const { reference, amount, due_date, date, notes } = req.body;
 
+    // debtor_id from the path feeds the victim's total_owed/total_paid aggregates, so it
+    // has to be this tenant's debtor before any amount is written against it.
+    await assertOwned(client, 'debtors', req.params.id, req.business_id, 'Debtor');
+
     const invoiceResult = await client.query(
       `INSERT INTO debtor_invoices (business_id, debtor_id, reference, amount, due_date, date, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
@@ -141,6 +146,7 @@ router.post('/:id/invoices', validate(debtorInvoiceSchema), async (req, res) => 
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Create debtor invoice error:', err);
+    if (err.statusCode) return sendError(res, err.statusCode, err.message);
     sendError(res, 500, 'Server error');
   } finally {
     client.release();
@@ -153,6 +159,8 @@ router.post('/:id/payments', validate(debtorPaymentSchema), async (req, res) => 
     await client.query('BEGIN');
 
     const { amount, date, reference, notes } = req.body;
+
+    await assertOwned(client, 'debtors', req.params.id, req.business_id, 'Debtor');
 
     const paymentResult = await client.query(
       `INSERT INTO debtor_payments (business_id, debtor_id, amount, date, reference, notes, created_by)
@@ -171,6 +179,7 @@ router.post('/:id/payments', validate(debtorPaymentSchema), async (req, res) => 
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Record debtor payment error:', err);
+    if (err.statusCode) return sendError(res, err.statusCode, err.message);
     sendError(res, 500, 'Server error');
   } finally {
     client.release();

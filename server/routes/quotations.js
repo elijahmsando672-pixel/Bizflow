@@ -2,6 +2,7 @@ import express from 'express';
 import { query } from '../config/db.js';
 import sanitizeHtml from 'sanitize-html';
 import { sendError } from '../utils/sendError.js';
+import { assertOwned } from '../utils/tenantGuard.js';
 
 const router = express.Router();
 
@@ -53,6 +54,8 @@ router.post('/', async (req, res) => {
 
     const quotationNumber = await generateQuotationNumber(req.business_id);
 
+    await assertOwned(query, 'customers', customer_id, req.business_id, 'Customer');
+
     const result = await query(
       `INSERT INTO quotations (business_id, customer_id, customer_name, quotation_number, status, subtotal, tax_amount, discount_amount, total, valid_until, notes, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
@@ -60,6 +63,7 @@ router.post('/', async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    if (err.statusCode) return sendError(res, err.statusCode, err.message);
     console.error('Create quotation error:', err);
     sendError(res, 500, 'Server error');
   }
@@ -68,6 +72,9 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { customer_id, customer_name, status, subtotal, tax_amount, discount_amount, total, valid_until, notes } = req.body;
+
+    await assertOwned(query, 'customers', customer_id, req.business_id, 'Customer');
+
     const result = await query(
       `UPDATE quotations SET
         customer_id = COALESCE($1, customer_id),
@@ -86,6 +93,7 @@ router.put('/:id', async (req, res) => {
     if (result.rows.length === 0) return sendError(res, 404, 'Quotation not found');
     res.json(result.rows[0]);
   } catch (err) {
+    if (err.statusCode) return sendError(res, err.statusCode, err.message);
     console.error('Update quotation error:', err);
     sendError(res, 500, 'Server error');
   }

@@ -1,5 +1,7 @@
 import sanitizeHtml from 'sanitize-html';
 import { query, pool } from '../config/db.js';
+import { AppError } from '../utils/AppError.js';
+import { assertOwned, assertAllOwned, collectIds } from '../utils/tenantGuard.js';
 
 function sanitize(str) {
   return sanitizeHtml(String(str || ''), { allowedTags: [], allowedAttributes: {} });
@@ -91,13 +93,24 @@ function generateReceiptHTML(business, sale, items) {
 async function deductInventory(client, businessId, items) {
   for (const item of items) {
     if (item.product_id) {
-      const productResult = await client.query('SELECT stock_qty FROM products WHERE id = $1 FOR UPDATE', [item.product_id]);
-      const currentStock = productResult.rows[0]?.stock_qty || 0;
+      // business_id in the predicate as well as the id: the row lock and the stock
+      // update must both be confined to this tenant.
+      const productResult = await client.query(
+        'SELECT stock_qty FROM products WHERE id = $1 AND business_id = $2 FOR UPDATE',
+        [item.product_id, businessId]
+      );
+      const currentStock = productResult.rows[0]?.stock_qty;
+      if (currentStock === undefined) {
+        throw new AppError(`Product not found`, 404);
+      }
       if (currentStock < item.qty) {
         throw new Error(`Insufficient stock for ${item.product_name || 'item'}. Available: ${currentStock}, requested: ${item.qty}`);
       }
       const newQty = currentStock - item.qty;
-      await client.query('UPDATE products SET stock_qty = $1, updated_at = NOW() WHERE id = $2', [newQty, item.product_id]);
+      await client.query(
+        'UPDATE products SET stock_qty = $1, updated_at = NOW() WHERE id = $2 AND business_id = $3',
+        [newQty, item.product_id, businessId]
+      );
       await client.query(
         `INSERT INTO stock_movements (business_id, product_id, qty_before, qty_change, qty_after, reason, reference_type, reference_id)
          VALUES ($1, $2, $3, $4, $5, 'sale', 'sale', $6)`,
@@ -115,8 +128,8 @@ async function restoreInventory(client, businessId, saleId) {
   for (const item of items.rows) {
     if (item.product_id) {
       await client.query(
-        'UPDATE products SET stock_qty = stock_qty + $1, updated_at = NOW() WHERE id = $2',
-        [item.qty, item.product_id]
+        'UPDATE products SET stock_qty = stock_qty + $1, updated_at = NOW() WHERE id = $2 AND business_id = $3',
+        [item.qty, item.product_id, businessId]
       );
     }
   }
@@ -160,6 +173,13 @@ export async function createSale(businessId, userId, data) {
     }
 
     const saleNumber = await generateSaleNumber(client, businessId);
+
+    // Every request-supplied foreign key has to belong to this tenant before it is
+    // written or used to mutate another table. Without this a caller can point a sale
+    // at another business's customer, product or user and both read their data back
+    // through the joins below.
+    await assertOwned(client, 'customers', customer_id, businessId, 'Customer');
+    await assertAllOwned(client, 'products', collectIds(items, 'product_id'), businessId, 'Product');
 
     let subtotal = 0;
     for (const item of items) {
@@ -236,14 +256,24 @@ export async function updateSale(businessId, saleId, data) {
       );
       for (const item of items.rows) {
         if (item.product_id) {
-          const productResult = await client.query('SELECT stock_qty FROM products WHERE id = $1 FOR UPDATE', [item.product_id]);
-          const currentStock = productResult.rows[0]?.stock_qty || 0;
+          const productResult = await client.query(
+            'SELECT stock_qty FROM products WHERE id = $1 AND business_id = $2 FOR UPDATE',
+            [item.product_id, businessId]
+          );
+          const currentStock = productResult.rows[0]?.stock_qty;
+          if (currentStock === undefined) {
+            await client.query('ROLLBACK');
+            throw Object.assign(new Error(`Product not found`), { statusCode: 404 });
+          }
           if (currentStock < item.qty) {
             await client.query('ROLLBACK');
             throw Object.assign(new Error(`Insufficient stock for ${item.product_name}. Available: ${currentStock}, requested: ${item.qty}`), { statusCode: 400 });
           }
           const newQty = currentStock - item.qty;
-          await client.query('UPDATE products SET stock_qty = $1, updated_at = NOW() WHERE id = $2', [newQty, item.product_id]);
+          await client.query(
+            'UPDATE products SET stock_qty = $1, updated_at = NOW() WHERE id = $2 AND business_id = $3',
+            [newQty, item.product_id, businessId]
+          );
           await client.query(
             `INSERT INTO stock_movements (business_id, product_id, qty_before, qty_change, qty_after, reason, reference_type, reference_id)
              VALUES ($1, $2, $3, $4, $5, 'sale', 'sale', $6)`,
@@ -306,7 +336,7 @@ export async function generateReceipt(businessId, saleId) {
   try {
     const saleResult = await query(
       `SELECT s.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone
-       FROM sales s LEFT JOIN customers c ON s.customer_id = c.id
+       FROM sales s LEFT JOIN customers c ON s.customer_id = c.id AND c.business_id = s.business_id
        WHERE s.id = $1 AND s.business_id = $2`,
       [saleId, businessId]
     );
@@ -366,8 +396,8 @@ export async function getAllReceipts(businessId) {
   const result = await query(
     `SELECT r.*, s.invoice_number, s.sale_date, c.name as customer_name
      FROM receipts r
-     LEFT JOIN sales s ON r.sale_id = s.id
-     LEFT JOIN customers c ON s.customer_id = c.id
+     LEFT JOIN sales s ON r.sale_id = s.id AND s.business_id = r.business_id
+     LEFT JOIN customers c ON s.customer_id = c.id AND c.business_id = r.business_id
      WHERE r.business_id = $1
      ORDER BY r.created_at DESC`,
     [businessId]
@@ -378,7 +408,7 @@ export async function getAllReceipts(businessId) {
 export async function getSaleById(businessId, saleId) {
   const saleResult = await query(
     `SELECT s.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone
-     FROM sales s LEFT JOIN customers c ON s.customer_id = c.id
+     FROM sales s LEFT JOIN customers c ON s.customer_id = c.id AND c.business_id = s.business_id
      WHERE s.id = $1 AND s.business_id = $2`,
     [saleId, businessId]
   );
@@ -400,7 +430,7 @@ export async function getSaleById(businessId, saleId) {
 
 export async function getSales(businessId, status) {
   let sql = `SELECT s.*, c.name as customer_name, c.email as customer_email 
-             FROM sales s LEFT JOIN customers c ON s.customer_id = c.id 
+             FROM sales s LEFT JOIN customers c ON s.customer_id = c.id AND c.business_id = s.business_id 
              WHERE s.business_id = $1`;
   const params = [businessId];
 

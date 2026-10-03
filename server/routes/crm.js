@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../config/db.js';
 import { sendError } from '../utils/sendError.js';
+import { assertOwned } from '../utils/tenantGuard.js';
 
 const router = express.Router();
 
@@ -39,8 +40,8 @@ router.get('/', async (req, res) => {
     const result = await query(
       `SELECT l.*, u.name as assigned_name, c.name as created_name
        FROM leads l
-       LEFT JOIN users u ON l.assigned_to = u.id
-       LEFT JOIN users c ON l.created_by = c.id
+       LEFT JOIN users u ON l.assigned_to = u.id AND u.business_id = l.business_id
+       LEFT JOIN users c ON l.created_by = c.id AND c.business_id = l.business_id
        WHERE ${conditions.join(' AND ')}
        ORDER BY l.created_at DESC`,
       params
@@ -56,7 +57,7 @@ router.get('/:id', async (req, res) => {
   try {
     const result = await query(
       `SELECT l.*, u.name as assigned_name
-       FROM leads l LEFT JOIN users u ON l.assigned_to = u.id
+       FROM leads l LEFT JOIN users u ON l.assigned_to = u.id AND u.business_id = l.business_id
        WHERE l.id = $1 AND l.business_id = $2`,
       [req.params.id, req.business_id]
     );
@@ -71,6 +72,10 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { first_name, last_name, email, phone, company, job_title, source, status, lead_score, estimated_value, assigned_to, notes } = req.body;
+
+    // assigned_to is joined back on the lead list, so it must be this tenant's user.
+    await assertOwned(query, 'users', assigned_to, req.business_id, 'Assignee');
+
     const result = await query(
       `UPDATE leads SET first_name=COALESCE($2,first_name), last_name=COALESCE($3,last_name), email=COALESCE($4,email),
        phone=COALESCE($5,phone), company=COALESCE($6,company), job_title=COALESCE($7,job_title), source=COALESCE($8,source),
@@ -82,6 +87,7 @@ router.put('/:id', async (req, res) => {
     if (!result.rows.length) return sendError(res, 404, 'Lead not found');
     res.json(result.rows[0]);
   } catch (error) {
+    if (error.statusCode) return sendError(res, error.statusCode, error.message);
     console.error('Update lead error:', error);
     sendError(res, 500, 'Failed to update lead');
   }
@@ -104,7 +110,9 @@ router.post('/:id/convert', async (req, res) => {
 
     const customerId = customerResult.rows[0].id;
 
-    await query(`UPDATE leads SET converted_customer_id = $1, status = 'converted' WHERE id = $2`, [customerId, req.params.id]);
+    // The lead is confirmed as this tenant's on the line above, but the tenant predicate is
+    // repeated here so this statement is safe on its own terms.
+    await query(`UPDATE leads SET converted_customer_id = $1, status = 'converted' WHERE id = $2 AND business_id = $3`, [customerId, req.params.id, businessId]);
 
     await query(
       `INSERT INTO customer_activities (business_id, customer_id, activity_type, subject, created_by)
@@ -122,6 +130,10 @@ router.post('/:id/convert', async (req, res) => {
 router.post('/:id/activities', async (req, res) => {
   try {
     const { activity_type, subject, description, scheduled_at } = req.body;
+
+    // The path segment is the customer id here, not a lead id.
+    await assertOwned(query, 'customers', req.params.id, req.business_id, 'Customer');
+
     const result = await query(
       `INSERT INTO customer_activities (business_id, customer_id, activity_type, subject, description, scheduled_at, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
@@ -129,6 +141,7 @@ router.post('/:id/activities', async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
+    if (error.statusCode) return sendError(res, error.statusCode, error.message);
     console.error('Create activity error:', error);
     sendError(res, 500, 'Failed to create activity');
   }

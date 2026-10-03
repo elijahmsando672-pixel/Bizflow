@@ -26,17 +26,28 @@ describe('runtime detection', () => {
   });
 
   it('detects Supabase hosts including the pooler', () => {
-    expect(isSupabase({ DATABASE_URL: DIRECT_URL })).toBe(true);
-    expect(isSupabase({ DATABASE_URL: POOLER_URL })).toBe(true);
-    expect(isSupabase({ DATABASE_URL: SESSION_POOLER_URL })).toBe(true);
-    expect(isSupabase({ DATABASE_URL: LOCAL_URL })).toBe(false);
+    expect(isSupabase({ SUPABASE_DB_URL: DIRECT_URL })).toBe(true);
+    expect(isSupabase({ SUPABASE_POOLER_URL: POOLER_URL })).toBe(true);
+    expect(isSupabase({ SUPABASE_POOLER_URL: SESSION_POOLER_URL })).toBe(true);
+    expect(isSupabase({ DB_HOST: 'db.projref.supabase.co' })).toBe(true);
+    expect(isSupabase({ DB_HOST: 'localhost', DB_PORT: '5432' })).toBe(false);
     expect(isSupabase({})).toBe(false);
   });
 
+  it('resolves the hostname from whichever target the pool actually connects to', () => {
+    // A stale DB_HOST alongside a Supabase URL used to mask the Supabase hostname,
+    // which switched off TLS entirely for a connection that really was Supabase.
+    expect(isSupabase({ DB_HOST: 'localhost', SUPABASE_POOLER_URL: POOLER_URL })).toBe(true);
+    expect(isSupabase({ DB_HOST: 'localhost', DATABASE_URL: DIRECT_URL })).toBe(true);
+    expect(isSupabase({ DB_HOST: 'localhost', SUPABASE_POOLER_URL: LOCAL_URL })).toBe(false);
+  });
+
   it('only treats port 6543 as the transaction pooler', () => {
-    expect(isTransactionPooler({ DATABASE_URL: POOLER_URL })).toBe(true);
-    expect(isTransactionPooler({ DATABASE_URL: SESSION_POOLER_URL })).toBe(false);
-    expect(isTransactionPooler({ DATABASE_URL: DIRECT_URL })).toBe(false);
+    expect(isTransactionPooler({ SUPABASE_POOLER_URL: POOLER_URL })).toBe(true);
+    expect(isTransactionPooler({ SUPABASE_POOLER_URL: SESSION_POOLER_URL })).toBe(false);
+    expect(isTransactionPooler({ SUPABASE_DB_URL: DIRECT_URL })).toBe(false);
+    expect(isTransactionPooler({ DB_HOST: 'db.projref.supabase.co', DB_PORT: '6543' })).toBe(true);
+    expect(isTransactionPooler({ DB_HOST: 'db.projref.supabase.co', DB_PORT: '5432' })).toBe(false);
   });
 });
 
@@ -50,42 +61,68 @@ describe('local development CORS origins', () => {
 
 describe('pool configuration', () => {
   it('keeps a large pool for long running hosts', () => {
-    const config = buildPoolConfig({ DATABASE_URL: LOCAL_URL });
+    const config = buildPoolConfig({ DB_HOST: 'localhost', DB_PORT: '5432' });
     expect(config.max).toBe(20);
     expect(config.idleTimeoutMillis).toBe(30000);
     expect(config.ssl).toBeUndefined();
     expect(config.application_name).toBe('bizflow-api');
   });
 
+  it('still honours a legacy DATABASE_URL instead of silently using localhost', () => {
+    const config = buildPoolConfig({ DB_HOST: 'localhost', DATABASE_URL: DIRECT_URL, DB_SSL_CA_PEM: 'CA-PEM' });
+    expect(config.connectionString).toBe(DIRECT_URL);
+    expect(config.ssl).toEqual({ rejectUnauthorized: true, ca: 'CA-PEM' });
+  });
+
+  it('refuses to build an unencrypted pool for a masked Supabase target', () => {
+    expect(() =>
+      buildPoolConfig({ DB_HOST: 'localhost', SUPABASE_POOLER_URL: POOLER_URL, NODE_ENV: 'production' })
+    ).toThrow(/DB_SSL_CA/);
+  });
+
   it('collapses to a single connection per serverless instance', () => {
-    const config = buildPoolConfig({ VERCEL: '1', DATABASE_URL: SESSION_POOLER_URL });
+    const config = buildPoolConfig({ VERCEL: '1', SUPABASE_POOLER_URL: SESSION_POOLER_URL });
     expect(config.max).toBe(1);
     expect(config.idleTimeoutMillis).toBe(1000);
     expect(config.application_name).toBe('bizflow-api-serverless');
   });
 
-  it('enables TLS for Supabase without failing certificate verification by default', () => {
-    const config = buildPoolConfig({ DATABASE_URL: DIRECT_URL });
+  it('verifies the Supabase certificate once its CA is pinned', () => {
+    const config = buildPoolConfig({ SUPABASE_DB_URL: DIRECT_URL, DB_SSL_CA_PEM: 'CA-PEM' });
+    expect(config.ssl).toEqual({ rejectUnauthorized: true, ca: 'CA-PEM' });
+  });
+
+  it('degrades to unverified TLS for Supabase without a CA outside production', () => {
+    const config = buildPoolConfig({ SUPABASE_DB_URL: DIRECT_URL, NODE_ENV: 'test' });
     expect(config.ssl).toEqual({ rejectUnauthorized: false });
   });
 
+  it('refuses to start in production when the Supabase CA is missing', () => {
+    expect(() => buildPoolConfig({ SUPABASE_DB_URL: DIRECT_URL, NODE_ENV: 'production' })).toThrow(/DB_SSL_CA/);
+  });
+
   it('keeps certificate verification on when it is explicitly requested', () => {
-    const config = buildPoolConfig({ DATABASE_URL: DIRECT_URL, DB_SSL_REJECT_UNAUTHORIZED: 'true' });
-    expect(config.ssl).toEqual({ rejectUnauthorized: true });
+    const config = buildPoolConfig({ SUPABASE_DB_URL: DIRECT_URL, DB_SSL_REJECT_UNAUTHORIZED: 'true', DB_SSL_CA_PEM: 'CA-PEM' });
+    expect(config.ssl).toEqual({ rejectUnauthorized: true, ca: 'CA-PEM' });
+  });
+
+  it('allows an explicit opt out of verification', () => {
+    const config = buildPoolConfig({ SUPABASE_DB_URL: DIRECT_URL, DB_SSL_REJECT_UNAUTHORIZED: 'false' });
+    expect(config.ssl).toEqual({ rejectUnauthorized: false });
   });
 
   it('enables TLS for any host when DB_SSL is set', () => {
-    const config = buildPoolConfig({ DATABASE_URL: LOCAL_URL, DB_SSL: 'true' });
+    const config = buildPoolConfig({ DB_HOST: 'localhost', DB_PORT: '5432', DB_SSL: 'true' });
     expect(config.ssl).toEqual({ rejectUnauthorized: true });
   });
 
   it('disables the client statement cache behind the transaction pooler', () => {
-    expect(buildPoolConfig({ DATABASE_URL: POOLER_URL }).options).toBe('-c statement_cache_size=0');
-    expect(buildPoolConfig({ DATABASE_URL: SESSION_POOLER_URL }).options).toBeUndefined();
+    expect(buildPoolConfig({ SUPABASE_POOLER_URL: POOLER_URL }).options).toBe('-c statement_cache_size=0');
+    expect(buildPoolConfig({ SUPABASE_POOLER_URL: SESSION_POOLER_URL }).options).toBeUndefined();
   });
 
   it('honours explicit pool overrides', () => {
-    const config = buildPoolConfig({ VERCEL: '1', DATABASE_URL: SESSION_POOLER_URL, DB_POOL_MAX: '4' });
+    const config = buildPoolConfig({ VERCEL: '1', SUPABASE_POOLER_URL: SESSION_POOLER_URL, DB_POOL_MAX: '4' });
     expect(config.max).toBe(4);
   });
 
@@ -97,17 +134,27 @@ describe('pool configuration', () => {
 
 describe('schema initialization connection', () => {
   it('refuses to run DDL through the transaction pooler', () => {
-    expect(() => buildInitConfig({ DATABASE_URL: POOLER_URL })).toThrow(/DB_INIT_URL/);
+    expect(() => buildInitConfig({ SUPABASE_POOLER_URL: POOLER_URL })).toThrow(/DB_INIT_URL/);
   });
 
   it('uses DB_INIT_URL when the pooler URL is set', () => {
-    const config = buildInitConfig({ DATABASE_URL: POOLER_URL, DB_INIT_URL: DIRECT_URL });
+    const config = buildInitConfig({
+      SUPABASE_POOLER_URL: POOLER_URL,
+      DB_INIT_URL: DIRECT_URL,
+      NODE_ENV: 'test',
+    });
     expect(config.connectionString).toBe(DIRECT_URL);
     expect(config.ssl).toEqual({ rejectUnauthorized: false });
   });
 
+  it('refuses unverified schema initialization against production Supabase', () => {
+    expect(() =>
+      buildInitConfig({ SUPABASE_POOLER_URL: POOLER_URL, DB_INIT_URL: DIRECT_URL, NODE_ENV: 'production' })
+    ).toThrow(/Schema initialization/);
+  });
+
   it('uses the application URL when it is not a transaction pooler', () => {
-    const config = buildInitConfig({ DATABASE_URL: SESSION_POOLER_URL });
+    const config = buildInitConfig({ SUPABASE_POOLER_URL: SESSION_POOLER_URL });
     expect(config.connectionString).toBe(SESSION_POOLER_URL);
   });
 });
@@ -126,7 +173,7 @@ describe('configuration reporting', () => {
   it('warns about the default JWT secret in production', () => {
     const report = configuration({
       JWT_SECRET: 'bizflow-secret-key-change-in-production',
-      DATABASE_URL: SESSION_POOLER_URL,
+      SUPABASE_POOLER_URL: SESSION_POOLER_URL,
       NODE_ENV: 'production',
       APP_URL: 'https://bizflow.vercel.app',
     });

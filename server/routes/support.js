@@ -2,6 +2,7 @@ import express from 'express';
 import { query } from '../config/db.js';
 import { sendTicketCreatedEmail, sendTicketReplyEmail } from '../utils/email.js';
 import { sendError } from '../utils/sendError.js';
+import { assertOwned } from '../utils/tenantGuard.js';
 
 const router = express.Router();
 
@@ -83,7 +84,7 @@ router.get('/dashboard-stats', async (req, res) => {
       `SELECT t.ticket_number, t.subject, t.status, t.priority, t.created_at,
               c.name as customer_name
        FROM support_tickets t
-       LEFT JOIN customers c ON t.customer_id = c.id
+       LEFT JOIN customers c ON t.customer_id = c.id AND c.business_id = t.business_id
        WHERE t.business_id = $1
        ORDER BY t.created_at DESC LIMIT 10`,
       [req.business_id]
@@ -110,6 +111,11 @@ router.post('/', async (req, res) => {
     const slaDeadline = new Date();
     slaDeadline.setHours(slaDeadline.getHours() + slaHours);
 
+    // Both ids are joined back on every read of a ticket, so neither may be stored
+    // until it is proven to belong to this tenant.
+    await assertOwned(query, 'customers', customer_id, req.business_id, 'Customer');
+    await assertOwned(query, 'users', assigned_to, req.business_id, 'Assignee');
+
     const result = await query(
       `INSERT INTO support_tickets (business_id, customer_id, ticket_number, subject, description, priority, category, assigned_to, sla_deadline, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
@@ -133,6 +139,8 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(ticket);
   } catch (error) {
+    // Ownership failures carry their own status; anything else is a genuine 500.
+    if (error.statusCode) return sendError(res, error.statusCode, error.message);
     console.error('Create ticket error:', error);
     sendError(res, 500, 'Failed to create ticket');
   }
@@ -155,8 +163,8 @@ router.get('/', async (req, res) => {
               u.name as assigned_name,
               CASE WHEN t.sla_deadline < NOW() AND t.status IN ('open','in_progress') THEN true ELSE false END as sla_breached
        FROM support_tickets t
-       LEFT JOIN customers c ON t.customer_id = c.id
-       LEFT JOIN users u ON t.assigned_to = u.id
+       LEFT JOIN customers c ON t.customer_id = c.id AND c.business_id = t.business_id
+       LEFT JOIN users u ON t.assigned_to = u.id AND u.business_id = t.business_id
        WHERE ${conditions.join(' AND ')}
        ORDER BY 
          CASE t.priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 END,
@@ -177,8 +185,8 @@ router.get('/:id', async (req, res) => {
               u.name as assigned_name,
               CASE WHEN t.sla_deadline < NOW() AND t.status IN ('open','in_progress') THEN true ELSE false END as sla_breached
        FROM support_tickets t
-       LEFT JOIN customers c ON t.customer_id = c.id
-       LEFT JOIN users u ON t.assigned_to = u.id
+       LEFT JOIN customers c ON t.customer_id = c.id AND c.business_id = t.business_id
+       LEFT JOIN users u ON t.assigned_to = u.id AND u.business_id = t.business_id
        WHERE t.id = $1 AND t.business_id = $2`,
       [req.params.id, req.business_id]
     );
@@ -222,6 +230,16 @@ router.put('/:id', async (req, res) => {
 router.post('/:id/replies', async (req, res) => {
   try {
     const { message, is_internal } = req.body;
+
+    // The ticket id comes straight from the path. Proving ownership first means the
+    // INSERT below cannot attach a reply to another tenant's ticket, and it makes the
+    // updated_at bump below safe.
+    const ticket = await query(
+      'SELECT id FROM support_tickets WHERE id = $1 AND business_id = $2',
+      [req.params.id, req.business_id]
+    );
+    if (!ticket.rows.length) return sendError(res, 404, 'Ticket not found');
+
     const result = await query(
       `INSERT INTO ticket_replies (business_id, ticket_id, message, is_internal, created_by)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
@@ -229,11 +247,14 @@ router.post('/:id/replies', async (req, res) => {
     );
     const reply = result.rows[0];
 
-    await query(`UPDATE support_tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [req.params.id]);
+    await query(
+      `UPDATE support_tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND business_id = $2`,
+      [req.params.id, req.business_id]
+    );
 
     if (!is_internal) {
       const ticketResult = await query(
-        `SELECT t.*, c.email as customer_email FROM support_tickets t LEFT JOIN customers c ON t.customer_id = c.id WHERE t.id = $1 AND t.business_id = $2`,
+        `SELECT t.*, c.email as customer_email FROM support_tickets t LEFT JOIN customers c ON t.customer_id = c.id AND c.business_id = t.business_id WHERE t.id = $1 AND t.business_id = $2`,
         [req.params.id, req.business_id]
       );
       if (ticketResult.rows.length) {
@@ -255,7 +276,7 @@ router.get('/:id/replies', async (req, res) => {
     const result = await query(
       `SELECT r.*, u.name as author_name
        FROM ticket_replies r
-       LEFT JOIN users u ON r.created_by = u.id
+       LEFT JOIN users u ON r.created_by = u.id AND u.business_id = r.business_id
        WHERE r.ticket_id = $1 AND r.business_id = $2
        ORDER BY r.created_at ASC`,
       [req.params.id, req.business_id]

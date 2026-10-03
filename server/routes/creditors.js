@@ -2,6 +2,7 @@ import express from 'express';
 import Joi from 'joi';
 import { query, pool } from '../config/db.js';
 import { sendError } from '../utils/sendError.js';
+import { assertOwned } from '../utils/tenantGuard.js';
 
 const router = express.Router();
 
@@ -95,6 +96,10 @@ router.post('/:id/payments', validate(creditorPaymentSchema), async (req, res) =
     await client.query('BEGIN');
     const { amount, date, reference, notes } = req.body;
 
+    // The creditor id is taken from the path and stored as a foreign key, so it has to
+    // be this tenant's creditor first.
+    await assertOwned(client, 'creditors', req.params.id, req.business_id, 'Creditor');
+
     const paymentResult = await client.query(
       `INSERT INTO creditor_payments (business_id, creditor_id, amount, date, reference, notes, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
@@ -112,6 +117,7 @@ router.post('/:id/payments', validate(creditorPaymentSchema), async (req, res) =
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Record creditor payment error:', err);
+    if (err.statusCode) return sendError(res, err.statusCode, err.message);
     sendError(res, 500, 'Server error');
   } finally {
     client.release();

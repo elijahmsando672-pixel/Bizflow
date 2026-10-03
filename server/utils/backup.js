@@ -1,5 +1,6 @@
 import { execFile } from 'child_process';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
@@ -27,9 +28,12 @@ const getTimeout = () => {
 // Credentials are passed through the environment so they never appear in argv or a shell
 const buildPgEnv = () => {
   const env = { ...process.env, PGCONNECT_TIMEOUT: process.env.PGCONNECT_TIMEOUT || '10' };
+  let tempCaPath = '';
 
-  if (process.env.DATABASE_URL) {
-    env.PGDATABASE = process.env.DATABASE_URL;
+  const supabaseUrl = process.env.SUPABASE_POOLER_URL || process.env.SUPABASE_DB_URL;
+
+  if (supabaseUrl) {
+    env.PGDATABASE = supabaseUrl;
   } else {
     env.PGHOST = process.env.DB_HOST || 'localhost';
     env.PGPORT = String(process.env.DB_PORT || 5432);
@@ -38,12 +42,25 @@ const buildPgEnv = () => {
     if (process.env.DB_PASSWORD) env.PGPASSWORD = process.env.DB_PASSWORD;
   }
 
-  if (env.DB_SSL === 'true') {
-    env.PGSSLMODE = env.DB_SSL_REJECT_UNAUTHORIZED === 'false' ? 'require' : 'verify-full';
-    if (process.env.DB_SSL_CA) env.PGSSLROOTCERT = process.env.DB_SSL_CA;
+  // Supabase uses its own CA, so a verified dump needs that CA pinned. A PEM value is
+  // written to a temp file because libpq only reads PGSSLROOTCERT from disk.
+  if (env.DB_SSL === 'true' || supabaseUrl) {
+    const wantsVerify = env.DB_SSL_REJECT_UNAUTHORIZED !== 'false';
+    env.PGSSLMODE = wantsVerify ? 'verify-full' : 'require';
+    delete env.PGSSLROOTCERT;
+
+    if (wantsVerify) {
+      if (env.DB_SSL_CA) {
+        env.PGSSLROOTCERT = env.DB_SSL_CA;
+      } else if (env.DB_SSL_CA_PEM) {
+        tempCaPath = path.join(os.tmpdir(), `bizflow-db-ca-${process.pid}.crt`);
+        fs.writeFileSync(tempCaPath, env.DB_SSL_CA_PEM, { mode: 0o600 });
+        env.PGSSLROOTCERT = tempCaPath;
+      }
+    }
   }
 
-  return env;
+  return { env, tempCaPath };
 };
 
 const cleanupOldBackups = (backupDir) => {
@@ -70,6 +87,7 @@ export const createBackup = async (label = 'manual') => {
   const filepath = path.join(backupDir, filename);
   const partialPath = path.join(backupDir, `${filename}.partial`);
   const timeout = getTimeout();
+  const { env, tempCaPath } = buildPgEnv();
 
   try {
     fs.mkdirSync(backupDir, { recursive: true, mode: 0o700 });
@@ -77,7 +95,7 @@ export const createBackup = async (label = 'manual') => {
     await execFileAsync(
       'pg_dump',
       ['--format=plain', '--no-owner', '--no-acl', '--no-password', '--file', partialPath],
-      { env: buildPgEnv(), timeout, maxBuffer: 1024 * 1024 }
+      { env, timeout, maxBuffer: 1024 * 1024 }
     );
 
     if (!fs.existsSync(partialPath)) {
@@ -101,5 +119,7 @@ export const createBackup = async (label = 'manual') => {
 
     console.error('Backup failed:', message);
     return { success: false, error: message };
+  } finally {
+    if (tempCaPath) fs.rmSync(tempCaPath, { force: true });
   }
 };

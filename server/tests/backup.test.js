@@ -10,7 +10,8 @@ vi.mock('child_process', () => ({ execFile: execFileMock }));
 const { createBackup } = await import('../utils/backup.js');
 
 const ENV_KEYS = [
-  'DATABASE_URL',
+  'SUPABASE_POOLER_URL',
+  'SUPABASE_DB_URL',
   'DB_HOST',
   'DB_PORT',
   'DB_NAME',
@@ -60,7 +61,7 @@ describe('createBackup', () => {
   });
 
   it('keeps credentials out of argv and writes the dump atomically', async () => {
-    process.env.DATABASE_URL = 'postgresql://user:secret@db:5432/bizflow';
+    process.env.SUPABASE_DB_URL = 'postgresql://user:secret@db:5432/bizflow';
     succeedWithDump();
 
     const result = await createBackup('manual');
@@ -70,9 +71,9 @@ describe('createBackup', () => {
 
     const [binary, args, options] = execFileMock.mock.calls[0];
     expect(binary).toBe('pg_dump');
-    expect(args).not.toContain(process.env.DATABASE_URL);
+    expect(args).not.toContain(process.env.SUPABASE_DB_URL);
     expect(args.some((arg) => String(arg).includes('secret'))).toBe(false);
-    expect(options.env.PGDATABASE).toBe(process.env.DATABASE_URL);
+    expect(options.env.PGDATABASE).toBe(process.env.SUPABASE_DB_URL);
 
     const files = fs.readdirSync(backupDir);
     expect(files).toEqual([result.filename]);

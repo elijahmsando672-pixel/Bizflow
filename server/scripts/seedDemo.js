@@ -3,6 +3,17 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Refuse to run anywhere that is not a throwaway database. This script creates an
+// owner account with a published password, so a stray run against production
+// would hand a working login to anyone who read the repository.
+if (process.env.NODE_ENV === 'production' && process.env.SEED_DEMO_ALLOW_PRODUCTION !== 'true') {
+  console.error(
+    'Refusing to seed demo data with NODE_ENV=production. ' +
+    'Set SEED_DEMO_ALLOW_PRODUCTION=true only against a disposable database.'
+  );
+  process.exit(1);
+}
+
 const { Pool } = pg;
 
 const pool = new Pool({
@@ -36,13 +47,19 @@ async function seedDemo() {
       );
       BUSINESS_ID = bizResult.rows[0].id;
       const { hashPassword } = await import('../utils/password.js');
-      const hashedPassword = await hashPassword('test123');
+      // Generated per run unless the operator supplies one, so the demo account's
+      // password is never a value published in the repository.
+      const demoPassword = process.env.SEED_DEMO_PASSWORD || `Demo-${crypto.randomUUID()}`;
+      const hashedPassword = await hashPassword(demoPassword);
       const userResult = await query(
         `INSERT INTO users (business_id, name, email, password, role) VALUES ($1, 'Elijah', 'elijah@bizflow.com', $2, 'owner') RETURNING id`,
         [BUSINESS_ID, hashedPassword]
       );
       USER_ID = userResult.rows[0].id;
       console.log('✅ Created demo business and admin user');
+      console.log(`   email:    elijah@bizflow.com`);
+      console.log(`   password: ${demoPassword}`);
+      console.log('   This password is not stored anywhere — copy it now.');
     } else {
       const user = existingUser.rows[0];
       USER_ID = user.id;
