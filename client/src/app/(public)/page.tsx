@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { TrendingUp, Package, Users, BarChart3, Zap, Check, ArrowRight, Menu, X } from 'lucide-react';
+import { TrendingUp, Package, Users, BarChart3, Zap, ArrowRight, Menu, X } from 'lucide-react';
 
 export default function BizFlowLanding() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -28,12 +28,6 @@ export default function BizFlowLanding() {
     { icon: TrendingUp, title: "Multi-Shop", desc: "One system for one store or twenty. Stock moves between them." },
   ];
 
-  const plans = [
-    { name: "Starter", price: "2,500", transactions: "500/mo", branches: "1", features: ["Basic reports", "Email support"] },
-    { name: "Professional", price: "5,500", transactions: "Unlimited", branches: "3", features: ["Advanced analytics", "Priority support", "CRM", "Team management"], popular: true },
-    { name: "Enterprise", price: "Custom", transactions: "Unlimited", branches: "Unlimited", features: ["Everything", "Dedicated support", "API access", "Custom integrations"] },
-  ];
-
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Navigation */}
@@ -47,7 +41,6 @@ export default function BizFlowLanding() {
           </div>
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm text-muted-foreground hover:text-foreground">Features</a>
-            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground">Pricing</a>
             <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground">Sign In</Link>
             <Link href="/register" className="bg-primary text-primary-foreground px-5 py-2 rounded-lg text-sm font-medium hover:bg-primary/90">
               Get Started
@@ -60,7 +53,6 @@ export default function BizFlowLanding() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-border px-6 py-4 space-y-4">
             <a href="#features" className="block text-sm text-muted-foreground">Features</a>
-            <a href="#pricing" className="block text-sm text-muted-foreground">Pricing</a>
             <Link href="/login" className="block text-sm text-muted-foreground">Sign In</Link>
             <Link href="/register" className="block w-full bg-primary text-primary-foreground px-5 py-2 rounded-lg text-sm font-medium text-center">Get Started</Link>
           </div>
@@ -82,13 +74,13 @@ export default function BizFlowLanding() {
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link href="/register" className="bg-primary text-primary-foreground px-8 py-3 rounded-xl font-medium hover:bg-primary/90 flex items-center gap-2">
-                  Start Free <ArrowRight size={18} />
+                  Get Started <ArrowRight size={18} />
                 </Link>
-                <button className="border border-border px-8 py-3 rounded-xl font-medium hover:bg-muted">
+                <Link href="/login" className="border border-border px-8 py-3 rounded-xl font-medium hover:bg-muted">
                   See Demo
-                </button>
+                </Link>
               </div>
-              <p className="text-sm text-muted-foreground mt-4">No card. 14 days free. Cancel anytime.</p>
+              <p className="text-sm text-muted-foreground mt-4">Set up in minutes. No card required.</p>
             </div>
 
             <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
@@ -199,71 +191,13 @@ export default function BizFlowLanding() {
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="py-24">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="text-4xl font-bold mb-4">Pick what fits</h2>
-            <p className="text-lg text-muted-foreground">14-day free trial on all plans. No card required.</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6 lg:gap-8 max-w-4xl mx-auto">
-            {plans.map((plan, i) => (
-              <div
-                key={i}
-                className={`rounded-2xl p-8 border transition ${
-                  plan.popular
-                    ? 'border-primary bg-card shadow-md'
-                    : 'border-border bg-card'
-                }`}
-              >
-                {plan.popular && (
-                  <div className="inline-block bg-primary text-primary-foreground text-xs font-bold px-4 py-1 rounded-full mb-4">
-                    Most Popular
-                  </div>
-                )}
-                <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
-                <div className="mb-6">
-                  <div className="text-4xl font-bold">KSh {plan.price}</div>
-                  <div className="text-sm text-muted-foreground mt-1">/month</div>
-                </div>
-                <div className="space-y-3 mb-8">
-                  <div className="flex gap-2 text-sm">
-                    <Check size={16} className="text-success flex-shrink-0 mt-0.5" />
-                    <span><strong>{plan.transactions}</strong> transactions</span>
-                  </div>
-                  <div className="flex gap-2 text-sm">
-                    <Check size={16} className="text-success flex-shrink-0 mt-0.5" />
-                    <span><strong>{plan.branches}</strong> {plan.branches === "1" ? "branch" : "branches"}</span>
-                  </div>
-                </div>
-                <Link href="/register" className={`block w-full py-3 rounded-xl font-medium transition mb-8 text-center ${
-                  plan.popular
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                    : 'border border-border hover:bg-muted'
-                }`}>
-                  Start Free Trial
-                </Link>
-                <div className="space-y-3">
-                  {plan.features.map((feature, j) => (
-                    <div key={j} className="flex gap-2 text-sm">
-                      <Check size={16} className="text-primary flex-shrink-0 mt-0.5" />
-                      <span className="text-muted-foreground">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* CTA */}
       <section className="py-24 border-t border-border">
         <div className="max-w-3xl mx-auto px-6 text-center">
           <h2 className="text-4xl font-bold mb-4">Ready to stop the chaos?</h2>
-          <p className="text-lg text-muted-foreground mb-8">Start your free trial today. Grow faster tomorrow.</p>
+          <p className="text-lg text-muted-foreground mb-8">Set up in minutes. No technical skills required.</p>
           <Link href="/register" className="inline-block bg-primary text-primary-foreground px-10 py-4 rounded-xl font-medium hover:bg-primary/90 text-lg">
-            Get Started Free
+            Get Started
           </Link>
         </div>
       </section>
@@ -285,7 +219,6 @@ export default function BizFlowLanding() {
               <div className="font-semibold text-background mb-4">Product</div>
               <ul className="space-y-2 text-sm">
                 <li><a href="#" className="hover:text-background">Features</a></li>
-                <li><a href="#" className="hover:text-background">Pricing</a></li>
                 <li><a href="#" className="hover:text-background">API</a></li>
               </ul>
             </div>
