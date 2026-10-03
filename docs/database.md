@@ -22,9 +22,13 @@ export const isTransactionPooler
 
 ### Configuration sources
 
-`DATABASE_URL` wins. Only if it is empty do the discrete `DB_HOST` / `DB_PORT` /
-`DB_NAME` / `DB_USER` / `DB_PASSWORD` variables apply. Two Supabase shorthands
-are also read in that fallback: `SUPABASE_DB_URL` and `SUPABASE_POOLER_URL`.
+The discrete `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD`
+variables are the primary target. Two Supabase shorthands are read when `DB_HOST`
+is empty: `SUPABASE_DB_URL` and `SUPABASE_POOLER_URL`.
+
+`isSupabase` and `isTransactionPooler` detect from `DB_HOST` as well as from
+those URLs, so discrete fields pointing at a Supabase host still get the right
+TLS and pooler defaults.
 
 `DB_INIT_URL` overrides the connection used by `db:init` only, so schema
 creation can use a direct or session-mode connection while the API uses the
@@ -42,10 +46,12 @@ These drive three automatic behaviours:
 
 - **Pool sizing.** Serverless instances default to **one** connection each,
   since instances are short-lived and numerous. Override with `DB_POOL_MAX`.
-- **TLS.** Enabled automatically for Supabase hosts. Certificate *verification*
-  defaults **off** for them, because Supabase's chain is not issued by a public
-  root. Set `DB_SSL_REJECT_UNAUTHORIZED=true` to require it, or point
-  `DB_SSL_CA` at a CA bundle.
+- **TLS.** Enabled automatically for Supabase hosts, and certificate *verification*
+  is **on** by default. Supabase's chain is not issued by a public root, so verifying
+  it means pinning Supabase's own CA: set `DB_SSL_CA_PEM` to the contents of
+  `prod-ca-2021.crt` (Dashboard → Database → SSL Configuration), or `DB_SSL_CA` to its
+  path. In production a Supabase target without a CA is a startup failure rather than
+  a silent downgrade to unverified TLS.
 - **Pooler detection.** `db:init` refuses to run through the transaction
   pooler, because advisory locks and DDL need a real session.
 

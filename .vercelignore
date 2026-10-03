@@ -15,4 +15,3 @@ Dockerfile
 docker-compose.yml
 deploy.sh
 stop.sh
-test.html

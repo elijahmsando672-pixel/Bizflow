@@ -36,12 +36,6 @@ Minimum viable `.env`:
 
 ```env
 JWT_SECRET=<openssl rand -base64 64>
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/bizflow
-```
-
-Or use discrete parts instead of a URL:
-
-```env
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=bizflow
@@ -49,8 +43,8 @@ DB_USER=postgres
 DB_PASSWORD=postgres
 ```
 
-`DATABASE_URL` wins if both forms are present. See the full variable reference
-in [Deployment](./deployment.md#environment-variables).
+See the full variable reference in
+[Deployment](./deployment.md#environment-variables).
 
 For the frontend:
 
@@ -94,7 +88,7 @@ docker compose up -d postgres
 ```
 
 This publishes Postgres on **host port 5433** (`docker-compose.yml:13`), not
-5432. Set `DATABASE_URL=postgresql://postgres:postgres@localhost:5433/bizflow`.
+5432. Set `DB_PORT=5433`.
 
 ## Seed demo data
 
@@ -103,12 +97,33 @@ npm --prefix server run start     # boots and creates the schema
 node server/seed.js               # or the helper
 ```
 
-Or `node server/scripts/seedDemo.js`.
+Or `npm --prefix server run seed:demo`.
 
-Credentials created:
+The seed creates `elijah@bizflow.com` and prints a generated password once. Set
+`SEED_DEMO_PASSWORD` to choose your own. It refuses to run when
+`NODE_ENV=production` unless `SEED_DEMO_ALLOW_PRODUCTION=true` is set, so it
+cannot plant a known login on a deployed database.
 
-- Email: `elijah@bizflow.com`
-- Password: `Test@1234`
+### Cleaning up a database seeded by an older version
+
+Earlier versions of `seedDemo.js` wrote a fixed password that was published in the
+repository's README. Any database seeded before that change still accepts it, and
+nothing in the code can revoke a credential that already exists. On every
+database that was ever seeded with that version, delete or disable the account
+before going live:
+
+```sql
+-- Deactivate first so the row (and its FK children) survives for inspection.
+UPDATE users SET is_active = false WHERE email = 'elijah@bizflow.com';
+
+-- Then remove it and, if it was the only owner, the seeded business with it.
+DELETE FROM users WHERE email = 'elijah@bizflow.com';
+```
+
+Check `login_attempts` and `audit_logs` for that account before deleting it, so
+you can tell whether the credential was ever used. Rotating the password instead
+of deleting leaves an unnecessary owner row behind, which is why deletion is the
+better default here.
 
 ## Run
 
@@ -208,7 +223,11 @@ Four suites, all requiring a live PostgreSQL:
 Environment the tests need:
 
 ```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/bizflow_test
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=bizflow_test
+DB_USER=postgres
+DB_PASSWORD=postgres
 DB_SSL=false
 JWT_SECRET=test-secret-key
 NODE_ENV=test
@@ -219,7 +238,7 @@ CI does exactly this against a `postgres:16` service container
 
 ```bash
 createdb bizflow_test
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/bizflow_test npm --prefix server test
+DB_NAME=bizflow_test npm --prefix server test
 ```
 
 ### Frontend
@@ -303,12 +322,12 @@ that `CORS_ORIGINS` includes the frontend origin *with scheme*, and that
 a reload.
 
 **`FATAL ERROR: Missing required environment variables`**
-`JWT_SECRET` is unset, or none of `DATABASE_URL` / `SUPABASE_DB_URL` /
-`SUPABASE_POOLER_URL` is set and one of `DB_HOST` / `DB_NAME` / `DB_USER` /
-`DB_PASSWORD` is missing. The check is `server/app.js:61-78`.
+`JWT_SECRET` is unset, or neither `DB_HOST` nor a `SUPABASE_*` URL is set and one
+of `DB_HOST` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` is missing. The check is
+`server/app.js:61-78`.
 
 **`ECONNREFUSED` on the database with Docker running**
-Docker publishes Postgres on **5433**. Your `DATABASE_URL` says 5432.
+Docker publishes Postgres on **5433**. Your `DB_PORT` says 5432.
 
 **Tables missing after boot**
 Set `DB_AUTO_INIT=false` at some point and it stayed set, or the init failed

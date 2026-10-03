@@ -13,7 +13,7 @@ Full technical reference lives in [`docs/`](./docs):
 | [Backend](./docs/backend.md) | Every route, middleware and utility in `server/` |
 | [Frontend](./docs/frontend.md) | Routing, the API client, component conventions |
 | [Database](./docs/database.md) | 67 tables, auto-migration, backups |
-| [Deployment](./docs/deployment.md) | Docker, Vercel, Railway, Render, Supabase |
+| [Deployment](./docs/deployment.md) | Docker, Vercel, Supabase |
 | [Auxiliary projects](./docs/auxiliary-projects.md) | `apps/api`, `packages/*`, `standalone/`, `bizflow-landing/`, `migration/` |
 
 The repository also contains several dormant projects — a NestJS rewrite, shared
@@ -88,16 +88,18 @@ needs no CORS.
 `server/app.js`, which builds the Express app without opening a port, running DDL,
 or calling `process.exit()` — a serverless instance has to stay alive to answer the
 request it was invoked for. `server/index.js` is only a bootstrap for long-running
-hosts (Docker, Render, a VM) and does nothing when it is merely imported.
+hosts (Docker, a VM) and does nothing when it is merely imported.
 
 Supabase connection notes:
-- Point `DATABASE_URL` at the **connection pooler**, not the direct connection.
+- Point `SUPABASE_POOLER_URL` at the **connection pooler**, not the direct connection.
   Vercel has no IPv6, so `db.<project>.supabase.co` is unreachable from a function.
   Use port `6543` (transaction mode) for the API and `5432` on the pooler host
   (session mode) wherever a real session is needed.
-- TLS is enabled automatically for `*.supabase.co` and `*.supabase.com` hosts.
-  Certificate verification defaults to off for them because Supabase's chain is not
-  issued by a public root; set `DB_SSL_REJECT_UNAUTHORIZED=true` to require it.
+- TLS is enabled automatically for `*.supabase.co` and `*.supabase.com` hosts, with
+  certificate **verification on by default**. Supabase's chain is not issued by a
+  public root, so verifying it means pinning Supabase's CA: set `DB_SSL_CA_PEM` to the
+  contents of `prod-ca-2021.crt` from Dashboard → Database → SSL Configuration. In
+  production a missing CA is a startup failure, not a silent downgrade.
 - Serverless instances are short lived, so the pool defaults to one connection per
   instance, detected automatically from `VERCEL`. Override with `DB_POOL_MAX`.
 - Schema creation is a deployment step, not a boot step. Set `DB_AUTO_INIT=false`
@@ -110,7 +112,7 @@ Supabase connection notes:
 
 Required Vercel environment variables:
 ```
-DATABASE_URL          transaction pooler URL (port 6543)
+SUPABASE_POOLER_URL   transaction pooler URL (port 6543)
 DB_INIT_URL           direct or session connection, used by db:init only
 DB_AUTO_INIT          false
 JWT_SECRET            openssl rand -base64 64
@@ -133,15 +135,40 @@ Serverless limitations worth knowing before going live:
   Video processing and similar jobs should stay on a long-running host.
 - **Argon2 needs a prebuilt binary.** If the runtime has no compatible native build,
   password hashing falls back to bcrypt automatically and logs a warning.
-- **Backups are not scheduled on Vercel.** `npm run backup` needs a cron trigger or
-  a long-running host; Supabase also offers its own managed backups and PITR.
+- **Backups are not run by the app on Vercel.** `npm run backup` and the in-process
+  job scheduler both need a long-running host. Enable Supabase PITR for data
+  protection and drive scheduled jobs from Vercel Cron; see
+  [deployment docs](./docs/deployment.md#backups-and-cron).
 
 ## Login Credentials
-Register a new account at `/signup`, or use the seed demo account:
-- Email: `elijah@bizflow.com`
-- Password: `Test@1234`
+
+Register a new account at `/signup`.
+
+The demo seed (`npm run seed:demo`) creates `elijah@bizflow.com` with a password
+it generates at run time and prints once — it is not stored anywhere and is not
+documented here. The seed refuses to run when `NODE_ENV=production` unless you
+explicitly set `SEED_DEMO_ALLOW_PRODUCTION=true`, so it cannot be used to plant a
+known login on a deployed database.
+
+Earlier versions of the seed wrote a fixed password that was published here. That
+password is no longer created, but any database seeded back then still accepts
+it — revoke the account on those databases before going live. See
+[seed cleanup](./docs/getting-started.md#cleaning-up-a-database-seeded-by-an-older-version).
 
 ## Architecture
+
+### Multi-tenancy
+Isolation is a `business_id` column on every business-scoped table, enforced in
+application code — **there is no row-level security**, and the foreign keys are
+plain single-column references, so Postgres will not stop a query that forgets the
+tenant filter. Two things carry the isolation: `req.business_id` comes from the
+verified JWT (or the API key row) and never from request input, and every tenant
+query must filter on it. `server/utils/tenantGuard.js` (`assertOwned`) additionally
+proves ownership before a request-supplied id is persisted as a foreign key.
+Roles are per-business only — there is no platform-admin tier.
+
+See [Architecture → Multi-tenancy](./docs/architecture.md#multi-tenancy) for the
+failure modes and the review recipe.
 
 ### Security
 - **JWT access tokens** (15 min) + **httpOnly refresh tokens** (7 days, cookie-only, no XSS exposure)
@@ -189,7 +216,7 @@ Strategies are only activated when the corresponding env vars are set.
 - **Frontend**: Next.js 16.2.4 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS v4, Recharts
 - **Backend**: Express 4, PostgreSQL, JWT + httpOnly refresh tokens, Argon2id, Passport.js (OAuth)
 - **Validation**: Zod (frontend), Joi (backend)
-- **Deployment**: Vercel (frontend), Docker / Railway (backend)
+- **Deployment**: Vercel (frontend), Docker or a long-running host (backend)
 
 ## Project Structure
 
@@ -210,7 +237,7 @@ Bizflow/
 │   ├── middleware/      # auth, CSRF, RBAC, security
 │   └── utils/           # Password hashing, email, audit, jobs
 ├── api/                 # Vercel serverless entry points
-├── scripts/             # Endpoint contract linter, keep-alive
+├── scripts/             # Endpoint contract linter
 ├── docker-compose.yml
 └── .env.example
 ```
@@ -225,7 +252,7 @@ site), `migration/` (one-off SQL Server importer). See
 ### Server (`server/.env`)
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
+| `SUPABASE_POOLER_URL` | PostgreSQL transaction pooler URL |
 | `JWT_SECRET` | Secret for signing JWT tokens |
 | `SMTP_*` | Email configuration (welcome, password reset) |
 | `GOOGLE_CLIENT_*` | Google OAuth credentials (optional) |

@@ -121,5 +121,8 @@ client/public/__manus__/version.json
 # Turbo
 .turbo/
 
-# Agent scratch space (holds a worktree copy of this repo)
+# Agent scratch space (holds a worktree copy of this repo, or session summaries)
 .kilo/
+.opencode/
+.qodo/
+.kombai/

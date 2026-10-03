@@ -17,8 +17,7 @@ A greenfield rewrite of the Express API in **NestJS 10** with **Prisma 5**,
 ### Status: not connected to anything
 
 - No `node_modules`, no `dist` — **it has never been installed in this tree**
-- Not in `docker-compose.yml`, `railway.json`, `render.yaml`, `vercel.json`, or
-  CI
+- Not in `docker-compose.yml`, `vercel.json`, or CI
 - No root `package.json` script references it
 - The frontend does not call it
 - It reuses **zero** code from `server/` — every one of its relative imports
@@ -168,8 +167,7 @@ to `localStorage['bizflow-theme']` and defaulting to the OS preference.
 
 Static — no backend, no API calls. It builds to a `dist/` and could be deployed
 to any static host, but **no deployment config in this repo references it**; it
-is not in `vercel.json`, `.vercelignore`, `docker-compose.yml`, `railway.*` or
-`render.yaml`. It does have its own committed `package-lock.json`, so it has
+is not in `vercel.json`, `.vercelignore` or `docker-compose.yml`. It does have its own committed `package-lock.json`, so it has
 been installed at some point.
 
 Several declared dependencies are unused: `recharts`, `react-countup`,
@@ -246,13 +244,6 @@ npm run validate
 
 Useful as a review prompt. Do not gate on it, and re-point it at `app.js` before
 relying on it.
-
-### `keep-alive.sh`
-
-Pings `https://bizflow-api-qo3d.onrender.com/api/auth/health` every 10 minutes
-to keep Render's free tier awake. The crontab hint in the comment contains a
-hardcoded home directory — edit it before use. It logs only; it takes no
-corrective action.
 
 ---
 

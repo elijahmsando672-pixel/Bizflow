@@ -58,7 +58,7 @@ port and never runs DDL**. Two thin wrappers sit on top of it:
 
 | Entry | Runs when | What it adds |
 |-------|-----------|--------------|
-| `server/index.js` | `node server/index.js` — Docker, Render, Railway, a VM | `app.listen(5000)`, optional schema init, graceful shutdown |
+| `server/index.js` | `node server/index.js` — Docker, a VM | `app.listen(5000)`, optional schema init, graceful shutdown |
 | `api/index.js` | Vercel request to `/api` | `maxDuration: 30`, config warnings |
 | `api/[...path].js` | Vercel request to `/api/*` | Identical to `api/index.js` |
 
@@ -130,7 +130,7 @@ Unversioned extras:
 | Path | Purpose |
 |------|---------|
 | `/` | Service banner |
-| `/api/health` | `SELECT 1`; `503` when config is incomplete. Used by Docker and Render |
+| `/api/health` | `SELECT 1`; `503` when config is incomplete. Used by Docker and container hosts |
 | `/api/version` | Build metadata; the client uses it to detect deployment skew |
 | `/api/metrics` | Pool and request metrics, admin/owner only |
 | `/api/docs` | Swagger UI |
@@ -197,26 +197,87 @@ Supporting auth features:
 
 ## Multi-tenancy
 
-Every business-scoped table carries a `business_id` foreign key. Isolation is
-enforced in the data-access layer, not in the router:
+**Tenancy is a `business_id` column, enforced in application code. There is no
+row-level security.** This is the single most important thing to know before
+touching a query, because the database will not stop you from getting it wrong.
 
-- `middleware/protect.js` verifies the JWT and populates `req.user`, including
-  `req.user.business_id`.
-- `middleware/rbac.js` (`requirePermission`) checks the role's permission
-  matrix for the resource and action.
-- Every query filters on the tenant. Route handlers read the id off `req.user`,
-  never off a request body or query parameter, so a caller cannot ask for
-  another business's rows.
+### What the schema does and does not give you
+
+Every business-scoped table carries the same shape:
+
+```sql
+business_id UUID REFERENCES businesses(id) ON DELETE CASCADE
+```
+
+That is a **plain single-column** foreign key. There are no composite keys of the
+form `FOREIGN KEY (business_id, customer_id) REFERENCES customers (business_id,
+id)`, and no `CREATE POLICY` / `ENABLE ROW LEVEL SECURITY` anywhere in the
+schema. Postgres therefore enforces exactly one thing: that the id exists. It
+will happily store a row owned by tenant A that points at tenant B's customer,
+and it will happily return that row to whoever asks.
+
+Two consequences follow, and they are the two bug shapes this codebase has hit:
+
+- A **read** leak is any `SELECT` that filters on a request-supplied id but not on
+  `business_id`. Nothing raises; the other tenant's row is simply returned.
+- A **stored dangling FK** is an `INSERT`/`UPDATE` that persists a caller-supplied
+  id without first proving the row belongs to them. It looks harmless at write
+  time and becomes a read leak later, the moment some query joins across it.
+
+### The two controls that actually hold
+
+1. **The tenant id is never request input.** `middleware/protect.js` verifies the
+   JWT and sets `req.business_id` from the token's claims; `middleware/apiKey.js`
+   sets it from the looked-up API key row. Neither reads a header, body, or query
+   parameter, so a caller cannot ask for another business's rows. If you are
+   reaching for anything other than `req.business_id` as a tenant filter, that is
+   the bug.
+2. **Every tenant query filters on `business_id`.** This is a per-handler
+   convention, *not* a central data-access layer — there is no ORM or repository
+   that injects the filter for you. A forgotten filter fails silently, which is why
+   it has to be checked by review rather than by the type system.
+
+For (2)'s second failure mode — FK writes — `utils/tenantGuard.js` provides
+`assertOwned(client, table, id, businessId)`, which throws unless the row exists
+*and* belongs to the caller. It takes the table from a fixed allow-list, so a
+table name can never arrive from a request, and it returns the same 404 for
+"missing" and "belongs to someone else" so it cannot be used as an enumeration
+oracle across tenants. Use it for any body-supplied id that is about to be
+persisted as a foreign key; a bare `WHERE id = $1` check is not equivalent.
+
+### Reviewing a change
+
+The risky edits are any handler that takes an id from `req.params`/`req.body` and
+reaches a tenant table. To find them, look for statements that filter a tenant
+table on a placeholder but never mention `business_id`:
+
+```bash
+# Statements touching a tenant table by id with no business_id in the statement
+rg -U 'FROM (users|customers|products|sales|invoices|employees|debtors|creditors)
+       [^;]*?WHERE[^;]*?id = \$[0-9]' server/routes server/controllers server/services
+```
+
+Anything that shows up needs either an explicit `AND business_id = $n` or an
+`assertOwned` call. Note that reads keyed off a *user* rather than a tenant
+(`refresh_tokens`, `otp_codes`, `password_resets`, `verification_tokens`,
+`user_devices`) are legitimately scoped by `user_id` instead, and the
+pre-authentication paths in `controllers/authController.js` legitimately look up
+`users` by email before a session exists.
 
 ### Role model
 
 `users.role` is a `VARCHAR(20)` defaulting to `'staff'`
-(`server/config/db.js:168`). Roles are **hierarchical**, defined by `ROLE_RANK`
-in `server/routes/team.js:21` and `server/routes/users.js:14`:
+(`server/config/db.js:220`). Roles are **hierarchical**, defined by `ROLE_RANK`
+in `server/config/roles.js:14`:
 
 ```js
-const ROLE_RANK = { staff: 1, accountant: 1, manager: 2, admin: 3, owner: 4 };
+export const ROLE_RANK = { staff: 1, accountant: 1, manager: 2, admin: 3, owner: 4 };
 ```
+
+Note that these roles are **per-business only**. There is no platform-admin tier,
+so no role grants authority over a tenant other than the caller's own — a check
+like "is the caller an owner" is never on its own sufficient to act on a business
+id that came from the request.
 
 `staff` and `accountant` sit at the same rank. An actor may only act on a target
 whose rank is **less than or equal to** their own (`outranks`), which is what
@@ -227,7 +288,7 @@ rejects a role above your own, and `POST /users` requires at least `manager`.
 ### The permission matrix
 
 Authorization is a separate, database-driven layer. The `permissions` table
-(`server/config/db.js:1089`) holds one row per
+(`server/config/db.js:1141`) holds one row per
 `(business_id, role_name, resource)` with four booleans:
 
 | Column | Meaning |

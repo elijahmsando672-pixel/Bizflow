@@ -16,7 +16,7 @@ is the short orientation document.
 | [Backend](./backend.md) | Express API: middleware chain, route inventory, auth, RBAC, jobs |
 | [Frontend](./frontend.md) | Next.js App Router: layout, API client, page/component conventions |
 | [Database](./database.md) | Schema, auto-migration, Prisma schema, legacy SQL Server migration |
-| [Deployment](./deployment.md) | Docker Compose, Vercel, Railway, Render, Supabase, backups |
+| [Deployment](./deployment.md) | Docker Compose, Vercel, Supabase, backups |
 | [Auxiliary projects](./auxiliary-projects.md) | `apps/api`, `packages/*`, `standalone/`, `bizflow-landing/`, `scripts/` |
 
 ## The repository at a glance
@@ -39,7 +39,7 @@ Bizflow/
 ├── standalone/        # React 18 + Vite UI mock, fake auth     ← PROTOTYPE
 ├── bizflow-landing/   # React 19 + Vite marketing site         ← UNDEPLOYED
 ├── migration/         # One-off SQL Server → PostgreSQL CLI    ← COMPLETE
-└── scripts/           # Endpoint contract linter, keep-alive   ← OPS
+└── scripts/           # Endpoint contract linter              ← OPS
 ```
 
 ### Which project is which
@@ -122,7 +122,7 @@ Vitest + supertest.
 `server/config/db.js`.
 
 **Infrastructure** — Vercel (frontend + API as same-origin functions),
-Supabase (managed Postgres), Docker Compose, Railway, Render.
+Supabase (managed Postgres), Docker Compose.
 
 ## Local ports
 
@@ -141,11 +141,9 @@ Supabase (managed Postgres), Docker Compose, Railway, Render.
 
 ## Demo credentials
 
-Seed data is written by `server/seed.js` / `server/scripts/seedDemo.js`.
+Seed data is written by `server/seed.js` / `server/scripts/seedDemo.js`. The demo
+account's password is generated at run time, printed once, and never committed or
+documented. Set `SEED_DEMO_PASSWORD` to pick your own.
 
-- Email: `elijah@bizflow.com`
-- Password: `Test@1234`
-
-The Prisma seed in `packages/database/prisma/seed.ts` uses a *different*
-account (`demo@bizflow.com` / `demo1234`) that only exists in the `apps/api`
-schema, not in the live database.
+Both seeds refuse to run when `NODE_ENV=production` unless
+`SEED_DEMO_ALLOW_PRODUCTION=true` is set.
