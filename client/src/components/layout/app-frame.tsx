@@ -3,8 +3,8 @@
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
+import AuthGuard from "@/components/auth/AuthGuard";
 
-/** Routes that render without the authenticated application chrome. */
 const PUBLIC_ROUTES = new Set([
   "/",
   "/login",
@@ -18,8 +18,16 @@ const PUBLIC_ROUTES = new Set([
   "/about",
   "/pricing",
   "/contact",
-  // Post-authentication launcher: full-bleed glass layout, so no sidebar.
   "/business",
+]);
+
+/**
+ * Authenticated routes that render full-bleed — no sidebar, no topbar, no
+ * footer — but still pass through AuthGuard so the session is validated.
+ * Useful for kiosk/POS screens and other pages where every pixel matters.
+ */
+const FULL_BLEED_ROUTES = new Set([
+  "/dashboard/sales/new",
 ]);
 
 function isPublicRoute(pathname: string): boolean {
@@ -27,14 +35,15 @@ function isPublicRoute(pathname: string): boolean {
   return pathname.startsWith("/auth");
 }
 
-/**
- * Single decision point for application chrome: public and auth-flow routes
- * render bare, every other route is wrapped in the BizFlow app shell.
- */
+function isFullBleedRoute(pathname: string): boolean {
+  return FULL_BLEED_ROUTES.has(pathname);
+}
+
 export function AppFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/";
 
   if (isPublicRoute(pathname)) return <>{children}</>;
+  if (isFullBleedRoute(pathname)) return <AuthGuard>{children}</AuthGuard>;
 
   return <AppShell>{children}</AppShell>;
 }

@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: bizflow-backend
+    runtime: docker
+    plan: starter
+    dockerfilePath: server/Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # --- Core ---
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "5000"
+      - key: NEXT_PUBLIC_API_URL
+        fromSecret: NEXT_PUBLIC_API_URL
+      # --- Authentication ---
+      - key: JWT_SECRET
+        fromSecret: JWT_SECRET
+      # --- Database (Supabase) ---
+      # Use the transaction pooler (port 6543) for runtime queries.
+      # Schema initialization should be run separately via `npm run db:init`
+      # with DB_INIT_URL pointing at the session/direct connection.
+      - key: SUPABASE_POOLER_URL
+        fromSecret: SUPABASE_POOLER_URL
+      - key: DB_SSL_CA_PEM
+        fromSecret: DB_SSL_CA_PEM
+      - key: DB_AUTO_INIT
+        value: "false"
+      # --- CORS ---
+      # Set to your Vercel frontend origin (with scheme).
+      - key: APP_URL
+        fromSecret: APP_URL
+      - key: CORS_ORIGINS
+        fromSecret: CORS_ORIGINS
+      # --- Email (optional) ---
+      - key: SMTP_HOST
+        fromSecret: SMTP_HOST
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        fromSecret: SMTP_USER
+      - key: SMTP_PASS
+        fromSecret: SMTP_PASS
+      # --- Business (optional) ---
+      - key: BUSINESS_NAME
+        value: BizFlow

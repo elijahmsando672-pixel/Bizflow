@@ -7,7 +7,8 @@ because the frontend is always the same Next.js build.
 |--------|----------|-----|----------|
 | Docker Compose | `client/Dockerfile` → :3000 | `server/Dockerfile` → :5000 | `postgres:16-alpine` → **:5433** |
 | Vercel + Supabase | Next.js on Vercel | `api/*.js` as a function, same origin | Supabase pooler :6543 |
-| Vercel + any Postgres host | Next.js on Vercel | Express on a long-running host, cross-origin | Managed Postgres |
+| Render / Railway + Supabase | Next.js on Vercel | Express on Render/Railway, cross-origin | Supabase pooler :6543 |
+| Any long-running VM | any host | Express on a VM, cross-origin | any Postgres |
 
 ## Docker Compose
 
@@ -261,6 +262,41 @@ Hobby plans are limited to daily crons, so a weekly schedule needs a paid plan.
 
 Until such a route exists, run recurring work from the long-running Docker/VM
 deployment, where `setInterval` is actually reliable.
+
+## Render or Railway + Supabase
+
+A `render.yaml` and `railway.json` live at the repo root for one-command deploys
+of the backend API to Render or Railway with Supabase as the database.
+
+1. Fork the repo into Render's "Web Service" (or Railway's "Deploy from repo").
+2. Set these **secrets** in the platform dashboard (they map to the `fromSecret`
+   keys in `render.yaml`):
+
+   | Secret name | Value |
+   |---|---|
+   | `JWT_SECRET` | `openssl rand -base64 64` |
+   | `SUPABASE_POOLER_URL` | transaction pooler URL, port 6543 |
+   | `DB_SSL_CA_PEM` | contents of `prod-ca-2021.crt` from Supabase Dashboard → Database → SSL |
+   | `CORS_ORIGINS` | your Vercel frontend origin, e.g. `https://bizflow.vercel.app` |
+   | `APP_URL` | same frontend origin |
+   | `NEXT_PUBLIC_API_URL` | the Render/Railway API URL, e.g. `https://bizflow-api.onrender.com/api` |
+   | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | SMTP credentials (optional) |
+
+3. Run `db:init` once from a machine that can reach the database directly
+   (the pooler at :6543 cannot run DDL):
+
+   ```bash
+   DB_INIT_URL=postgresql://postgres.<ref>:<password>@db.<ref>.supabase.co:5432/postgres \
+   npm --prefix server run db:init
+   ```
+
+4. On Vercel, set `NEXT_PUBLIC_API_URL` to the API URL from step 2 and redeploy
+   the frontend.
+
+This layout is cross-origin — the API is on a different domain than the Vercel
+frontend, so `CORS_ORIGINS` must list the frontend origin **with its scheme**,
+and refresh-token cookies are subject to `SameSite` rules. See
+[Long-running host](#long-running-host-docker-vm) for the general caveats.
 
 ## Long-running host (Docker, VM)
 
