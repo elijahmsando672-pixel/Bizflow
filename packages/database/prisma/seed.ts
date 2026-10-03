@@ -1,5 +1,16 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+
+// Same guard as server/seed.js and server/scripts/seedDemo.js: this file writes a
+// fixed business id, so a run against production would overwrite a real tenant.
+if (process.env.NODE_ENV === 'production' && process.env.SEED_DEMO_ALLOW_PRODUCTION !== 'true') {
+  console.error(
+    'Refusing to seed demo data with NODE_ENV=production. ' +
+    'Set SEED_DEMO_ALLOW_PRODUCTION=true only against a disposable database.'
+  );
+  process.exit(1);
+}
 
 const prisma = new PrismaClient();
 
@@ -19,6 +30,10 @@ async function main() {
     },
   });
 
+  // Generated per run unless the operator supplies one, so the demo account's
+  // password is never a value published in the repository.
+  const demoPassword = process.env.SEED_DEMO_PASSWORD || `Demo-${crypto.randomUUID()}`;
+
   // Create demo user (or use existing)
   const user = await prisma.user.upsert({
     where: { email: 'demo@bizflow.com' },
@@ -26,7 +41,7 @@ async function main() {
     create: {
       email: 'demo@bizflow.com',
       name: 'Demo User',
-      passwordHash: await bcrypt.hash('demo1234', 12),
+      passwordHash: await bcrypt.hash(demoPassword, 12),
       role: 'OWNER',
       businessId: business.id,
     },
@@ -110,6 +125,7 @@ async function main() {
   console.log('Database seeded successfully!');
   console.log(`Business: ${business.name} (${business.id})`);
   console.log(`User: ${user.email}`);
+  console.log(`Password: ${demoPassword}`);
   console.log(`Products: ${products.length}`);
   console.log(`Customer: ${customer?.name ?? 'N/A'}`);
 }
