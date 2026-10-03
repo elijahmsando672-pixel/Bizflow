@@ -135,6 +135,7 @@ export default function CreditTransactionsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="credit"
         title="Credit transactions"
         description="Every credit invoice raised for your debtor accounts."
         actions={

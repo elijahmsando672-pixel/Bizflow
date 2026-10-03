@@ -123,6 +123,7 @@ export default function CustomersPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="customers"
         title="Customers"
         description="Everyone who buys from your business, with contact details and credit limits."
         actions={

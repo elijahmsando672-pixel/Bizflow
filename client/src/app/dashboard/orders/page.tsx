@@ -187,6 +187,7 @@ export default function OrdersPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="orders"
         title="Orders"
         description="Sales that still need handing over or chasing for payment."
         actions={

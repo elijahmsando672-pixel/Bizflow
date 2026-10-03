@@ -192,6 +192,7 @@ export default function ProductsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="products"
         title="Items & products"
         description="Your catalogue, pricing, and stock levels."
         actions={

@@ -164,6 +164,7 @@ export default function MpesaReportsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="payments"
         title="M-Pesa reports"
         description="Where your mobile money came from and where it went."
         actions={

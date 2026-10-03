@@ -148,6 +148,7 @@ export default function NotificationsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="notifications"
         title="Notifications"
         description="Overdue sales, stock alerts, and system messages in one place."
         actions={

@@ -123,6 +123,7 @@ export default function BudgetsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="budgets"
         title="Budgets"
         description="Plan what to restock, what it will cost, and raise a draft purchase order in one step."
         actions={

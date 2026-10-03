@@ -225,6 +225,7 @@ export default function MpesaAgentsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="payments"
         title="M-Pesa agents"
         description="The till and paybill numbers you collect through, and the commission each one earns."
         actions={

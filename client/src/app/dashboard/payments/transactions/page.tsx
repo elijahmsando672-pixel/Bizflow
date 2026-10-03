@@ -147,6 +147,7 @@ export default function MpesaTransactionsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="payments"
         title="M-Pesa transactions"
         description="Every mobile money movement recorded against your business."
         actions={

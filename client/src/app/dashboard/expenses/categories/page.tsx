@@ -99,6 +99,7 @@ export default function ExpenseCategoriesPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="expenses"
         title="Expense categories"
         description="Group spend so reports and budgets stay meaningful."
         actions={

@@ -292,6 +292,7 @@ export default function ExpensesPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="expenses"
         title="Expenses"
         description="Every cost you record also posts to your cash-flow ledger, so reports stay in step."
         actions={

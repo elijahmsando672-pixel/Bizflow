@@ -375,6 +375,7 @@ export default function PaymentsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="payments"
         title="Payments"
         description="Money in and out — mobile money settlements and the invoices you have raised."
         actions={

@@ -66,6 +66,7 @@ export default function RevenuePage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="revenue"
         title="Revenue"
         description="Sales performance, average order value, and your best customers and products."
         actions={

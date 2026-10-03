@@ -96,6 +96,7 @@ export default function CategoriesPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="categories"
         title="Categories"
         description="Group your products so the catalogue and reports stay organised."
         actions={

@@ -30,6 +30,7 @@ import {
 } from "@/components/dashboard/dashboard-panels";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { Panel, PanelBody } from "@/components/ui/panel";
 
@@ -117,32 +118,27 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground lg:text-2xl">
-            {greeting()}
-            {user?.name ? `, ${user.name.split(" ")[0]}` : ""}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {today()}
-            {selectedShop ? ` · ${selectedShop.name}` : ""} — here is how your business is doing.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button asChild>
-            <Link href="/dashboard/sales/new">
-              <ScanLine className="h-4 w-4" aria-hidden />
-              New Sale
-            </Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/reports">
-              <BarChart3 className="h-4 w-4" aria-hidden />
-              Reports
-            </Link>
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        module="dashboard"
+        title={`${greeting()}${user?.name ? `, ${user.name.split(" ")[0]}` : ""}`}
+        description={`${today()}${selectedShop ? ` · ${selectedShop.name}` : ""} — here is how your business is doing.`}
+        actions={
+          <>
+            <Button asChild>
+              <Link href="/dashboard/sales/new">
+                <ScanLine className="h-4 w-4" aria-hidden />
+                New Sale
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/reports">
+                <BarChart3 className="h-4 w-4" aria-hidden />
+                Reports
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
       <section aria-label="Quick actions">
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">

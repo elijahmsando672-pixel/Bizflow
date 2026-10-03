@@ -187,6 +187,7 @@ export default function InventoryPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="inventory"
         title="Inventory"
         description="Stock on hand for every product, with reorder levels and the value of the shelf."
         actions={

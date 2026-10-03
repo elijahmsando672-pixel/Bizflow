@@ -83,6 +83,7 @@ export default function ReportsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="reports"
         title="Reports"
         description="Profit and loss, sales performance, stock value, cashflow, and VAT."
         actions={

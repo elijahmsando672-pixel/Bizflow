@@ -130,6 +130,7 @@ export default function StockTransfersPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="transfers"
         title="Stock transfers"
         description="Every movement of stock in and out, with the running balance for each item."
         actions={

@@ -162,6 +162,7 @@ export default function UsersPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="users"
         title="Users"
         description="Team members, roles, and pending invitations for this business."
         actions={

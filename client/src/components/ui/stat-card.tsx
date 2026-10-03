@@ -55,7 +55,7 @@ export function StatCard({
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
         {Icon ? (
-          <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", ICON_TONES[tone])}>
+          <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-xl", ICON_TONES[tone])}>
             <Icon className="h-4 w-4" aria-hidden />
           </span>
         ) : null}
@@ -77,7 +77,7 @@ export function StatCard({
   );
 
   const shell = cn(
-    "rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm transition-colors",
+    "rounded-card border border-border bg-card p-4 text-card-foreground shadow-card transition-colors",
     href && "hover:border-primary/40 focus-visible:border-primary/40",
     className
   );

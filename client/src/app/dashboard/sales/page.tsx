@@ -262,6 +262,7 @@ export default function SalesPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="sales"
         title="Sales"
         description="Every sale your business has raised, with what has been collected and what is still owed."
         actions={

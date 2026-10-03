@@ -241,6 +241,7 @@ export default function CreditPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="credit"
         title="Credit"
         description="Track who owes you, who you owe, and every credit transaction."
         actions={

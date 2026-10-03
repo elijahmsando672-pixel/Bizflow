@@ -250,6 +250,8 @@ export default function PointOfSalePage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="pos"
+        variant="plain"
         title="Point of Sale"
         description="Ring up a sale, take payment, and print a receipt."
         actions={

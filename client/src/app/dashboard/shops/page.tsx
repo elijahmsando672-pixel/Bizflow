@@ -261,6 +261,7 @@ export default function ShopsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="shops"
         title="Business"
         description="The branches, counters and depots you trade from."
         actions={

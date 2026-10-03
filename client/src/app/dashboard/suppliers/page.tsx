@@ -173,6 +173,7 @@ export default function SuppliersPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="suppliers"
         title="Suppliers"
         description="The vendors you buy from and the purchase orders you have raised."
         actions={

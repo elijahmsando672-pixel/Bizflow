@@ -114,6 +114,7 @@ export default function ExpiringDocumentsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="documents"
         title="Expiring soon"
         description="Invoices approaching their due date and quotations approaching expiry."
         actions={

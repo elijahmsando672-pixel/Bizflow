@@ -139,6 +139,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="settings"
         title="Settings"
         description="Your account, business details, and security."
       />

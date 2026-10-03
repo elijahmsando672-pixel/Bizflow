@@ -36,6 +36,7 @@
   --shadow-card: 0 2px 10px 0 rgb(94 86 105 / 0.08);
   --shadow-dropdown: 0 4px 16px 0 rgb(94 86 105 / 0.14);
   --shadow-modal: 0 10px 32px 0 rgb(94 86 105 / 0.2);
+  --shadow-hero: 0 8px 24px -10px rgb(94 86 105 / 0.28);
 }
 
 @theme inline {
@@ -76,6 +77,10 @@
   --radius-xl: 0.625rem;
   --radius-2xl: 0.75rem;
   --radius-3xl: 1rem;
+  /* Surfaces (cards, panels, stat tiles, hero banners) share one 16px radius. */
+  --radius-card: 1rem;
+  /* Soft, wide lift used by the coloured module hero banners. */
+  --shadow-hero: 0 8px 24px -10px rgb(94 86 105 / 0.28);
   --font-sans: var(--font-poppins);
   --font-mono: var(--font-geist-mono);
 }
@@ -113,6 +118,7 @@
   --shadow-card: 0 2px 10px 0 rgb(0 0 0 / 0.3);
   --shadow-dropdown: 0 4px 16px 0 rgb(0 0 0 / 0.45);
   --shadow-modal: 0 10px 32px 0 rgb(0 0 0 / 0.55);
+  --shadow-hero: 0 8px 24px -10px rgb(0 0 0 / 0.5);
 }
 
 * {

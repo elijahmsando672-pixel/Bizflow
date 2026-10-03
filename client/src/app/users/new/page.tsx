@@ -55,6 +55,8 @@ export default function InviteUserPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        module="users"
+        variant="plain"
         title="Invite user"
         description="Give a colleague access to your business with the right level of permission."
         actions={
