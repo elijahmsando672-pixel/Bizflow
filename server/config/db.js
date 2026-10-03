@@ -20,7 +20,18 @@ export const isServerless = (env = process.env) =>
 // DATABASE_URL is kept last purely as a compatibility fallback. Deployments that
 // predate the SUPABASE_* names still have DATABASE_URL set in their environment, and
 // silently ignoring it would point the pool at localhost instead of failing loudly.
-const connectionString = (env) => env.SUPABASE_POOLER_URL || env.SUPABASE_DB_URL || env.DATABASE_URL || '';
+//
+// The exception is the test suite. `server/.env` is gitignored, so every developer
+// has one, and it almost always carries a DATABASE_URL pointing at their working
+// database. That file wins the precedence above, which meant `npm test` quietly
+// created and deleted rows in the developer's real data while CI — which has no
+// .env — ran against bizflow_test and looked fine. Under NODE_ENV=test the
+// discrete DB_* vars are honoured instead, so the suite can only reach what the
+// test job explicitly named.
+const connectionString = (env) => {
+  if (env.NODE_ENV === 'test' && env.DB_NAME) return '';
+  return env.SUPABASE_POOLER_URL || env.SUPABASE_DB_URL || env.DATABASE_URL || '';
+};
 
 const hostFrom = (url) => {
   if (!url) return '';

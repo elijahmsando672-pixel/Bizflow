@@ -41,6 +41,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (value) => typeof value === 'string' && UUID.test(value);
 
 /**
+ * Callers reach for this from two places: inside a transaction, where they hold a
+ * pool client, and outside one, where all they have is the module-level `query`
+ * helper. Accept both rather than making every call site wrap the helper.
+ */
+const runner = (client) =>
+  typeof client === 'function' ? client : client.query.bind(client);
+
+/**
  * Throws unless `id` is a row in `table` owned by `businessId`.
  *
  * The message deliberately does not distinguish "missing" from "belongs to someone
@@ -57,7 +65,7 @@ export const assertOwned = async (client, table, id, businessId, label = table) 
     throw new AppError(`Invalid ${label} reference`, 400);
   }
 
-  const { rows } = await client.query(
+  const { rows } = await runner(client)(
     `SELECT 1 FROM ${table} WHERE id = $1 AND business_id = $2`,
     [id, businessId]
   );

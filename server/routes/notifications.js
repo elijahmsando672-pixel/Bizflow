@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
     const overdueSales = await query(
       `SELECT s.*, c.name as customer_name, c.email as customer_email
        FROM sales s 
-       LEFT JOIN customers c ON s.customer_id = c.id
+       LEFT JOIN customers c ON s.customer_id = c.id AND c.business_id = s.business_id
        WHERE s.business_id = $1 AND s.status IN ('pending', 'sent') AND s.due_date < NOW() - INTERVAL '3 days'`,
       [businessId]
     );
@@ -45,7 +45,7 @@ router.post('/send-reminder/:id', async (req, res) => {
     const invoiceResult = await query(
       `SELECT s.*, c.name as customer_name, c.email as customer_email
        FROM sales s 
-       LEFT JOIN customers c ON s.customer_id = c.id
+       LEFT JOIN customers c ON s.customer_id = c.id AND c.business_id = s.business_id
        WHERE s.id = $1 AND s.business_id = $2`,
       [req.params.id, req.business_id]
     );

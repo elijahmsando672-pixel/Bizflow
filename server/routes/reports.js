@@ -21,7 +21,7 @@ router.get('/profit-loss', async (req, res) => {
     );
     const cogs = await query(
       `SELECT COALESCE(SUM(si.qty * p.cost_price), 0) as total
-       FROM sale_items si LEFT JOIN products p ON si.product_id = p.id
+       FROM sale_items si LEFT JOIN products p ON si.product_id = p.id AND p.business_id = si.business_id
        WHERE si.business_id = $1 AND si.created_at BETWEEN $2 AND $3`,
       [businessId, startDate, endDate]
     );
@@ -87,7 +87,7 @@ router.get('/sales-report', async (req, res) => {
 
     const topCustomers = await query(
       `SELECT c.name, COUNT(*) as purchase_count, SUM(s.total) as total_spent
-       FROM sales s JOIN customers c ON s.customer_id = c.id
+       FROM sales s JOIN customers c ON s.customer_id = c.id AND c.business_id = s.business_id
        WHERE s.business_id = $1 AND s.sale_date BETWEEN $2 AND $3
        GROUP BY c.id, c.name ORDER BY total_spent DESC LIMIT 10`,
       [businessId, startDate, endDate]
@@ -95,7 +95,7 @@ router.get('/sales-report', async (req, res) => {
 
     const topProducts = await query(
       `SELECT p.name, SUM(si.qty) as qty_sold, SUM(si.total) as revenue
-       FROM sale_items si JOIN products p ON si.product_id = p.id
+       FROM sale_items si JOIN products p ON si.product_id = p.id AND p.business_id = si.business_id
        WHERE si.business_id = $1 AND si.created_at BETWEEN $2 AND $3
        GROUP BY p.id, p.name ORDER BY revenue DESC LIMIT 10`,
       [businessId, startDate, endDate]
@@ -134,7 +134,7 @@ router.get('/inventory-report', async (req, res) => {
 
     const stockMovements = await query(
       `SELECT sm.*, p.name as product_name
-       FROM stock_movements sm JOIN products p ON sm.product_id = p.id
+       FROM stock_movements sm JOIN products p ON sm.product_id = p.id AND p.business_id = sm.business_id
        WHERE sm.business_id = $1 AND sm.created_at >= NOW() - INTERVAL '30 days'
        ORDER BY sm.created_at DESC LIMIT 50`,
       [businessId]

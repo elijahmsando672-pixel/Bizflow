@@ -3,54 +3,72 @@ import { query } from '../config/db.js';
 import csvParser from 'csv-parser';
 import { Readable } from 'stream';
 import { sendError } from '../utils/sendError.js';
+import { assertOwned } from '../utils/tenantGuard.js';
 
 const router = express.Router();
 
+// `fks` names the columns that hold a reference to another tenant-owned row.
+// The column allowlist keeps `business_id` out of a caller's reach, but it does
+// not stop a caller pointing `customer_id` at somebody else's customer: the row
+// would be written into the caller's tenant while referencing a row the caller
+// cannot read. Every id below is proved to belong to the caller's business
+// before the insert.
 const RESOURCE_CONFIG = {
   customers: {
     table: 'customers',
     columns: ['name', 'email', 'phone', 'company', 'address', 'notes', 'credit_limit'],
     required: ['name'],
+    fks: {},
   },
   products: {
     table: 'products',
     columns: ['name', 'sku', 'category', 'price', 'stock_qty', 'description', 'reorder_level', 'cost_price'],
     required: ['name', 'price'],
+    fks: {},
   },
   leads: {
     table: 'leads',
     columns: ['first_name', 'last_name', 'email', 'phone', 'company', 'job_title', 'source', 'status', 'estimated_value', 'notes'],
     required: ['first_name'],
+    fks: {},
   },
   vendors: {
     table: 'vendors',
     columns: ['name', 'email', 'phone', 'contact_person', 'address', 'payment_terms', 'notes'],
     required: ['name'],
+    fks: {},
   },
   employees: {
     table: 'employees',
     columns: ['first_name', 'last_name', 'email', 'phone', 'position', 'department', 'hire_date', 'status'],
     required: ['first_name', 'email'],
+    fks: {},
   },
   invoices: {
     table: 'invoices',
     columns: ['customer_id', 'invoice_number', 'total', 'status', 'due_date', 'notes'],
     required: ['customer_id', 'total'],
+    fks: { customer_id: 'customers' },
   },
   expenses: {
     table: 'expenses',
     columns: ['description', 'amount', 'category', 'expense_date', 'status', 'receipt_url'],
     required: ['description', 'amount'],
+    fks: {},
   },
   deals: {
     table: 'deals',
     columns: ['name', 'lead_id', 'stage_id', 'value', 'probability', 'expected_close_date', 'notes'],
     required: ['name'],
+    fks: { lead_id: 'leads', stage_id: 'deal_stages' },
   },
   tickets: {
     table: 'support_tickets',
-    columns: ['subject', 'description', 'priority', 'status', 'customer_id', 'assignee_id'],
+    // `ticket_number` is NOT NULL and UNIQUE, and the column holding the assignee
+    // is `assigned_to`. Without both this config can only ever produce failed rows.
+    columns: ['ticket_number', 'subject', 'description', 'priority', 'status', 'customer_id', 'assigned_to'],
     required: ['subject'],
+    fks: { customer_id: 'customers', assigned_to: 'users' },
   },
 };
 
@@ -60,6 +78,27 @@ const validateColumnNames = (columns) => {
     if (!VALID_COLUMN_RE.test(col)) {
       throw new Error(`Invalid column name: ${col}`);
     }
+  }
+};
+
+/**
+ * Proves every foreign key on an incoming row belongs to the caller's business.
+ *
+ * `business_id` is taken from the JWT and the column allowlist keeps callers from
+ * supplying it, so the row itself lands in the right tenant. What the allowlist
+ * does not cover is the row pointing *outward*: `customer_id` is an ordinary
+ * column in the list, so without this check an importer could store a reference
+ * to another tenant's customer. Reads that join on the id would then hand back
+ * that other tenant's name and email.
+ *
+ * Throwing per row is intentional — the caller sees one failed row in the import
+ * report rather than losing the whole file.
+ */
+const assertRowOwned = async (config, row, businessId) => {
+  for (const [column, table] of Object.entries(config.fks || {})) {
+    const id = row?.[column];
+    if (id === undefined || id === null || id === '') continue;
+    await assertOwned(query, table, id, businessId, column);
   }
 };
 
@@ -92,6 +131,8 @@ router.post('/:resource', async (req, res) => {
         const allColumns = [businessIdCol, ...columns];
         const allValues = [req.business_id, ...values];
         const allPlaceholders = ['$1', ...placeholders.map((_, i) => `$${i + 2}`)];
+
+        await assertRowOwned(config, row, req.business_id);
 
         const result = await query(
           `INSERT INTO ${config.table} (${allColumns.join(', ')}) VALUES (${allPlaceholders.join(', ')}) RETURNING id`,
@@ -161,6 +202,8 @@ router.post('/csv/:resource', async (req, res) => {
         const allColumns = ['business_id', ...columns];
         const allValues = [req.business_id, ...values];
         const allPlaceholders = ['$1', ...placeholders.map((_, i) => `$${i + 2}`)];
+
+        await assertRowOwned(config, cleaned, req.business_id);
 
         const result = await query(
           `INSERT INTO ${config.table} (${allColumns.join(', ')}) VALUES (${allPlaceholders.join(', ')}) RETURNING id`,

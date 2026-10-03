@@ -47,7 +47,7 @@ router.get('/', async (req, res) => {
     const recentSales = await query(
       `SELECT s.*, c.name as customer_name 
        FROM sales s 
-       LEFT JOIN customers c ON s.customer_id = c.id 
+       LEFT JOIN customers c ON s.customer_id = c.id AND c.business_id = s.business_id 
        WHERE s.business_id = $1 
        ORDER BY s.created_at DESC 
        LIMIT 5`,
@@ -209,9 +209,9 @@ router.get('/top-products', async (req, res) => {
               SUM(si.total) as total_revenue,
               AVG(si.unit_price) as avg_selling_price
        FROM sale_items si
-       JOIN products p ON si.product_id = p.id
-       LEFT JOIN categories c ON p.category_id = c.id
-       JOIN sales s ON si.sale_id = s.id
+       JOIN products p ON si.product_id = p.id AND p.business_id = si.business_id
+       LEFT JOIN categories c ON p.category_id = c.id AND c.business_id = p.business_id
+       JOIN sales s ON si.sale_id = s.id AND s.business_id = si.business_id
        WHERE si.business_id = $1 AND s.status != 'draft'
          AND s.sale_date >= CURRENT_DATE - $2::integer
        GROUP BY p.id, p.name, p.sku, p.stock_qty, p.selling_price, c.name

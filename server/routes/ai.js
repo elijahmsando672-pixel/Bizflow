@@ -37,7 +37,7 @@ router.get('/insights', async (req, res) => {
     );
     const topProducts = await query(
       `SELECT p.name, SUM(si.qty) as qty_sold, SUM(si.total) as revenue
-       FROM sale_items si JOIN products p ON si.product_id = p.id
+       FROM sale_items si JOIN products p ON si.product_id = p.id AND p.business_id = si.business_id
        WHERE si.business_id = $1 AND si.created_at >= NOW() - INTERVAL '30 days'
        GROUP BY p.id, p.name ORDER BY revenue DESC LIMIT 5`,
       [businessId]
