@@ -110,11 +110,15 @@ to check. Affected: `productController`, `crm`, `quotations`, `support`,
 Not fixed here. Listed so they are not mistaken for solved.
 
 - **No row-level security.** Isolation is one missing `WHERE` clause away from a
-  breach, in every query, forever. The plan is `withTenant`, which opens a
-  transaction, runs `set_config('app.current_business_id', ...)`, and lets RLS
-  policies on `business_id` become the backstop. Not yet implemented. Until then,
-  an ad-hoc query with a missing predicate is a data breach, and nothing will
-  stop it.
+  breach, in every query, forever. Until then, an ad-hoc query with a missing
+  predicate is a data breach, and nothing will stop it.
+
+  The groundwork is now in place: `server/utils/withTenant.js` opens a
+  transaction, pins the tenant with `set_config('app.current_business_id', ...)`,
+  and `describeRlsCoverage` reports whether the connected role could bypass
+  policies entirely. **No policies are written and no table has RLS enabled**, so
+  nothing reads that setting yet. The helper exists so enabling RLS later is a
+  migration rather than a refactor of every route.
 - **`assertOwned` only covers 22 tables.** Tables such as `stock_movements`,
   `payments`, `shops`, `notifications`, `audit_logs` and `team_invitations` carry
   `business_id` but are not in its allowlist, so `assertOwned` refuses to check
@@ -139,3 +143,6 @@ Not fixed here. Listed so they are not mistaken for solved.
    enumeration oracle across tenants. Keep it that way.
 5. A new join between two tenant tables needs the predicate. The regression test
    pattern in `tests/tenant-isolation.test.js` is the cheap way to prove it.
+6. Route handlers that need several statements should use `withTenant` rather
+   than hand-rolling `pool.connect()` / `BEGIN` / `COMMIT`. It is the same thing,
+   with the tenant pinned and the rollback handled in one place.

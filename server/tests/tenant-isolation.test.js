@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { app, setupDB } from './test-server.js';
 import { query } from '../config/db.js';
+import { withTenant, describeRlsCoverage } from '../utils/withTenant.js';
 
 // Tenant isolation is the one property a hosted multi-tenant product cannot get
 // wrong, so it is asserted rather than reviewed. Two businesses are created and
@@ -288,5 +289,79 @@ describe('joins do not leak across a tenant boundary', () => {
     // The sale is A's, so the route does find it; what it must not do is resolve
     // B's email address. A 2xx would mean the reminder went to B's customer.
     expect([400, 404]).toContain(res.status);
+  });
+});
+
+describe('withTenant', () => {
+  const SETTING = "SELECT current_setting('app.current_business_id', true) AS v";
+
+  it('pins the tenant for the duration of the transaction', async () => {
+    const seen = await withTenant(tenant.a.businessId, async (client) => {
+      const { rows } = await client.query(SETTING);
+      return rows[0].v;
+    });
+    expect(seen).toBe(tenant.a.businessId);
+  });
+
+  // The reason the third argument to set_config is `true`. With `false` the value
+  // lives on the session, and the pool hands that session to the next request — so
+  // a request that never set the tenant would silently inherit the previous
+  // tenant's identity. That is a cross-tenant read with no stack trace pointing
+  // at it, which is why this is asserted rather than trusted.
+  it('does not leave the tenant on the connection after commit', async () => {
+    await withTenant(tenant.a.businessId, async () => 'ok');
+    const { rows } = await query(SETTING);
+    expect(rows[0].v === null || rows[0].v === '').toBe(true);
+  });
+
+  it('does not leave the tenant on the connection after rollback', async () => {
+    await expect(
+      withTenant(tenant.a.businessId, async () => {
+        throw new Error('force rollback');
+      })
+    ).rejects.toThrow('force rollback');
+
+    const { rows } = await query(SETTING);
+    expect(rows[0].v === null || rows[0].v === '').toBe(true);
+  });
+
+  it('refuses to run without a tenant', async () => {
+    await expect(withTenant(null, async () => 'ok')).rejects.toThrow(/tenant is required/i);
+    await expect(withTenant(undefined, async () => 'ok')).rejects.toThrow(/tenant is required/i);
+  });
+
+  it('returns the callback result', async () => {
+    await expect(withTenant(tenant.a.businessId, async () => 42)).resolves.toBe(42);
+  });
+
+  it('makes a read-only transaction reject writes', async () => {
+    await expect(
+      withTenant(tenant.a.businessId, async (client) => {
+        await client.query("INSERT INTO customers (business_id, name) VALUES ($1, 'Rohu')", [tenant.a.businessId]);
+      }, { readOnly: true })
+    ).rejects.toThrow();
+
+    const { rows } = await query('SELECT count(*)::int AS n FROM customers WHERE name = $1', ['Rohu']);
+    expect(rows[0].n).toBe(0);
+  });
+});
+
+describe('describeRlsCoverage', () => {
+  it('reports whether the connected role can bypass row-level security', async () => {
+    const report = await describeRlsCoverage();
+
+    expect(typeof report.role).toBe('string');
+    expect(report.role).not.toBe('');
+    expect(typeof report.isSuperuser).toBe('boolean');
+    expect(typeof report.bypassesRls).toBe('boolean');
+    // Every table in this schema carries business_id, so the count is the whole
+    // inventory and a lower number means new tables were added without thinking
+    // about isolation.
+    expect(report.tenantTables).toBeGreaterThan(50);
+
+    // Nothing is true in a test database, which is the point: the report exists so
+    // a deployment where RLS *is* enabled by a superuser or the table owner is
+    // visible before it is trusted.
+    expect(typeof report.rlsIsInert).toBe('boolean');
   });
 });
