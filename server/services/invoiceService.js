@@ -1,8 +1,7 @@
 import { query, pool } from '../config/db.js';
 import { sendInvoiceEmail } from '../utils/email.js';
 import { assertOwned, assertAllOwned, collectIds } from '../utils/tenantGuard.js';
-
-const TAX_RATE = 0.16;
+import { calculateTotals, loadTaxRate, roundMoney } from '../utils/money.js';
 
 async function generateInvoiceNumber(client, businessId) {
   const result = await client.query(
@@ -12,23 +11,16 @@ async function generateInvoiceNumber(client, businessId) {
   return `INV-${String(parseInt(result.rows[0].next_num)).padStart(5, '0')}`;
 }
 
-function calculateTotals(items, discountAmount) {
-  let subtotal = 0;
-  for (const item of items) {
-    subtotal += (item.qty * item.unit_price) - (item.discount || 0);
-  }
-  const taxAmount = subtotal * TAX_RATE;
-  const total = Math.max(0, subtotal + taxAmount - discountAmount);
-  return { subtotal, taxAmount, total };
+function lineTotal(item) {
+  return roundMoney((item.qty * item.unit_price) - (item.discount || 0));
 }
 
 async function insertInvoiceItems(client, businessId, invoiceId, items) {
   for (const item of items) {
-    const itemTotal = (item.qty * item.unit_price) - (item.discount || 0);
     await client.query(
       `INSERT INTO invoice_items (business_id, invoice_id, product_id, product_name, qty, unit_price, discount, total)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [businessId, invoiceId, item.product_id, item.product_name, item.qty, item.unit_price, item.discount || 0, itemTotal]
+      [businessId, invoiceId, item.product_id, item.product_name, item.qty, item.unit_price, item.discount || 0, lineTotal(item)]
     );
   }
 }
@@ -59,7 +51,8 @@ export async function createInvoice(businessId, userId, data) {
     }
 
     const invoiceNumber = await generateInvoiceNumber(client, businessId);
-    const { subtotal, taxAmount, total } = calculateTotals(items, discount_amount);
+    const taxRate = await loadTaxRate(client, businessId);
+    const { subtotal, taxAmount, total } = calculateTotals({ items, orderDiscount: discount_amount, taxRatePercent: taxRate });
 
     // A request-supplied customer_id is stored as-is and joined back on every read, so
     // it has to be proven to belong to this tenant before it is written.
@@ -110,17 +103,30 @@ export async function updateInvoice(businessId, invoiceId, data) {
     // would move the invoice onto another tenant's customer record.
     await assertOwned(client, 'customers', customer_id, businessId, 'Customer');
 
-    let subtotal = existingInvoice.rows[0].subtotal;
+    const finalDiscount = discount_amount ?? existingInvoice.rows[0].discount_amount;
+    const taxRate = await loadTaxRate(client, businessId);
+
+    let subtotal;
+    let taxAmount;
+    let total;
+
     if (items && items.length > 0) {
       await assertAllOwned(client, 'products', collectIds(items, 'product_id'), businessId, 'Product');
       await client.query('DELETE FROM invoice_items WHERE invoice_id = $1 AND business_id = $2', [invoiceId, businessId]);
       await insertInvoiceItems(client, businessId, invoiceId, items);
-      subtotal = calculateTotals(items, discount_amount || existingInvoice.rows[0].discount_amount).subtotal;
+      // Recomputed from the new lines so the discount cannot exceed the subtotal
+      // they imply. An update that lowered the line count while leaving a large
+      // discount in place used to produce a negative total.
+      ({ subtotal, taxAmount, total } = calculateTotals({ items, orderDiscount: finalDiscount, taxRatePercent: taxRate }));
+    } else {
+      // Lines unchanged, so the subtotal stays as stored rather than being rebuilt
+      // from items this request did not send.
+      subtotal = roundMoney(existingInvoice.rows[0].subtotal);
+      const recomputed = calculateTotals({ items: [{ qty: 1, unit_price: subtotal }], orderDiscount: finalDiscount, taxRatePercent: taxRate });
+      taxAmount = recomputed.taxAmount;
+      total = recomputed.total;
     }
 
-    const finalDiscount = discount_amount ?? existingInvoice.rows[0].discount_amount;
-    const taxAmount = subtotal * TAX_RATE;
-    const total = subtotal + taxAmount - finalDiscount;
     const paidDate = status === 'paid' ? new Date() : existingInvoice.rows[0].paid_date;
 
     const result = await client.query(

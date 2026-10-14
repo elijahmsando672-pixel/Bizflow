@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../config/db.js';
 import { sendError } from '../utils/sendError.js';
+import { calculateTotals, loadTaxRate } from '../utils/money.js';
 
 const router = express.Router();
 
@@ -293,14 +294,18 @@ router.post('/restock-budget', async (req, res) => {
     const poNumber = `PO-${poCounter}`;
     const budgetItems = items || [];
 
-    let subtotal = 0;
-    for (const item of budgetItems) {
-      const qty = Math.max(0, Math.ceil(item.reorder_level * multiplier - item.stock_qty));
-      subtotal += qty * parseFloat(item.cost_price || 0);
-    }
+    // The restock quantity per product is computed twice below, once to total the
+    // order and once to insert the lines. Deriving it here keeps the two in step:
+    // they used to be separate loops, so a change to the rounding or the ceiling
+    // would total an order that did not match its own line items.
+    const restockQty = (item) => Math.max(0, Math.ceil(item.reorder_level * multiplier - item.stock_qty));
 
-    const tax = Math.round(subtotal * 0.16);
-    const total = subtotal + tax;
+    const taxRatePercent = await loadTaxRate(query, req.business_id);
+    const { subtotal, taxAmount: tax, total } = calculateTotals({
+      items: budgetItems.map((item) => ({ qty: restockQty(item), unit_price: parseFloat(item.cost_price || 0) })),
+      orderDiscount: 0,
+      taxRatePercent,
+    });
 
     const po = await query(
       `INSERT INTO purchase_orders (business_id, po_number, vendor_id, status, order_date, subtotal, tax_amount, total, notes, created_by)
@@ -309,7 +314,7 @@ router.post('/restock-budget', async (req, res) => {
     );
 
     for (const item of budgetItems) {
-      const qty = Math.max(0, Math.ceil(item.reorder_level * multiplier - item.stock_qty));
+      const qty = restockQty(item);
       if (qty > 0) {
         await query(
           `INSERT INTO po_items (business_id, po_id, product_id, product_name, qty, unit_price, total)

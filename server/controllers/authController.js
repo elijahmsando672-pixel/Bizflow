@@ -1,3 +1,4 @@
+/* tenant-exempt-file: users — pre-authentication flows, where the caller's identity or a single-use emailed token is the scope and no session's business_id exists yet */
 import jwt from 'jsonwebtoken';
 import Joi from 'joi';
 import crypto from 'crypto';
@@ -93,8 +94,17 @@ const checkIpWhitelist = async (businessId, ip) => {
 const registerSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
   email: Joi.string().email().required(),
-  password: Joi.string().min(10).pattern(/[a-z]/).pattern(/[A-Z]/).pattern(/[0-9]/).pattern(/[^a-zA-Z0-9]/).required()
-    .messages({ 'string.pattern.base': 'Password must contain uppercase, lowercase, number, and special character', 'string.min': 'Password must be at least 10 characters' }),
+  // Each rule reports its own failure so the client can name the exact
+  // requirement that is missing instead of repeating all four.
+  password: Joi.string().min(10).required()
+    .pattern(/[a-z]/, 'a lowercase letter')
+    .pattern(/[A-Z]/, 'an uppercase letter')
+    .pattern(/[0-9]/, 'a number')
+    .pattern(/[^a-zA-Z0-9]/, 'a special character')
+    .messages({
+      'string.min': 'Password must be at least 10 characters',
+      'string.pattern.name': 'Password must contain at least {{#name}}',
+    }),
   business_name: Joi.string().min(2).max(255).required(),
   phone: Joi.string().pattern(/^[+]?[\d\s-]+$/).optional(),
   captcha_token: Joi.string().optional(),

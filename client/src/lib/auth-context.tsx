@@ -249,7 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!response.ok) {
       let msg = "Invalid OTP";
-      try { const err = await response.json(); msg = err.error || msg; } catch {}
+      try { const err = await response.json(); msg = err.error || err.message || msg; } catch {}
       throw new Error(msg);
     }
 
@@ -285,7 +285,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let data: any;
     try { data = await response.json(); } catch { throw new Error("Invalid server response"); }
     if (!response.ok) {
-      throw new Error(data.error || "Registration failed");
+      throw new Error(data.error || data.message || "Registration failed");
     }
 
     setToken(data.token);

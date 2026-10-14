@@ -1,3 +1,4 @@
+/* tenant-exempt-file: users — pre-authentication attribution, resolving the tenant to file a login failure against before any session exists */
 import { query } from '../config/db.js';
 import { PRIVILEGED_ROLES } from '../config/roles.js';
 

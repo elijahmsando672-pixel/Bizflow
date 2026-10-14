@@ -1,5 +1,6 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
+import { calculateTotals, loadTaxRate } from '../utils/money.js';
 
 dotenv.config();
 
@@ -66,6 +67,10 @@ async function seedDemo() {
       const bizIdResult = await query(`SELECT business_id FROM users WHERE id = $1`, [user.id]);
       BUSINESS_ID = bizIdResult.rows[0].business_id;
     }
+
+    // Read the rate from the business row rather than assuming 16%, so demo data
+    // stays consistent with the tenant it is being seeded into.
+    const taxRatePercent = await loadTaxRate(query, BUSINESS_ID);
 
     // 1. Customers
     const customers = [
@@ -183,9 +188,11 @@ async function seedDemo() {
       saleCounter++;
       const invNum = `INV-${saleCounter}`;
       const custId = customerIds[s.customer];
-      const subtotal = s.items.reduce((sum, i) => sum + i.qty * i.price, 0);
-      const tax = Math.round(subtotal * 0.16);
-      const total = subtotal + tax;
+      const { subtotal, taxAmount: tax, total } = calculateTotals({
+        items: s.items.map((i) => ({ qty: i.qty, unit_price: i.price })),
+        orderDiscount: 0,
+        taxRatePercent: taxRatePercent,
+      });
 
       const sale = await query(
         `INSERT INTO sales (business_id, customer_id, invoice_number, status, sale_date, subtotal, tax_amount, total, amount_paid, created_by)
@@ -427,9 +434,11 @@ async function seedDemo() {
     for (const po of purchaseOrders) {
       poCounter++;
       const vendorId = vendorIds[po.vendor];
-      const subtotal = po.items.reduce((sum, i) => sum + i.qty * i.price, 0);
-      const tax = Math.round(subtotal * 0.16);
-      const total = subtotal + tax;
+      const { subtotal, taxAmount: tax, total } = calculateTotals({
+        items: po.items.map((i) => ({ qty: i.qty, unit_price: i.price })),
+        orderDiscount: 0,
+        taxRatePercent: taxRatePercent,
+      });
 
       const r = await query(
         `INSERT INTO purchase_orders (business_id, po_number, vendor_id, status, order_date, subtotal, tax_amount, total, created_by)

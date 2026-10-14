@@ -165,10 +165,23 @@ tenant filter. Two things carry the isolation: `req.business_id` comes from the
 verified JWT (or the API key row) and never from request input, and every tenant
 query must filter on it. `server/utils/tenantGuard.js` (`assertOwned`) additionally
 proves ownership before a request-supplied id is persisted as a foreign key.
-Roles are per-business only — there is no platform-admin tier.
+
+That second half is machine-checked rather than left to review:
+
+```bash
+npm run audit:tenancy
+```
+
+`scripts/audit-tenancy.js` reads the tenant-scoped tables out of the schema and
+requires every statement that touches one to carry a `business_id` comparison, so a
+forgotten predicate fails the build. It runs in CI as the `tenancy-audit` job and as
+part of `npm run lint`. Roles are per-business only — there is no platform-admin
+tier.
 
 See [Architecture → Multi-tenancy](./docs/architecture.md#multi-tenancy) for the
-failure modes and the review recipe.
+failure modes and the review recipe, and
+[Tenant isolation](./docs/tenant-isolation.md) for the audit trail of what has been
+found and fixed.
 
 ### Security
 - **JWT access tokens** (15 min) + **httpOnly refresh tokens** (7 days, cookie-only, no XSS exposure)
@@ -237,7 +250,7 @@ Bizflow/
 │   ├── middleware/      # auth, CSRF, RBAC, security
 │   └── utils/           # Password hashing, email, audit, jobs
 ├── api/                 # Vercel serverless entry points
-├── scripts/             # Endpoint contract linter
+├── scripts/             # Endpoint contract linter, tenancy audit
 ├── docker-compose.yml
 └── .env.example
 ```

@@ -222,6 +222,9 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
       registration_number VARCHAR(100),
       tax_id VARCHAR(100),
       logo_url TEXT,
+      -- VAT as a percentage (16 = 16%), applied to the amount after discount.
+      -- See migrations/008_business_tax_rate.sql.
+      tax_rate NUMERIC(5,2) NOT NULL DEFAULT 16.00,
       status VARCHAR(20) DEFAULT 'pending',
       timezone VARCHAR(50) DEFAULT 'Africa/Nairobi',
       currency VARCHAR(10) DEFAULT 'KES',
@@ -1330,7 +1333,7 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id UUID REFERENCES users(id) ON DELETE CASCADE,
       business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
-      endpoint TEXT NOT NULL UNIQUE,
+      endpoint TEXT NOT NULL,
       p256dh_key TEXT NOT NULL,
       auth_key TEXT NOT NULL,
       device_name VARCHAR(255),
@@ -1338,6 +1341,10 @@ export const initDatabase = async (retries = 10, baseDelay = 3000) => {
     );
 
     CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id);
+    -- An endpoint identifies a browser, not a tenant, so it is unique per business
+    -- rather than globally. See migrations/009_push_subscriptions_per_business.sql.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_push_subscriptions_business_endpoint
+      ON push_subscriptions(business_id, endpoint);
 
     -- ========================================
     -- Security: Temp Tokens (opaque short-lived, e.g. TOTP pre-auth)

@@ -70,6 +70,7 @@ export const authenticateApiKey = async (req, res, next) => {
     req.business_id = keyData.business_id;
     req.user = { id: keyData.created_by, business_id: keyData.business_id, role: 'api', apiKeyId: keyData.id };
 
+    /* tenant-exempt: bookkeeping on the key row the presented secret just resolved to, so there is no caller to scope it against */
     query('UPDATE api_keys SET last_used_at = NOW() WHERE id = $1', [keyData.id]).catch(() => {});
     next();
   } catch (err) {

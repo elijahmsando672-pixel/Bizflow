@@ -12,9 +12,10 @@
     "postinstall": "npm --prefix client install && npm --prefix server install",
     "build": "npm --prefix client run build",
     "start": "npm --prefix client run start",
-    "lint": "npm run lint:client && npm run lint:server",
+    "lint": "npm run lint:client && npm run lint:server && npm run audit:tenancy",
     "lint:client": "npm --prefix client run lint",
     "lint:server": "eslint .",
+    "audit:tenancy": "node scripts/audit-tenancy.js",
     "validate": "node scripts/validate-endpoints.js",
     "backup": "node server/scripts/backup.js",
     "version:sync": "node -e \"const v=require('./package.json').version; const p=require('./client/package.json'); p.version=v; require('fs').writeFileSync('./client/package.json', JSON.stringify(p, null, 2)+'\\n'); console.log('Synced client version to '+v);\""

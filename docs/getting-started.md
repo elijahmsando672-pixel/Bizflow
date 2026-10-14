@@ -164,13 +164,21 @@ thin proxy into `client/` or `server/`.
 | `npm run dev:all` | `concurrently` | Both of the above |
 | `npm run build` | `npm --prefix client run build` | Production frontend build |
 | `npm start` | `npm --prefix client run start` | Serve the built frontend |
-| `npm run lint` | `npm --prefix client run lint` | ESLint over the frontend |
+| `npm run lint` | `lint:client` + `lint:server` + `audit:tenancy` | Frontend ESLint, server ESLint, then the tenancy audit |
+| `npm run lint:client` | `npm --prefix client run lint` | Frontend ESLint only |
+| `npm run lint:server` | `eslint .` | Root ESLint flat config over `server/` and `scripts/` |
+| `npm run audit:tenancy` | `node scripts/audit-tenancy.js` | Fails if any SQL touching a business-scoped table lacks a `business_id` predicate. `-- --explain` quotes the offending statement; `-- --json` is machine-readable |
 | `npm run validate` | `node scripts/validate-endpoints.js` | Cross-layer API contract linter |
 | `npm run db:init` | `server/scripts/init-db.js` | Create/upgrade the schema explicitly |
 | `npm run backup` | `server/scripts/backup.js` | `pg_dump` with rotation. Label: `manual\|daily\|weekly\|monthly` |
 | `npm run version:sync` | inline `node -e` | Copies the root version into `client/package.json` |
-| `npm run validate` | â€” | See [below](#the-endpoint-contract-linter) |
+| `npm run validate` | — | See [below](#the-endpoint-contract-linter) |
 
+> **`npm run audit:tenancy` is the one gate that can fail.** Unlike `validate` below,
+> it exits non-zero on a violation and is wired into CI. It is a text-level check,
+> so it cannot see a `business_id` predicate that is present but wrong, nor SQL in
+> a file outside `server/{routes,controllers,services,middleware,utils}`.
+>
 > **`npm run validate` cannot currently fail.** The linter only calls
 > `logWarn`, never `logError`, and exits `1` only when `errors > 0`. A clean run
 > proves nothing. It is also half-stale: it scrapes route mount points from
@@ -260,20 +268,31 @@ npm --prefix migration test        # Vitest; needs TEST_DATABASE_URL for DB test
 ## Linting
 
 ```bash
-npm run lint                        # frontend, ESLint 9 flat config
+npm run lint                        # frontend ESLint + server ESLint + tenancy audit
+npm run lint:server                 # root eslint.config.js over server/ and scripts/
+npm run audit:tenancy               # tenant-scoping check on every SQL statement
 ```
 
-The server has **no linter**. There is no ESLint config in `server/` and no
-`lint` script in its `package.json`. The root `eslint.config.js` targets the
-client only.
+The server is linted by the **root** `eslint.config.js` — there is no separate
+config in `server/` and no `lint` script in `server/package.json`, which is why
+`lint:server` runs `eslint .` from the repository root. It reports warnings
+predominantly from `no-console`, which the codebase uses deliberately for
+startup and error logging; there are currently no errors.
+
+`audit:tenancy` is the security-relevant one and the only root script that can fail
+the build. It reads the business-scoped tables out of the schema and requires every
+statement touching one to carry a `business_id` comparison. See
+[tenant isolation](./tenant-isolation.md#the-check-that-keeps-this-true).
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` â€” triggers on push and PR to `main`.
+`.github/workflows/ci.yml` — triggers on push and PR to `main`.
 
 | Job | Working directory | Does |
 |-----|-------------------|------|
 | `lint` | `client` | `npm ci` + `npm run lint` |
+| `server-lint` | root | `npm ci` + `npm run lint:server` |
+| `tenancy-audit` | root | `npm ci` + `npm run audit:tenancy`. No database needed — it reads the SQL as text |
 | `server-test` | `server` | `npm ci` + `npx vitest run` against a `postgres:16` service |
 | `build` | `client` | `npm ci` + `npm run build` |
 

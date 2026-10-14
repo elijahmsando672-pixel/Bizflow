@@ -1,4 +1,8 @@
 import swaggerJsdoc from 'swagger-jsdoc';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+const serverDirectory = path.dirname(fileURLToPath(import.meta.url));
 
 const options = {
   definition: {
@@ -34,28 +38,42 @@ const options = {
       schemas: {
         Error: {
           type: 'object',
+          required: ['success', 'message'],
           properties: {
-            success: { type: 'boolean', example: false },
+            success: { type: 'boolean', const: false, example: false },
             message: { type: 'string', example: 'Product not found' },
-            code: { type: 'integer', example: 404 },
+            // Most handlers use the HTTP status; a few auth handlers use a
+            // stable string code (for example CAPTCHA_REQUIRED).
+            code: { oneOf: [{ type: 'integer' }, { type: 'string' }], example: 404 },
           },
+          additionalProperties: true,
         },
         Success: {
           type: 'object',
+          required: ['success', 'data'],
           properties: {
-            success: { type: 'boolean', example: true },
-            data: { type: 'object' },
+            success: { type: 'boolean', const: true, example: true },
+            data: {},
           },
+          additionalProperties: true,
         },
         PaginatedResponse: {
           type: 'object',
+          required: ['success', 'data', 'total', 'page', 'limit'],
           properties: {
-            success: { type: 'boolean', example: true },
-            data: { type: 'array', items: { type: 'object' } },
+            success: { type: 'boolean', const: true, example: true },
+            data: { type: 'array', items: {} },
             total: { type: 'integer' },
             page: { type: 'integer' },
             limit: { type: 'integer' },
           },
+        },
+        LegacySuccess: {
+          description: 'Compatibility shape used by existing endpoints during the response-envelope migration.',
+          oneOf: [
+            { type: 'array', items: {} },
+            { type: 'object' },
+          ],
         },
       },
     },
@@ -89,7 +107,9 @@ const options = {
       { name: 'System', description: 'System health & metrics' },
     ],
   },
-  apis: ['./routes/*.js', './controllers/*.js'],
+  // Resolve from this file so the generated contract does not depend on the
+  // process working directory (npm scripts, tests, and serverless differ).
+  apis: [path.join(serverDirectory, '../routes/*.js'), path.join(serverDirectory, '../controllers/*.js')],
 };
 
 export const swaggerSpec = swaggerJsdoc(options);

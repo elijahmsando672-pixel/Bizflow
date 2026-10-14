@@ -24,8 +24,16 @@ router.post('/unsubscribe', async (req, res, next) => {
   try {
     const { endpoint } = req.body;
     if (!endpoint) throw new AppError('endpoint is required', 400);
-    await removeSubscription(endpoint);
-    res.json({ success: true, message: 'Unsubscribed' });
+    // Scoped to the caller. The endpoint is request-supplied, so without the
+    // tenant and user predicates this would delete any business's subscription.
+    const removed = await removeSubscription(endpoint, {
+      userId: req.user.id,
+      businessId: req.business_id,
+    });
+    // A miss is reported as success: the caller's intent — this endpoint should not
+    // receive their pushes — holds either way, and distinguishing the two would
+    // turn this into a probe for whether another tenant holds an endpoint.
+    res.json({ success: true, message: 'Unsubscribed', removed });
   } catch (err) { next(err); }
 });
 

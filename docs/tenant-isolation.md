@@ -77,6 +77,40 @@ every id belonging to B is probed with A's token — for `404` on `GET`/`PUT`/
 deliberately dangling reference. Both halves were confirmed to fail before the
 change; a test that cannot fail proves nothing.
 
+### Fixed: push endpoints were a cross-tenant handle
+
+Found by `scripts/audit-tenancy.js` rather than by reading routes. A push endpoint
+is a long opaque URL the browser's push service hands out, and `push_subscriptions`
+carried a **global** `UNIQUE` on it. Uniqueness scoped the table to the platform
+where the rest of the schema scopes to the tenant, and two routes took advantage of
+that:
+
+| Route | Before | Consequence |
+| --- | --- | --- |
+| `POST /api/push/unsubscribe` | `DELETE ... WHERE endpoint = $1` | any authenticated member who knew another tenant's endpoint removed that tenant's subscription, silently stopping its notifications |
+| `POST /api/push/subscribe` | `ON CONFLICT (endpoint) DO UPDATE SET p256dh_key, auth_key` | registering an endpoint another tenant already held overwrote the victim's key material while leaving its `business_id` in place, so its pushes then failed at the push service |
+
+Fixed in two halves:
+
+- `server/migrations/009_push_subscriptions_per_business.sql` drops the global
+  constraint and makes uniqueness the pair `(business_id, endpoint)`, the same shape
+  as `002_unique_per_business.sql`. `server/config/db.js` carries the index too, so
+  a fresh database never has the global constraint at all.
+- `removeSubscription` now **requires** a scope — `{ userId, businessId }` — and
+  throws without one rather than falling back to a delete by endpoint alone. A
+  required argument is the point: an optional filter invites the unscoped call
+  back. The 410-pruning path inside `sendNotification` is handed the same scope the
+  send was made under.
+
+The response reports `removed` but returns `200` for a miss as well as a hit: the
+caller's intent holds either way, and distinguishing them would turn the endpoint
+into a probe for whether another tenant holds one.
+
+Regression tests in `server/tests/push-tenancy.test.js`. Confirmed to fail against
+the pre-fix delete (3 of the behavioural tests) and to assert the index shape
+directly, since the behavioural half would still pass on a database where the
+migration had not been applied.
+
 ### Investigated, not exploitable: team invitations
 
 `server/routes/team.js` looked like a cross-tenant write at first glance. The
@@ -105,13 +139,52 @@ pass `query` from `server/config/db.js`, a function, which would have thrown
 to check. Affected: `productController`, `crm`, `quotations`, `support`,
 `pipeline`, `timetracking`. The runner now accepts either.
 
+## The check that keeps this true
+
+`scripts/audit-tenancy.js` (`npm run audit:tenancy`) makes the convention
+enforceable instead of reviewable. It reads the tenant-scoped table list out of the
+schema, finds every SQL literal handed to `query(`, and requires each statement that
+touches one of those tables to carry a `business_id` comparison.
+
+```bash
+npm run audit:tenancy          # report, non-zero exit on any violation
+npm run audit:tenancy -- --explain   # with the offending statement quoted
+```
+
+Three shapes pass without a comparison, because requiring one would be wrong:
+
+- an `INSERT` that **names** `business_id` in its column list — the row is placed
+  in a tenant rather than selected from one;
+- a `WHERE` assembled in JS (`WHERE ${conditions.join(' AND ')}`), which the audit
+  cannot judge and leaves to review;
+- an `UPDATE` that sets `business_id`, which is a tenant move, not a tenant-blind
+  write.
+
+Everything else needs the comparison. A statement may opt out with an inline
+`/* tenant-exempt: <reason> */` above it, and a whole file may declare one for named
+tables only:
+
+```js
+/* tenant-exempt-file: users — pre-authentication, identity is the scope */
+```
+
+Naming the tables keeps the door shut on the rest of the file: a new `customers`
+query beside an exempted `users` statement still has to carry its own predicate.
+There are currently 25 exemptions, all in pre-authentication or platform-aggregate
+code; `--json` lists them with their reasons.
+
+This runs in CI as the `tenancy-audit` job and as part of `npm run lint`.
+
 ## Standing gaps
 
 Not fixed here. Listed so they are not mistaken for solved.
 
 - **No row-level security.** Isolation is one missing `WHERE` clause away from a
-  breach, in every query, forever. Until then, an ad-hoc query with a missing
-  predicate is a data breach, and nothing will stop it.
+  breach, in every query, forever. The audit above catches the omission in
+  application code; it cannot catch the query written outside the directories it
+  scans, and it cannot catch a statement that carries a `business_id` predicate
+  that is wrong — aliased to the wrong table in a join, or built from a variable
+  that is not `req.business_id`.
 
   The groundwork is now in place: `server/utils/withTenant.js` opens a
   transaction, pins the tenant with `set_config('app.current_business_id', ...)`,
@@ -146,3 +219,13 @@ Not fixed here. Listed so they are not mistaken for solved.
 6. Route handlers that need several statements should use `withTenant` rather
    than hand-rolling `pool.connect()` / `BEGIN` / `COMMIT`. It is the same thing,
    with the tenant pinned and the rollback handled in one place.
+7. Give a uniqueness constraint to a tenant's **pair**, never a globally unique
+   column that any tenant can supply. `endpoint`, `invoice_number` and
+   `ticket_number` all identify rows within a business; making any of them globally
+   unique hands one tenant a handle on another's row. See
+   `002_unique_per_business.sql` and
+   `009_push_subscriptions_per_business.sql`.
+8. A helper that deletes or mutates by a request-supplied value takes its scope as
+   a **required** argument and throws without it.
+9. Run `npm run audit:tenancy` before opening a PR. A new statement without a
+   `business_id` predicate fails the build, which is cheaper than finding it later.

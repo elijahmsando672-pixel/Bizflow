@@ -310,14 +310,22 @@ Constrained `UNIQUE(business_id, role_name, resource)`; indexed on
 Three behaviours worth knowing:
 
 1. **`owner` and `admin` bypass the matrix entirely** — `requirePermission`
-   returns `next()` before it ever queries (`rbac.js:37`).
+   returns `next()` before it ever queries (`rbac.js:66`, via `isPrivileged` in
+   `config/roles.js:34`).
 2. **HTTP method maps to permission** via `actionMap`: `GET → can_read`,
    `POST → can_create`, `PUT`/`PATCH → can_update`, `DELETE → can_delete`.
-   Any other method passes through unchecked.
-3. **A base URL with no entry in `resourceRouteMap` is allowed.** The map
-   (`rbac.js:8-26`) covers only 15 prefixes. An unmapped one falls through with
-   `next()`, so new routers are unprotected by default — add them to the map
-   when you add the router.
+   Any other method is denied rather than passed through (`rbac.js:73`).
+3. **A base URL with no entry in `resourceRouteMap` is denied.** The map
+   (`rbac.js:8-38`) covers 29 prefixes. An unmapped one is refused with
+   `403 Access denied: route has no permission mapping` (`rbac.js:76`), so a new
+   router is closed rather than open — but it stays unusable until it is added to
+   the map. Adding the router without the map entry is a visible 403 in the UI,
+   not a silent hole.
+
+Two routers deliberately sit outside the matrix, mounted with `protect` alone:
+`/api/sessions` and `/api/push`. Both are scoped to the caller by construction
+rather than by permission row — sessions by the authenticated user's own id, and
+push subscriptions by `req.user.id` **and** `req.business_id` on every statement.
 
 ### Default matrix
 

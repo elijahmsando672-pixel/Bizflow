@@ -1,3 +1,4 @@
+/* tenant-exempt-file: users, refresh_tokens — platform-wide counters for the admin metrics dashboard, which deliberately aggregate across tenants */
 const metrics = {
   requestCount: 0,
   errorCount: 0,

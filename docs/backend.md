@@ -373,6 +373,14 @@ refuses when the target is the business `owner`.
 
 `routes/push.js` — `POST /subscribe`, `POST /unsubscribe`
 
+Mounted with `protect` only, no `requirePermission`. Both handlers scope
+themselves: `subscribe` writes `req.business_id` and `req.user.id` from the
+session, and `unsubscribe` passes both into `removeSubscription`, which requires
+them. The `endpoint` is the only request-supplied value and it is never used alone
+to select or delete a row — uniqueness is on `(business_id, endpoint)`, not on
+`endpoint` alone. See
+[tenant isolation](./tenant-isolation.md#fixed-push-endpoints-were-a-cross-tenant-handle).
+
 ### Sessions, API keys, webhooks
 
 `routes/sessions.js` — `GET /history`, `GET /active`, `POST /revoke/:sessionId`,

@@ -1,3 +1,4 @@
+/* tenant-exempt-file: login_history — a user's own login history, keyed by the globally unique user id; a tenant could not widen it */
 import { query } from '../config/db.js';
 
 export const recordLoginHistory = async ({

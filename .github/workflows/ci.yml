@@ -29,6 +29,18 @@ jobs:
       - run: npm ci
       - run: npm run lint:server
 
+  # Tenancy is enforced in application code, not by the database, so the only thing
+  # standing between a forgotten WHERE clause and a cross-tenant read is a check.
+  tenancy-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run audit:tenancy
+
   server-test:
     runs-on: ubuntu-latest
     services:

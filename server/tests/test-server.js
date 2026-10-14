@@ -23,6 +23,7 @@ import procurementRoutes from '../routes/procurement.js';
 import apiKeyRoutes from '../routes/apiKeys.js';
 import teamRoutes, { teamPublicRoutes } from '../routes/team.js';
 import usersRoutes from '../routes/users.js';
+import pushRoutes from '../routes/push.js';
 
 const authenticateApiKeyOrJwt = (req, res, next) => {
   authenticateApiKey(req, res, () => {
@@ -49,6 +50,8 @@ app.use('/api/api-keys', authenticateApiKeyOrJwt, apiKeyRoutes);
 app.use('/api/team', teamPublicRoutes);
 app.use('/api/team', authenticate, teamRoutes);
 app.use('/api/users', authenticate, usersRoutes);
+// Mirrors app.js: /api/push sits behind `protect` only, with no requirePermission.
+app.use('/api/push', authenticate, pushRoutes);
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });

@@ -1,3 +1,4 @@
+/* tenant-exempt-file: users, team_invitations — invitations are addressed by a 256-bit emailed token and accepted before any session exists, so the token is the capability; users are resolved by the invited email, which is inherent to inviting by address */
 import express from 'express';
 import crypto from 'crypto';
 import Joi from 'joi';

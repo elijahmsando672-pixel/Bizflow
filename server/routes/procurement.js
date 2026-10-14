@@ -2,6 +2,7 @@ import express from 'express';
 import { query, pool } from '../config/db.js';
 import { sendError } from '../utils/sendError.js';
 import { assertOwned, assertAllOwned, collectIds } from '../utils/tenantGuard.js';
+import { calculateTotals, loadTaxRate } from '../utils/money.js';
 
 const router = express.Router();
 
@@ -90,9 +91,12 @@ router.post('/purchase-orders', async (req, res) => {
     return sendError(res, 400, 'Items must be an array');
   }
 
-  const subtotal = items.reduce((sum, item) => sum + (Number(item.qty) * Number(item.unit_price)), 0);
-  const taxAmount = subtotal * 0.16;
-  const total = subtotal + taxAmount;
+  const taxRatePercent = await loadTaxRate(query, req.business_id);
+  const { subtotal, taxAmount, total } = calculateTotals({
+    items,
+    orderDiscount: 0,
+    taxRatePercent,
+  });
 
   let client;
   try {

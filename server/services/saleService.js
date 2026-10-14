@@ -2,12 +2,18 @@ import sanitizeHtml from 'sanitize-html';
 import { query, pool } from '../config/db.js';
 import { AppError } from '../utils/AppError.js';
 import { assertOwned, assertAllOwned, collectIds } from '../utils/tenantGuard.js';
+import { calculateTotals, loadTaxRate, roundMoney } from '../utils/money.js';
 
 function sanitize(str) {
   return sanitizeHtml(String(str || ''), { allowedTags: [], allowedAttributes: {} });
 }
 
-function generateReceiptHTML(business, sale, items) {
+function generateReceiptHTML(business, sale, items, taxRatePercent) {
+  // Printed from the rate the sale was charged, not a literal. A receipt reading
+  // "Tax (16%)" on a zero-rated or exempt sale is a document that contradicts its
+  // own line items, and it is the document the customer keeps.
+  const taxRateLabel = Number.isFinite(Number(taxRatePercent)) ? `${roundMoney(taxRatePercent)}%` : '';
+
   const rows = items.map(item => `
     <tr>
       <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${sanitize(item.product_name || item.name || 'Item')}</td>
@@ -79,7 +85,7 @@ function generateReceiptHTML(business, sale, items) {
   <div class="totals">
     <div class="totals-row"><span>Subtotal</span><span>KSh ${parseFloat(sale.subtotal || 0).toLocaleString()}</span></div>
     ${sale.discount_amount > 0 ? `<div class="totals-row" style="color:#dc2626;"><span>Discount</span><span>- KSh ${parseFloat(sale.discount_amount || 0).toLocaleString()}</span></div>` : ''}
-    ${sale.tax_amount > 0 ? `<div class="totals-row"><span>Tax (16%)</span><span>KSh ${parseFloat(sale.tax_amount || 0).toLocaleString()}</span></div>` : ''}
+    ${sale.tax_amount > 0 ? `<div class="totals-row"><span>Tax (${taxRateLabel})</span><span>KSh ${parseFloat(sale.tax_amount || 0).toLocaleString()}</span></div>` : ''}
     <div class="totals-row total"><span>Total Paid</span><span>KSh ${parseFloat(sale.total || 0).toLocaleString()}</span></div>
   </div>
   <div class="footer">
@@ -181,12 +187,12 @@ export async function createSale(businessId, userId, data) {
     await assertOwned(client, 'customers', customer_id, businessId, 'Customer');
     await assertAllOwned(client, 'products', collectIds(items, 'product_id'), businessId, 'Product');
 
-    let subtotal = 0;
-    for (const item of items) {
-      subtotal += (item.qty * item.unit_price) - (item.discount || 0);
-    }
-    const taxAmount = subtotal * 0.16;
-    const total = Math.max(0, subtotal + taxAmount - discount_amount);
+    const taxRate = await loadTaxRate(client, businessId);
+    const { subtotal, taxAmount, total } = calculateTotals({
+      items,
+      orderDiscount: discount_amount,
+      taxRatePercent: taxRate,
+    });
 
     const saleResult = await client.query(
       `INSERT INTO sales (business_id, customer_id, invoice_number, sale_date, due_date, subtotal, tax_amount, discount_amount, total, amount_paid, notes, status, created_by)
@@ -196,11 +202,28 @@ export async function createSale(businessId, userId, data) {
     const sale = saleResult.rows[0];
 
     for (const item of items) {
-      const itemTotal = (item.qty * item.unit_price) - (item.discount || 0);
+      // product_name is NOT NULL, and a caller sending only a product_id left it
+      // null, so the whole sale failed with a 500 on a column it never populated.
+      // The product row is this tenant's (assertAllOwned above), so its name is a
+      // safe fallback and keeps the line readable on the receipt and in reports
+      // after the product is later renamed or deleted.
+      let productName = item.product_name;
+      if (!productName && item.product_id) {
+        const { rows } = await client.query(
+          'SELECT name FROM products WHERE id = $1 AND business_id = $2',
+          [item.product_id, businessId]
+        );
+        productName = rows[0]?.name;
+      }
+
       await client.query(
         `INSERT INTO sale_items (business_id, sale_id, product_id, product_name, qty, unit_price, discount, total)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [businessId, sale.id, item.product_id, item.product_name, item.qty, item.unit_price, item.discount || 0, itemTotal]
+        [
+          businessId, sale.id, item.product_id, productName || 'Item',
+          item.qty, item.unit_price, item.discount || 0,
+          roundMoney((item.qty * item.unit_price) - (item.discount || 0)),
+        ]
       );
       if (item.product_id) {
         item.saleId = sale.id;
@@ -222,6 +245,10 @@ export async function createSale(businessId, userId, data) {
     return sale;
   } catch (err) {
     await client.query('ROLLBACK');
+    // Logged here rather than only at the route: a 500 from a sale is a money bug
+    // and the reason is otherwise invisible, since the route forwards anything
+    // that is not a 400 to the error middleware as an empty body.
+    console.error('createSale error:', err);
     throw err;
   } finally {
     client.release();
@@ -356,14 +383,14 @@ export async function generateReceipt(businessId, saleId) {
     );
 
     const businessResult = await query(
-      `SELECT name, phone, address, tax_id FROM businesses WHERE id = $1`,
+      `SELECT name, phone, address, tax_id, tax_rate FROM businesses WHERE id = $1`,
       [businessId]
     );
     const business = businessResult.rows[0] || {};
 
     const receiptNumber = await generateReceiptNumberStandalone(businessId);
 
-    const receiptHTML = generateReceiptHTML(business, sale, itemsResult.rows);
+    const receiptHTML = generateReceiptHTML(business, sale, itemsResult.rows, business.tax_rate);
 
     const receipt = await query(
       `INSERT INTO receipts (business_id, sale_id, receipt_number, customer_name, customer_phone, items, subtotal, discount_amount, tax_amount, total, receipt_html)
