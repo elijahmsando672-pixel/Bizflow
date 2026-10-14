@@ -13,6 +13,7 @@ Full technical reference lives in [`docs/`](./docs):
 | [Backend](./docs/backend.md) | Every route, middleware and utility in `server/` |
 | [Frontend](./docs/frontend.md) | Routing, the API client, component conventions |
 | [Database](./docs/database.md) | 67 tables, auto-migration, backups |
+| [API contract](./docs/api-contract.md) | Endpoint-by-endpoint request/response contract |
 | [Deployment](./docs/deployment.md) | Docker, Vercel, Supabase |
 | [Auxiliary projects](./docs/auxiliary-projects.md) | `apps/api`, `packages/*`, `standalone/`, `bizflow-landing/`, `migration/` |
 
@@ -51,11 +52,12 @@ npm run server
 
 ### 4. Run Development
 ```bash
-# Terminal 1: Backend
-npm run server
+# Both servers together (backend :5000 + frontend :3000)
+npm run dev:all
 
-# Terminal 2: Frontend
-npm run dev
+# Or separately in two terminals
+npm run server   # Terminal 1: Backend
+npm run dev      # Terminal 2: Frontend
 ```
 Visit http://localhost:3000
 
@@ -142,7 +144,9 @@ Serverless limitations worth knowing before going live:
 
 ## Login Credentials
 
-Register a new account at `/signup`.
+Register a new account at `/signup`. New passwords must be at least 10
+characters and include an uppercase letter, a lowercase letter, a number and a
+special character; the form names the exact requirement a password misses.
 
 The demo seed (`npm run seed:demo`) creates `elijah@bizflow.com` with a password
 it generates at run time and prints once — it is not stored anywhere and is not
@@ -226,7 +230,7 @@ Strategies are only activated when the corresponding env vars are set.
 - **AI Insights** — Business predictions (requires Google AI API key)
 
 ## Tech Stack
-- **Frontend**: Next.js 16.2.4 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS v4, Recharts
+- **Frontend**: Next.js 16.2.9 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS v4, Recharts
 - **Backend**: Express 4, PostgreSQL, JWT + httpOnly refresh tokens, Argon2id, Passport.js (OAuth)
 - **Validation**: Zod (frontend), Joi (backend)
 - **Deployment**: Vercel (frontend), Docker or a long-running host (backend)
@@ -239,13 +243,13 @@ The two live applications, plus the deploy glue that joins them:
 Bizflow/
 ├── client/              # Next.js frontend (port 3000)
 │   ├── src/
-│   │   ├── app/         # App Router pages (~100 routes)
+│   │   ├── app/         # App Router pages (~90 routes)
 │   │   ├── components/  # layout, ui, dashboard, reports
 │   │   └── lib/         # API client, auth context, navigation
 │   └── public/          # Static assets
 ├── server/              # Express API (port 5000)
 │   ├── config/          # DB pool + auto-migration, OAuth
-│   ├── routes/          # 37 Express routers
+│   ├── routes/          # 35 Express routers
 │   ├── services/        # Sale and invoice domain logic
 │   ├── middleware/      # auth, CSRF, RBAC, security
 │   └── utils/           # Password hashing, email, audit, jobs
