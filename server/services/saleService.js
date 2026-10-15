@@ -272,10 +272,16 @@ export async function updateSale(businessId, saleId, data) {
     }
 
     const currentSale = saleResult.rows[0];
-    const transitioningToPaid = status === 'paid' && currentSale.status !== 'paid';
+    // Both 'paid' and 'completed' count as settled: createSale deducts inventory for
+    // either, so treating only 'paid' as the settlement transition re-deducted stock
+    // when a completed sale was later marked paid.
+    const SETTLED = new Set(['paid', 'completed']);
+    const wasSettled = SETTLED.has(currentSale.status);
+    const nowSettled = SETTLED.has(status);
+    const transitioningToSettled = nowSettled && !wasSettled;
     let paidDate = null;
 
-    if (transitioningToPaid) {
+    if (transitioningToSettled) {
       paidDate = new Date();
       const items = await client.query(
         'SELECT product_id, qty, product_name FROM sale_items WHERE sale_id = $1 AND business_id = $2',
@@ -312,15 +318,15 @@ export async function updateSale(businessId, saleId, data) {
 
     const result = await client.query(
       `UPDATE sales SET status = COALESCE($1, status), notes = COALESCE($2, notes),
-       amount_paid = CASE WHEN $1 = 'paid' THEN total ELSE amount_paid END,
-       paid_date = CASE WHEN $1 = 'paid' THEN $3 ELSE paid_date END,
+       amount_paid = CASE WHEN $6 THEN total ELSE amount_paid END,
+       paid_date = CASE WHEN $6 THEN $3 ELSE paid_date END,
        updated_at = NOW() WHERE id = $4 AND business_id = $5 RETURNING *`,
-      [status, notes, paidDate, saleId, businessId]
+      [status, notes, paidDate, saleId, businessId, nowSettled]
     );
 
     await client.query('COMMIT');
 
-    if (transitioningToPaid) {
+    if (transitioningToSettled) {
       generateReceipt(businessId, saleId).catch(err => console.error('Auto-receipt error:', err));
     }
 

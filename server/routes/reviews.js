@@ -2,11 +2,15 @@ import express from 'express';
 import { query } from '../config/db.js';
 import sanitizeHtml from 'sanitize-html';
 import { sendError } from '../utils/sendError.js';
+import { assertOwned } from '../utils/tenantGuard.js';
 
 const router = express.Router();
 
 function sanitize(str) {
-  return sanitizeHtml(String(str || ''), { allowedTags: [], allowedAttributes: {} });
+  // A nullish field means "not provided" in a partial update; returning '' here
+  // would defeat the COALESCE(...) guards and blank out columns the caller omitted.
+  if (str === undefined || str === null) return null;
+  return sanitizeHtml(String(str), { allowedTags: [], allowedAttributes: {} });
 }
 
 router.get('/', async (req, res) => {
@@ -41,6 +45,9 @@ router.post('/', async (req, res) => {
     const { customer_id, customer_name, product_id, product_name, rating, comment, status } = req.body;
     if (!customer_name || !rating) return sendError(res, 400, 'Customer name and rating are required');
 
+    await assertOwned(query, 'customers', customer_id, req.business_id, 'Customer');
+    await assertOwned(query, 'products', product_id, req.business_id, 'Product');
+
     const result = await query(
       `INSERT INTO reviews (business_id, customer_id, customer_name, product_id, product_name, rating, comment, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
@@ -48,6 +55,7 @@ router.post('/', async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    if (err.statusCode) return sendError(res, err.statusCode, err.message);
     console.error('Create review error:', err);
     sendError(res, 500, 'Server error');
   }
@@ -56,6 +64,10 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { customer_id, customer_name, product_id, product_name, rating, comment, status } = req.body;
+
+    await assertOwned(query, 'customers', customer_id, req.business_id, 'Customer');
+    await assertOwned(query, 'products', product_id, req.business_id, 'Product');
+
     const result = await query(
       `UPDATE reviews SET
         customer_id = COALESCE($1, customer_id),
@@ -71,6 +83,7 @@ router.put('/:id', async (req, res) => {
     if (result.rows.length === 0) return sendError(res, 404, 'Review not found');
     res.json(result.rows[0]);
   } catch (err) {
+    if (err.statusCode) return sendError(res, err.statusCode, err.message);
     console.error('Update review error:', err);
     sendError(res, 500, 'Server error');
   }

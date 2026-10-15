@@ -16,7 +16,7 @@ router.get('/insights', async (req, res) => {
     const businessId = req.business_id;
 
     const revenue = await query(
-      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status = 'paid' AND sale_date >= NOW() - INTERVAL '30 days'`,
+      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status IN ('paid', 'completed') AND sale_date >= NOW() - INTERVAL '30 days'`,
       [businessId]
     );
     const expenses = await query(
@@ -24,7 +24,7 @@ router.get('/insights', async (req, res) => {
       [businessId]
     );
     const prevRevenue = await query(
-      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status = 'paid' AND sale_date >= NOW() - INTERVAL '60 days' AND sale_date < NOW() - INTERVAL '30 days'`,
+      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status IN ('paid', 'completed') AND sale_date >= NOW() - INTERVAL '60 days' AND sale_date < NOW() - INTERVAL '30 days'`,
       [businessId]
     );
     const customers = await query(
@@ -43,7 +43,7 @@ router.get('/insights', async (req, res) => {
       [businessId]
     );
     const recentSales = await query(
-      `SELECT sale_date, total FROM sales WHERE business_id = $1 AND status = 'paid' AND sale_date >= NOW() - INTERVAL '90 days' ORDER BY sale_date`,
+      `SELECT sale_date, total FROM sales WHERE business_id = $1 AND status IN ('paid', 'completed') AND sale_date >= NOW() - INTERVAL '90 days' ORDER BY sale_date`,
       [businessId]
     );
 
@@ -109,7 +109,7 @@ router.get('/predictions', async (req, res) => {
 
     const salesTrend = await query(
       `SELECT TO_CHAR(sale_date, 'YYYY-MM') as month, SUM(total) as revenue, COUNT(*) as count
-       FROM sales WHERE business_id = $1 AND status = 'paid' AND sale_date >= NOW() - INTERVAL '12 months'
+       FROM sales WHERE business_id = $1 AND status IN ('paid', 'completed') AND sale_date >= NOW() - INTERVAL '12 months'
        GROUP BY TO_CHAR(sale_date, 'YYYY-MM') ORDER BY month`,
       [businessId]
     );

@@ -27,7 +27,7 @@ router.get('/:saleId/receipt', async (req, res, next) => {
     if (!receipt) {
       const sale = await saleService.getSaleById(req.business_id, saleId);
       if (!sale) return sendError(res, 404, 'Sale not found');
-      if (sale.status !== 'paid') return sendError(res, 400, 'Receipt only available for paid sales');
+      if (sale.status !== 'paid' && sale.status !== 'completed') return sendError(res, 400, 'Receipt only available for settled sales');
 
       receipt = await saleService.generateReceipt(req.business_id, saleId);
       return res.status(201).json(receipt);
@@ -45,7 +45,7 @@ router.get('/:saleId/receipt/html', async (req, res, next) => {
     if (!receipt) {
       const sale = await saleService.getSaleById(req.business_id, saleId);
       if (!sale) return sendError(res, 404, 'Sale not found');
-      if (sale.status !== 'paid') return sendError(res, 400, 'Receipt only available for paid sales');
+      if (sale.status !== 'paid' && sale.status !== 'completed') return sendError(res, 400, 'Receipt only available for settled sales');
 
       receipt = await saleService.generateReceipt(req.business_id, saleId);
       if (!receipt) return sendError(res, 500, 'Failed to generate receipt');

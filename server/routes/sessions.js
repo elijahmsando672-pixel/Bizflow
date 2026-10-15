@@ -22,8 +22,11 @@ router.get('/active', async (req, res, next) => {
 
 router.post('/revoke/:sessionId', async (req, res, next) => {
   try {
+    // getActiveSessions returns login_history rows whose session_id is the sha256 of
+    // the refresh token, so the path segment is a hash, not the raw token.
     const r = await query(
-      'DELETE FROM refresh_tokens WHERE token = $1 AND user_id = $2 RETURNING id',
+      `DELETE FROM refresh_tokens
+       WHERE encode(digest(token, 'sha256'), 'hex') = $1 AND user_id = $2 RETURNING id`,
       [req.params.sessionId, req.user.id]
     );
     if (!r.rows.length) throw new AppError('Session not found', 404);

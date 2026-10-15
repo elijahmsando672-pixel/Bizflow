@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
     );
     
     const totalRevenue = await query(
-      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status = 'paid'`,
+      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status IN ('paid', 'completed')`,
       [businessId]
     );
     
@@ -102,7 +102,7 @@ router.get('/revenue-chart', async (req, res) => {
       sql = `
         SELECT DATE(sale_date) as date, SUM(total) as revenue
         FROM sales 
-        WHERE business_id = $1 AND status = 'paid' AND sale_date >= NOW() - INTERVAL '7 days'
+        WHERE business_id = $1 AND status IN ('paid', 'completed') AND sale_date >= NOW() - INTERVAL '7 days'
         GROUP BY DATE(sale_date)
         ORDER BY date
       `;
@@ -110,7 +110,7 @@ router.get('/revenue-chart', async (req, res) => {
       sql = `
         SELECT TO_CHAR(sale_date, 'YYYY-MM') as date, SUM(total) as revenue
         FROM sales 
-        WHERE business_id = $1 AND status = 'paid' AND sale_date >= NOW() - INTERVAL '1 year'
+        WHERE business_id = $1 AND status IN ('paid', 'completed') AND sale_date >= NOW() - INTERVAL '1 year'
         GROUP BY TO_CHAR(sale_date, 'YYYY-MM')
         ORDER BY date
       `;
@@ -118,7 +118,7 @@ router.get('/revenue-chart', async (req, res) => {
       sql = `
         SELECT TO_CHAR(sale_date, 'YYYY-MM-DD') as date, SUM(total) as revenue
         FROM sales 
-        WHERE business_id = $1 AND status = 'paid' AND sale_date >= NOW() - INTERVAL '30 days'
+        WHERE business_id = $1 AND status IN ('paid', 'completed') AND sale_date >= NOW() - INTERVAL '30 days'
         GROUP BY TO_CHAR(sale_date, 'YYYY-MM-DD')
         ORDER BY date
       `;
@@ -153,7 +153,7 @@ router.get('/expenses-chart', async (req, res) => {
 router.get('/profit-summary', async (req, res) => {
   try {
     const revenue = await query(
-      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status = 'paid'`,
+      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status IN ('paid', 'completed')`,
       [req.business_id]
     );
     

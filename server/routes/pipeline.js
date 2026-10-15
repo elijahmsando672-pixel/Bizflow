@@ -199,6 +199,12 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { name, stage_id, value, priority, expected_close_date, assigned_to, notes, outcome, loss_reason } = req.body;
+
+    // Matches the POST handler: stage_id and assigned_to are joined back on reads and
+    // must belong to this tenant before they are written.
+    await assertOwned(query, 'deal_stages', stage_id, req.business_id, 'Stage');
+    await assertOwned(query, 'users', assigned_to, req.business_id, 'Assignee');
+
     const updates = ['updated_at = CURRENT_TIMESTAMP'];
     const params = [req.params.id, req.business_id];
     let idx = 3;
@@ -232,6 +238,7 @@ router.put('/:id', async (req, res) => {
 
     res.json(deal);
   } catch (error) {
+    if (error.statusCode) return sendError(res, error.statusCode, error.message);
     console.error('Update deal error:', error);
     sendError(res, 500, 'Failed to update deal');
   }

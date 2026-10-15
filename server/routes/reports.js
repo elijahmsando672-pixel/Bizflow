@@ -12,7 +12,7 @@ router.get('/profit-loss', async (req, res) => {
     const businessId = req.business_id;
 
     const revenue = await query(
-      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status = 'paid' AND sale_date BETWEEN $2 AND $3`,
+      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE business_id = $1 AND status IN ('paid', 'completed') AND sale_date BETWEEN $2 AND $3`,
       [businessId, startDate, endDate]
     );
     const expenses = await query(
@@ -42,7 +42,7 @@ router.get('/profit-loss', async (req, res) => {
 
     const revenueByMonth = await query(
       `SELECT TO_CHAR(sale_date, 'YYYY-MM') as month, SUM(total) as revenue
-       FROM sales WHERE business_id = $1 AND status = 'paid' AND sale_date BETWEEN $2 AND $3
+       FROM sales WHERE business_id = $1 AND status IN ('paid', 'completed') AND sale_date BETWEEN $2 AND $3
        GROUP BY TO_CHAR(sale_date, 'YYYY-MM') ORDER BY month`,
       [businessId, startDate, endDate]
     );

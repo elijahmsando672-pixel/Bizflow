@@ -7,7 +7,10 @@ import { assertOwned } from '../utils/tenantGuard.js';
 const router = express.Router();
 
 function sanitize(str) {
-  return sanitizeHtml(String(str || ''), { allowedTags: [], allowedAttributes: {} });
+  // A nullish field means "not provided" in a partial update; returning '' here
+  // would defeat the COALESCE(...) guards and blank out columns the caller omitted.
+  if (str === undefined || str === null) return null;
+  return sanitizeHtml(String(str), { allowedTags: [], allowedAttributes: {} });
 }
 
 async function generateQuotationNumber(businessId) {
