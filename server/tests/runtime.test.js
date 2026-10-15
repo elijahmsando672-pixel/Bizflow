@@ -298,14 +298,14 @@ describe('bootstrap safety', () => {
 
 describe('vercel function entry points', () => {
   it('exports a handler from the entry file', async () => {
-    const index = await import('../api/index.js');
+    const index = await import('../../api/index.js');
 
     expect(typeof index.default).toBe('function');
     expect(index.config.maxDuration).toBe(30);
   });
 
   it('serves the root path through the function', async () => {
-    const { default: handler } = await import('../api/index.js');
+    const { default: handler } = await import('../../api/index.js');
     const response = await request(handler).get('/');
     expect(response.status).toBe(200);
     expect(response.body.name).toBe('BizFlow API');
