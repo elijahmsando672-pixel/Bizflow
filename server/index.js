@@ -33,7 +33,7 @@ if (missing.length > 0) {
 const PORT = process.env.PORT || 5000;
 
 export const startServer = async () => {
-  // listen first so health checks pass immediately (render needs this)
+  // listen first so health checks pass immediately
   const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`CORS: ${allowedOrigins.join(', ')}`);

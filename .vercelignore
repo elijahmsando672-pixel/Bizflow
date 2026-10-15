@@ -11,7 +11,3 @@ scripts
 standalone/dist
 *.md
 *.png
-Dockerfile
-docker-compose.yml
-deploy.sh
-stop.sh

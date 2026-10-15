@@ -62,7 +62,7 @@ Three ways to trigger it, in order of preference:
 | Method | When |
 |--------|------|
 | `npm run db:init` | Deployment, CI, anywhere with DB access |
-| Automatic on boot | Local dev, Docker — `DB_AUTO_INIT` unset or not `"false"` |
+| Automatic on boot | Local dev — `DB_AUTO_INIT` unset or not `"false"` |
 | Manual SQL | Applying `server/migrations/*.sql` by hand |
 
 **Set `DB_AUTO_INIT=false` on serverless.** Platforms boot a fresh instance per
@@ -227,9 +227,6 @@ Runs `server/scripts/backup.js`:
 - honours `PGCONNECT_TIMEOUT` for the libpq connect phase
 - **never puts credentials on the command line** — they go through the
   environment, so they do not appear in `ps` output
-
-Under Docker the dump lands in the `backup_data` volume, mapped to
-`/app/backups` (`docker-compose.yml:50-54`).
 
 `server/tests/backup.test.js` covers argv construction, rotation and the
 timeout without invoking `pg_dump`.

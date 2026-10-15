@@ -17,7 +17,7 @@ A greenfield rewrite of the Express API in **NestJS 10** with **Prisma 5**,
 ### Status: not connected to anything
 
 - No `node_modules`, no `dist` — **it has never been installed in this tree**
-- Not in `docker-compose.yml`, `vercel.json`, or CI
+- Not in `vercel.json` or CI
 - No root `package.json` script references it
 - The frontend does not call it
 - It reuses **zero** code from `server/` — every one of its relative imports
@@ -56,7 +56,7 @@ apps/api/src/
 | Rate limiting | 4 limiters, lockout, audit | `ThrottlerModule` registered, **guard never bound** |
 | Data access | raw SQL, 67 tables | Prisma, **8 tables** |
 | Background jobs | in-process queue + 3 intervals | none |
-| Health check | `GET /api/health` | **none** — the Dockerfile probes a URL with no handler |
+| Health check | `GET /api/health` | **none** — no health endpoint exists |
 
 Its Prisma `Session` model is shaped for refresh tokens and is **never read or
 written**.
@@ -76,7 +76,6 @@ written**.
   an unauthenticated send-as-anyone endpoint
 - `dashboard.service.ts` imports `date-fns`, which is not in its `package.json`
   (it only resolves via hoisting from the root)
-- `Dockerfile` assumes pnpm; the repo uses npm and has no `pnpm-workspace.yaml`
 - `jest.config.js` maps `@bizflow/*` to `apps/*/src` instead of `packages/*/src`
 
 ### If you want to continue it
@@ -167,7 +166,7 @@ to `localStorage['bizflow-theme']` and defaulting to the OS preference.
 
 Static — no backend, no API calls. It builds to a `dist/` and could be deployed
 to any static host, but **no deployment config in this repo references it**; it
-is not in `vercel.json`, `.vercelignore` or `docker-compose.yml`. It does have its own committed `package-lock.json`, so it has
+is not in `vercel.json` or `.vercelignore`. It does have its own committed `package-lock.json`, so it has
 been installed at some point.
 
 Several declared dependencies are unused: `recharts`, `react-countup`,

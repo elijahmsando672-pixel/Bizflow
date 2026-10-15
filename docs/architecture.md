@@ -22,7 +22,7 @@
                │  node-postgres (pg)
                ▼
 ┌──────────────────────────────┐
-│  PostgreSQL 15+              │  :5433 from Docker, :5432 bare metal
+│  PostgreSQL 15+              │  :5432 local, :6543 Supabase pooler
 │  ~70 tables                  │
 └──────────────────────────────┘
 ```
@@ -37,10 +37,9 @@
 │  Vercel project (single origin)                         │
 │                                                         │
 │  client/.next  ────────────────────  React pages       │
-│  api/index.js       ─┐                                 │
-│  api/[...path].js   ─┴─► server/app.js (Express)       │
+│  api/index.js       ──► server/app.js (Express)        │
 │                            │                            │
-│  rewrite /auth/:path* ────► /api/_auth/:path*          │
+│  rewrite /api/* & /auth/* ─► /api/index                │
 └────────────────────────────┼────────────────────────────┘
                              │  pg → pooler :6543
                              ▼
@@ -51,16 +50,15 @@ The single-origin layout matters: because `/api/*` never leaves the domain,
 cookie-based auth needs no CORS and `credentials: 'include'` works without
 `SameSite=None` gymnastics. See [Deployment](./deployment.md).
 
-## Three entry points, one Express app
+## Two entry points, one Express app
 
 `server/app.js` builds and exports the Express application. It **never binds a
 port and never runs DDL**. Two thin wrappers sit on top of it:
 
 | Entry | Runs when | What it adds |
 |-------|-----------|--------------|
-| `server/index.js` | `node server/index.js` — Docker, a VM | `app.listen(5000)`, optional schema init, graceful shutdown |
-| `api/index.js` | Vercel request to `/api` | `maxDuration: 30`, config warnings |
-| `api/[...path].js` | Vercel request to `/api/*` | Identical to `api/index.js` |
+| `server/index.js` | `node server/index.js` — local dev, a long-running host | `app.listen(5000)`, optional schema init, graceful shutdown |
+| `api/index.js` | Vercel request to `/api/*` or `/auth/*` | `maxDuration: 30`, config warnings, body-limit guard |
 
 `server/index.js:9-16` decides whether it owns the process by comparing
 `import.meta.url` against `pathToFileURL(process.argv[1])`. Importing it — as
@@ -68,9 +66,8 @@ tests and the Vercel functions do — has no side effects.
 
 ```
 server/index.js  ──imports──►  server/app.js  ──imports──►  routes, middleware, config
-                                                       │
-api/index.js      ──imports──►  server/app.js            │
-api/[...path].js  ──imports──►  server/vercel-handler.js ┘
+
+api/index.js  ──imports──►  server/vercel-handler.js  ──►  server/app.js
 ```
 
 `server/vercel-handler.js` is the serverless adapter. It does three things
@@ -79,9 +76,9 @@ before delegating to Express:
 1. **Rejects oversized bodies with `413`.** Vercel caps request bodies at 4.5 MB,
    below the 10 MB the import endpoint accepts. The limit is
    `PLATFORM_BODY_LIMIT_BYTES` (default `4608000`).
-2. **Restores the path for OAuth.** `vercel.json` rewrites `/auth/:path*` to
-   `/api/_auth/:path*` so the catch-all function receives it; the handler maps
-   `/api/_auth/*` back to `/auth/*` before Express sees it.
+2. **Restores the path for OAuth.** `vercel.json` rewrites `/auth/:path*` to the
+   function; the handler's `restorePath` maps an `/api/_auth/*` alias back to
+   `/auth/*` before Express routes it.
 3. **Calls `app(req, res)`** directly.
 
 ## Request lifecycle
@@ -130,7 +127,7 @@ Unversioned extras:
 | Path | Purpose |
 |------|---------|
 | `/` | Service banner |
-| `/api/health` | `SELECT 1`; `503` when config is incomplete. Used by Docker and container hosts |
+| `/api/health` | `SELECT 1`; `503` when config is incomplete. Used by uptime monitors and Vercel |
 | `/api/version` | Build metadata; the client uses it to detect deployment skew |
 | `/api/metrics` | Pool and request metrics, admin/owner only |
 | `/api/docs` | Swagger UI |

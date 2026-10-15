@@ -9,8 +9,6 @@
 | PostgreSQL | 15+ | `psql --version` |
 | `pg_dump` | matching your PG | `pg_dump --version` â€” only for backups |
 
-Optional: Docker (for `docker compose up`).
-
 ## Clone and install
 
 ```bash
@@ -80,15 +78,6 @@ DB_AUTO_INIT=false
 ```bash
 npm run db:init        # â†’ server/scripts/init-db.js
 ```
-
-### Docker Postgres
-
-```bash
-docker compose up -d postgres
-```
-
-This publishes Postgres on **host port 5433** (`docker-compose.yml:13`), not
-5432. Set `DB_PORT=5433`.
 
 ## Seed demo data
 
@@ -345,8 +334,9 @@ a reload.
 of `DB_HOST` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` is missing. The check is
 `server/app.js:61-78`.
 
-**`ECONNREFUSED` on the database with Docker running**
-Docker publishes Postgres on **5433**. Your `DB_PORT` says 5432.
+**`ECONNREFUSED` on the database**
+`DB_HOST` / `DB_PORT` is wrong or Postgres is not running. The default is
+`localhost:5432`.
 
 **Tables missing after boot**
 Set `DB_AUTO_INIT=false` at some point and it stayed set, or the init failed

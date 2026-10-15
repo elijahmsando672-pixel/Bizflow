@@ -221,9 +221,10 @@ Exempt from CSRF; has its own rate limiters.
 | `GET`/`POST` | `/apple`, `/apple/callback` |
 | `GET` | `/microsoft`, `/microsoft/callback` |
 
-Outside `/api` because Vercel rewrites `/auth/:path*` → `/api/_auth/:path*` and
-`vercel-handler.js` maps it back. Apple posts its callback as a `form_post`,
-hence `POST` rather than `GET`.
+Outside `/api` because `vercel.json` rewrites `/auth/:path*` to the serverless
+function, and `vercel-handler.js` restores the `/api/_auth/*` alias before
+Express routes it. Apple posts its callback as a `form_post`, hence `POST` rather
+than `GET`.
 
 ### Sales — `routes/sales.js` → `services/saleService.js`
 

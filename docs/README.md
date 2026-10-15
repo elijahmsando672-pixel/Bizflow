@@ -16,7 +16,7 @@ is the short orientation document.
 | [Backend](./backend.md) | Express API: middleware chain, route inventory, auth, RBAC, jobs |
 | [Frontend](./frontend.md) | Next.js App Router: layout, API client, page/component conventions |
 | [Database](./database.md) | Schema, auto-migration, Prisma schema, legacy SQL Server migration |
-| [Deployment](./deployment.md) | Docker Compose, Vercel, Supabase, backups |
+| [Deployment](./deployment.md) | Vercel + Supabase, backups |
 | [Auxiliary projects](./auxiliary-projects.md) | `apps/api`, `packages/*`, `standalone/`, `bizflow-landing/`, `scripts/` |
 
 ## The repository at a glance
@@ -31,7 +31,6 @@ Bizflow/
 ├── client/            # Next.js 16 App Router frontend        (port 3000)  ← LIVE
 ├── server/            # Express 4 + PostgreSQL API            (port 5000)  ← LIVE
 ├── api/               # Vercel serverless entry points         (deployed)
-├── docker-compose.yml # postgres + backend + frontend
 ├── .github/workflows/ # CI: client lint, server tests, client build
 │
 ├── apps/api/          # NestJS 10 + Prisma rewrite of the API  ← DORMANT
@@ -118,11 +117,11 @@ jsonwebtoken, Argon2id (bcrypt fallback), Passport (Google/Apple/Microsoft),
 express-rate-limit, helmet, nodemailer, otplib (TOTP), swagger-jsdoc,
 Vitest + supertest.
 
-**Database** — PostgreSQL 15+ (16 in Docker), ~70 tables created by DDL in
+**Database** — PostgreSQL 15+, ~70 tables created by DDL in
 `server/config/db.js`.
 
 **Infrastructure** — Vercel (frontend + API as same-origin functions),
-Supabase (managed Postgres), Docker Compose.
+Supabase (managed Postgres).
 
 ## Local ports
 
@@ -130,14 +129,9 @@ Supabase (managed Postgres), Docker Compose.
 |---------|------|-------|
 | Next.js frontend | 3000 | `npm run dev` |
 | Express API | 5000 | `npm run server` |
-| PostgreSQL (Docker) | **5433** | Host-mapped from container 5432 |
-| PostgreSQL (bare metal) | 5432 | What `.env.example` assumes |
+| PostgreSQL | 5432 | What `.env.example` assumes |
 | Vite (`standalone/`) | 4000 | Prototype only |
 | NestJS (`apps/api`) | 4000 | Dormant; not installed |
-
-> The Docker Postgres publishes **5433**, not 5432. If you run the stack with
-> `docker compose up` and the API cannot reach the database, this port mismatch
-> is the first thing to check.
 
 ## Demo credentials
 

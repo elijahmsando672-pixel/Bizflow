@@ -12,12 +12,10 @@ Next.js 16.2 App Router, React 19.2, TypeScript 5, Tailwind CSS v4. Runs on
 
 ```
 client/
-├── Dockerfile
 ├── next.config.ts
 ├── eslint.config.mjs
 ├── postcss.config.mjs
 ├── components.json          shadcn/ui config
-├── netlify.toml
 └── src/
     ├── app/                 ~100 routes
     ├── components/          layout, ui, dashboard, reports, auth, marketing
@@ -312,8 +310,8 @@ is skipped and `vercel.json` handles the forwarding instead.
 
 Other notable config:
 
-- `output: 'standalone'` off Vercel, on everywhere else — this is what the
-  Docker image's `node server.js` entrypoint needs
+- `output: 'standalone'` off Vercel, on everywhere else — lets a self-hosted
+  `node server.js` entrypoint run without a full `node_modules` tree
 - `outputFileTracingRoot: __dirname` — pinned so a stray parent lockfile cannot
   make Next infer a higher root and nest the output under a prefixed path
 - `turbopack.root: __dirname`

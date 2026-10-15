@@ -14,7 +14,7 @@ Full technical reference lives in [`docs/`](./docs):
 | [Frontend](./docs/frontend.md) | Routing, the API client, component conventions |
 | [Database](./docs/database.md) | 67 tables, auto-migration, backups |
 | [API contract](./docs/api-contract.md) | Endpoint-by-endpoint request/response contract |
-| [Deployment](./docs/deployment.md) | Docker, Vercel, Supabase |
+| [Deployment](./docs/deployment.md) | Vercel + Supabase |
 | [Auxiliary projects](./docs/auxiliary-projects.md) | `apps/api`, `packages/*`, `standalone/`, `bizflow-landing/`, `migration/` |
 
 The repository also contains several dormant projects — a NestJS rewrite, shared
@@ -61,11 +61,6 @@ npm run dev      # Terminal 2: Frontend
 ```
 Visit http://localhost:3000
 
-### Docker (alternative)
-```bash
-docker compose up --build
-```
-
 ### Database Backups
 ```bash
 # Requires the PostgreSQL client (pg_dump) on PATH
@@ -86,11 +81,11 @@ The frontend is a Next.js app and the API is an Express app deployed as a Vercel
 function on the same origin, so `/api/*` never leaves the domain and cookie auth
 needs no CORS.
 
-`api/index.js` and `api/[...path].js` are the function entry points. They import
+`api/index.js` is the function entry point. It imports
 `server/app.js`, which builds the Express app without opening a port, running DDL,
 or calling `process.exit()` — a serverless instance has to stay alive to answer the
-request it was invoked for. `server/index.js` is only a bootstrap for long-running
-hosts (Docker, a VM) and does nothing when it is merely imported.
+request it was invoked for. `server/index.js` is only a bootstrap for local
+development and long-running hosts, and does nothing when it is merely imported.
 
 Supabase connection notes:
 - Point `SUPABASE_POOLER_URL` at the **connection pooler**, not the direct connection.
@@ -233,7 +228,7 @@ Strategies are only activated when the corresponding env vars are set.
 - **Frontend**: Next.js 16.2.9 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS v4, Recharts
 - **Backend**: Express 4, PostgreSQL, JWT + httpOnly refresh tokens, Argon2id, Passport.js (OAuth)
 - **Validation**: Zod (frontend), Joi (backend)
-- **Deployment**: Vercel (frontend), Docker or a long-running host (backend)
+- **Deployment**: Vercel + Supabase (single origin — frontend and API on one domain)
 
 ## Project Structure
 
@@ -255,7 +250,6 @@ Bizflow/
 │   └── utils/           # Password hashing, email, audit, jobs
 ├── api/                 # Vercel serverless entry points
 ├── scripts/             # Endpoint contract linter, tenancy audit
-├── docker-compose.yml
 └── .env.example
 ```
 
